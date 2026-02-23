@@ -1,0 +1,43 @@
+@inherits LayoutComponentBase
+@inject QobuzApiService Api
+@inject SettingsService Settings
+
+<div id="app">
+    @if (!Api.IsLoggedIn)
+    {
+        <div style="width:100%;display:flex;align-items:center;justify-content:center;">
+            @Body
+        </div>
+    }
+    else
+    {
+        <nav class="sidebar">
+            <div class="sidebar-logo">QBDLX</div>
+            <div class="sidebar-user">
+                <strong>@Settings.Settings.UserDisplayName</strong>
+                @Settings.Settings.Email
+            </div>
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Downloader</NavLink>
+            <NavLink class="nav-link" href="/search">Search</NavLink>
+            <NavLink class="nav-link" href="/settings">Settings</NavLink>
+            <div class="nav-spacer"></div>
+            <button class="nav-link" @onclick="Logout">Logout</button>
+        </nav>
+        <div class="main-content">
+            @Body
+        </div>
+    }
+</div>
+
+@code {
+    private void Logout()
+    {
+        Settings.Update(s => {
+            s.UserAuthToken = "";
+        });
+        Api.SetCredentials("", "", "");
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+}

@@ -1,0 +1,144 @@
+@page "/login"
+@inject QobuzApiService Api
+@inject SettingsService Settings
+@inject NavigationManager Nav
+
+<div style="width: 400px;">
+    <div class="card">
+        <div style="text-align:center;margin-bottom:20px;">
+            <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
+            <p style="color:var(--text-secondary);font-size:0.85em;">Qobuz Downloader - Web Edition</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
+                @_error
+            </div>
+        }
+
+        @if (_useToken)
+        {
+            <div class="form-group">
+                <label>Auth Token</label>
+                <input type="password" @bind="_token" placeholder="token" />
+            </div>
+        }
+        else
+        {
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" @bind="_email" placeholder="e-mail" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" @bind="_password" placeholder="password" />
+            </div>
+        }
+
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="DoLogin" disabled="@_loading">
+            @(_loading ? "Logging in..." : "LOGIN")
+        </button>
+
+        <div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-sm btn-secondary" @onclick="() => _useToken = !_useToken">
+                @(_useToken ? "Login with email" : "Login with token")
+            </button>
+        </div>
+
+        <details style="margin-top:16px;">
+            <summary style="color:var(--text-secondary);font-size:0.85em;cursor:pointer;">Custom App ID / Secret</summary>
+            <div style="margin-top:8px;">
+                <div class="form-group">
+                    <label>App ID (leave blank for auto)</label>
+                    <input type="text" @bind="_customAppId" placeholder="App ID" />
+                </div>
+                <div class="form-group">
+                    <label>App Secret (leave blank for auto)</label>
+                    <input type="text" @bind="_customAppSecret" placeholder="App Secret" />
+                </div>
+            </div>
+        </details>
+    </div>
+</div>
+
+@code {
+    private string _email = "";
+    private string _password = "";
+    private string _token = "";
+    private string _customAppId = "";
+    private string _customAppSecret = "";
+    private string _error = "";
+    private bool _loading;
+    private bool _useToken;
+
+    protected override void OnInitialized()
+    {
+        var s = Settings.Settings;
+        _email = s.Email;
+        _customAppId = s.AppId;
+        _customAppSecret = s.AppSecret;
+        _useToken = s.UseTokenLogin;
+
+        // Auto-login if token and secret are persisted
+        if (!string.IsNullOrEmpty(s.UserAuthToken) && !string.IsNullOrEmpty(s.AppId) && !string.IsNullOrEmpty(s.AppSecret))
+        {
+            Api.SetCredentials(s.AppId, s.AppSecret, s.UserAuthToken);
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+    }
+
+    private async Task DoLogin()
+    {
+        _error = "";
+        _loading = true;
+
+        try
+        {
+            string appId = _customAppId;
+            if (string.IsNullOrEmpty(appId))
+                appId = await Api.GetAppIdAsync();
+
+            Models.QobuzLoginResponse result;
+
+            if (_useToken)
+            {
+                if (string.IsNullOrWhiteSpace(_token)) { _error = "No token provided"; return; }
+                result = await Api.LoginWithTokenAsync(appId, _token);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(_email)) { _error = "No email provided"; return; }
+                if (string.IsNullOrWhiteSpace(_password)) { _error = "No password provided"; return; }
+                result = await Api.LoginWithEmailAsync(appId, _email, _password);
+            }
+
+            string appSecret = _customAppSecret;
+            if (string.IsNullOrEmpty(appSecret))
+                appSecret = await Api.GetAppSecretAsync(appId, result.UserAuthToken!);
+
+            Api.SetCredentials(appId, appSecret, result.UserAuthToken!);
+
+            Settings.Update(s => {
+                s.AppId = appId;
+                s.AppSecret = appSecret;
+                s.UserAuthToken = result.UserAuthToken!;
+                s.UserId = result.User?.Id.ToString() ?? "";
+                s.UserDisplayName = result.User?.DisplayName ?? "";
+                s.Email = _email;
+                s.UseTokenLogin = _useToken;
+                s.UserLabel = result.User?.Credential?.Parameters?.ShortLabel ?? "";
+            });
+
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

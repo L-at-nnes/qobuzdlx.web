@@ -1,0 +1,145 @@
+@page "/"
+@page "/downloader"
+@inject DownloadService Download
+@inject SettingsService Settings
+@inject QobuzApiService Api
+@inject NavigationManager Nav
+@implements IDisposable
+
+<h3 style="margin-bottom:16px;">Downloader</h3>
+
+<!-- URL Input -->
+<div class="card">
+    <div class="url-bar">
+        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder="Paste a Qobuz URL..." @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
+        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">Download</button>
+        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">Bulk</button>
+        @if (Download.IsRunning)
+        {
+            <button class="btn btn-danger" @onclick="Download.Abort">ABORT</button>
+            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">SKIP</button>
+        }
+    </div>
+
+    @if (_showBatch)
+    {
+        <div style="margin-top:8px;">
+            <textarea @bind="_batchUrls" rows="5" placeholder="Paste one or more Qobuz URLs (one per line)..." style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">Download All</button>
+        </div>
+    }
+</div>
+
+<!-- Quality Selector -->
+<div class="card">
+    <div class="card-title">Quality</div>
+    <div class="quality-group">
+        <button class="quality-btn @(Settings.Settings.QualityFormat == "5" ? "active" : "")" @onclick='() => SetQuality("5", ".mp3")'>MP3 320</button>
+        <button class="quality-btn @(Settings.Settings.QualityFormat == "6" ? "active" : "")" @onclick='() => SetQuality("6", ".flac")'>FLAC 16bit</button>
+        <button class="quality-btn @(Settings.Settings.QualityFormat == "7" ? "active" : "")" @onclick='() => SetQuality("7", ".flac")'>FLAC 24bit &le;96kHz</button>
+        <button class="quality-btn @(Settings.Settings.QualityFormat == "27" ? "active" : "")" @onclick='() => SetQuality("27", ".flac")'>FLAC 24bit 192kHz</button>
+    </div>
+</div>
+
+<!-- Album Info + Progress -->
+@if (Download.Progress.CurrentAlbum != null)
+{
+    var album = Download.Progress.CurrentAlbum;
+    <div class="card">
+        <div class="album-info">
+            @if (!string.IsNullOrEmpty(album.Image?.Large))
+            {
+                <img src="@album.Image.Large" alt="Cover" />
+            }
+            <div class="album-details">
+                <h3>@album.Title @(album.Version != null ? $"({album.Version})" : "")</h3>
+                <p>@album.Artist?.Name</p>
+                <p>@album.ReleaseDateOriginal &middot; @album.TracksCount tracks</p>
+                <p>@album.Genre?.Name &middot; @album.Label?.Name</p>
+                <p style="font-size:0.8em;color:var(--text-secondary);">@(album.MaximumBitDepth)bit / @(album.MaximumSamplingRate)kHz</p>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Progress Bar -->
+@if (Download.IsRunning || Download.Progress.IsComplete)
+{
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;font-size:0.85em;margin-bottom:4px;">
+            <span>@Download.Progress.Status</span>
+            <span>@Download.Progress.Speed</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width:@(Download.Progress.Percent)%"></div>
+            <span class="progress-bar-text">@(Download.Progress.Percent)%</span>
+        </div>
+        @if (!string.IsNullOrEmpty(Download.Progress.CurrentItem))
+        {
+            <div style="font-size:0.85em;color:var(--text-secondary);margin-top:4px;">@Download.Progress.CurrentItem</div>
+        }
+    </div>
+}
+
+<!-- Log -->
+<div class="card">
+    <div class="card-title">Output</div>
+    <div class="log-output" @ref="_logRef">
+        @foreach (var line in Download.Progress.Log)
+        {
+            <div>@line</div>
+        }
+        @if (Download.Progress.Log.Count == 0)
+        {
+            <div style="color:var(--text-secondary);">Paste a Qobuz URL and click Download to start.</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string _inputUrl = "";
+    private string _batchUrls = "";
+    private bool _showBatch;
+    private ElementReference _logRef;
+
+    protected override void OnInitialized()
+    {
+        if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
+        Download.OnProgressChanged += OnProgress;
+    }
+
+    private void OnProgress()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StartDownload()
+    {
+        if (string.IsNullOrWhiteSpace(_inputUrl)) return;
+        await Download.ProcessUrlAsync(_inputUrl);
+    }
+
+    private async Task StartBatch()
+    {
+        var urls = _batchUrls.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(u => !string.IsNullOrWhiteSpace(u)).ToList();
+        if (urls.Count == 0) return;
+        await Download.ProcessBatchAsync(urls);
+    }
+
+    private void SetQuality(string formatId, string audioFormat)
+    {
+        Settings.Update(s => { s.QualityFormat = formatId; s.AudioFormat = audioFormat; });
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !Download.IsRunning)
+            await StartDownload();
+    }
+
+    public void Dispose()
+    {
+        Download.OnProgressChanged -= OnProgress;
+    }
+}

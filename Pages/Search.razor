@@ -1,0 +1,224 @@
+@page "/search"
+@inject QobuzApiService Api
+@inject DownloadService Download
+@inject SettingsService Settings
+
+<h3 style="margin-bottom:16px;">Search</h3>
+
+<div class="card">
+    <div class="url-bar">
+        <input type="text" @bind="_query" @bind:event="oninput" placeholder="Search albums, tracks or artists..." @onkeydown="OnKeyDown" />
+        <button class="btn btn-primary" @onclick='() => DoSearch("albums")' disabled="@_searching">Albums</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">Tracks</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">Artists</button>
+    </div>
+</div>
+
+@if (_searching)
+{
+    <div class="card" style="text-align:center;color:var(--text-secondary);">Searching...</div>
+}
+
+@if (_albums != null && _albums.Count > 0)
+{
+    <div class="card">
+        <div class="card-title">Albums (@_albums.Count results)</div>
+        <div class="search-results">
+            @foreach (var album in _albums)
+            {
+                <div class="search-result-row">
+                    <img src="@album.Image?.Thumbnail" alt="" />
+                    <div class="search-result-info">
+                        <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
+                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount tracks</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(album.Id)" disabled="@Download.IsRunning">Download</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (_tracks != null && _tracks.Count > 0)
+{
+    <div class="card">
+        <div class="card-title">Tracks (@_tracks.Count results)</div>
+        <div class="search-results">
+            @foreach (var track in _tracks)
+            {
+                <div class="search-result-row">
+                    <img src="@track.Album?.Image?.Thumbnail" alt="" />
+                    <div class="search-result-info">
+                        <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
+                        <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(track.Id)" disabled="@Download.IsRunning">Download</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (_artists != null && _artists.Count > 0)
+{
+    <div class="card">
+        <div class="card-title">Artists (@_artists.Count results)</div>
+        <div class="search-results">
+            @foreach (var artist in _artists)
+            {
+                var artistId = artist.Id;
+                var isExpanded = _expandedArtistId == artistId;
+                <div class="artist-block">
+                    <div class="search-result-row artist-row @(isExpanded ? "expanded" : "")" @onclick="() => ToggleArtist(artistId)">
+                        @if (!string.IsNullOrEmpty(artist.Picture))
+                        {
+                            <img src="@artist.Picture" alt="" class="artist-avatar" />
+                        }
+                        else
+                        {
+                            <div class="artist-avatar-placeholder">@(artist.Name?.Length > 0 ? artist.Name[0].ToString().ToUpper() : "?")</div>
+                        }
+                        <div class="search-result-info">
+                            <div class="title">@artist.Name</div>
+                            <div class="artist">@artist.AlbumsCount albums</div>
+                        </div>
+                        <span class="expand-icon">@(isExpanded ? "▾" : "▸")</span>
+                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">Download All</button>
+                    </div>
+
+                    @if (isExpanded)
+                    {
+                        <div class="artist-albums">
+                            @if (_loadingArtistAlbums)
+                            {
+                                <div class="artist-albums-loading">Loading albums...</div>
+                            }
+                            else if (_artistAlbums != null && _artistAlbums.Count > 0)
+                            {
+                                @foreach (var album in _artistAlbums)
+                                {
+                                    <div class="search-result-row artist-album-row">
+                                        <img src="@album.Image?.Thumbnail" alt="" />
+                                        <div class="search-result-info">
+                                            <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
+                                            <div class="artist">@album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                                        </div>
+                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(album.Id)" disabled="@Download.IsRunning">Download</button>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="artist-albums-loading">No albums found.</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private string _query = "";
+    private bool _searching;
+    private string _lastSearchType = "albums";
+    private List<QobuzAlbum>? _albums;
+    private List<QobuzTrack>? _tracks;
+    private List<QobuzArtist>? _artists;
+
+    // Artist expand state
+    private int _expandedArtistId;
+    private bool _loadingArtistAlbums;
+    private List<QobuzAlbum>? _artistAlbums;
+
+    private async Task DoSearch(string type)
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return;
+        _searching = true;
+        _lastSearchType = type;
+        _albums = null;
+        _tracks = null;
+        _artists = null;
+        _expandedArtistId = 0;
+        _artistAlbums = null;
+
+        try
+        {
+            switch (type)
+            {
+                case "albums":
+                    var albumResult = await Api.SearchAlbumsAsync(_query, 50);
+                    _albums = albumResult?.Albums?.Items ?? new();
+                    break;
+                case "tracks":
+                    var trackResult = await Api.SearchTracksAsync(_query, 50);
+                    _tracks = trackResult?.Tracks?.Items ?? new();
+                    break;
+                case "artists":
+                    var artistResult = await Api.SearchArtistsAsync(_query, 50);
+                    _artists = artistResult?.Artists?.Items ?? new();
+                    break;
+            }
+        }
+        catch
+        {
+            _albums = null;
+            _tracks = null;
+            _artists = null;
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private async Task ToggleArtist(int artistId)
+    {
+        if (_expandedArtistId == artistId)
+        {
+            _expandedArtistId = 0;
+            _artistAlbums = null;
+            return;
+        }
+
+        _expandedArtistId = artistId;
+        _artistAlbums = null;
+        _loadingArtistAlbums = true;
+        StateHasChanged();
+
+        try
+        {
+            var artist = await Api.GetArtistFullAsync(artistId.ToString());
+            _artistAlbums = artist.Albums?.Items ?? new();
+        }
+        catch
+        {
+            _artistAlbums = new();
+        }
+        finally
+        {
+            _loadingArtistAlbums = false;
+        }
+    }
+
+    private async Task DownloadAlbum(string albumId)
+    {
+        await Download.ProcessUrlAsync($"https://play.qobuz.com/album/{albumId}");
+    }
+
+    private async Task DownloadTrack(int trackId)
+    {
+        await Download.ProcessUrlAsync($"https://play.qobuz.com/track/{trackId}");
+    }
+
+    private async Task DownloadArtist(int artistId)
+    {
+        await Download.ProcessUrlAsync($"https://play.qobuz.com/artist/{artistId}");
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoSearch(_lastSearchType);
+    }
+}

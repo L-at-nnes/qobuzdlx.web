@@ -1,0 +1,212 @@
+using QobuzDLX.Web.Models;
+using TagLib;
+using Id3v2Tag = TagLib.Id3v2.Tag;
+using TagLib.Id3v2;
+
+namespace QobuzDLX.Web.Services;
+
+public class TaggingService
+{
+    private readonly SettingsService _settings;
+    private readonly TemplateService _templates;
+    private readonly ILogger<TaggingService> _logger;
+
+    public TaggingService(SettingsService settings, TemplateService templates, ILogger<TaggingService> logger)
+    {
+        _settings = settings;
+        _templates = templates;
+        _logger = logger;
+    }
+
+    public void WriteToFile(string filePath, string? artworkPath, QobuzAlbum album, QobuzTrack track)
+    {
+        Id3v2Tag.DefaultVersion = 4;
+        Id3v2Tag.ForceDefaultVersion = true;
+
+        using var file = TagLib.File.Create(filePath);
+        file.RemoveTags(TagTypes.Id3v1);
+
+        bool isFlac = filePath.EndsWith(".flac", StringComparison.OrdinalIgnoreCase);
+        var s = _settings.Settings;
+
+        if (isFlac)
+        {
+            var xiph = (TagLib.Ogg.XiphComment)file.GetTag(TagTypes.Xiph, true);
+            SetFlacTags(file, xiph, album, track, s);
+        }
+        else
+        {
+            var id3 = (Id3v2Tag)file.GetTag(TagTypes.Id3v2, true);
+            SetMp3Tags(file, id3, album, track, s);
+        }
+
+        SetCommonTags(file, album, track, s);
+        SetAlbumArtists(file, album, s);
+        EmbedArtwork(file, artworkPath, s);
+
+        file.Save();
+        _logger.LogDebug("File tagging completed: {Path}", filePath);
+    }
+
+    private void SetFlacTags(TagLib.File file, TagLib.Ogg.XiphComment tags, QobuzAlbum album, QobuzTrack track, AppSettings s)
+    {
+        if (s.TrackTag) file.Tag.Track = (uint)track.TrackNumber;
+        if (s.IsrcTag) tags.SetField("ISRC", track.ISRC ?? "");
+        if (s.TypeTag) tags.SetField("MEDIATYPE", album.ProductType.ToUpper());
+        if (s.UpcTag) tags.SetField("BARCODE", album.UPC ?? "");
+        if (s.LabelTag) tags.SetField("LABEL", album.Label?.Name ?? "");
+        if (s.ExplicitTag) tags.SetField("ITUNESADVISORY", track.ParentalWarning ? "1" : "0");
+
+        if (s.CommentTag && !string.IsNullOrEmpty(s.CommentText))
+        {
+            var comment = s.CommentText
+                .Replace("%description%", album.Description ?? "")
+                .Replace("<br/>", Environment.NewLine)
+                .Replace("<br />", Environment.NewLine);
+            tags.SetField("COMMENT", new[] { comment });
+        }
+
+        if (s.UrlTag)
+        {
+            var url = (!string.IsNullOrWhiteSpace(track.Url) ? track.Url : album.Url)?.Replace("/fr-fr/", "/");
+            if (!string.IsNullOrWhiteSpace(url))
+                tags.SetField("Qobuz URL", new[] { url });
+        }
+
+        if (s.ReleaseDateTag || s.YearTag)
+        {
+            var date = (!string.IsNullOrWhiteSpace(track.Album?.ReleaseDateOriginal) ? track.Album.ReleaseDateOriginal : album.ReleaseDateOriginal)?.Trim();
+            if (!string.IsNullOrEmpty(date))
+            {
+                if (s.ReleaseDateTag) tags.SetField("DATE", date);
+                if (s.YearTag && date.Length >= 4) tags.SetField("YEAR", date[..4]);
+            }
+        }
+    }
+
+    private void SetMp3Tags(TagLib.File file, Id3v2Tag mp3Tag, QobuzAlbum album, QobuzTrack track, AppSettings s)
+    {
+        if (s.UpcTag) UserTextInformationFrame.Get(mp3Tag, "BARCODE", true).Text = new[] { album.UPC ?? "" };
+        if (s.ExplicitTag) UserTextInformationFrame.Get(mp3Tag, "ITUNESADVISORY", true).Text = new[] { track.ParentalWarning ? "1" : "0" };
+        if (s.IsrcTag) mp3Tag.SetTextFrame("TSRC", track.ISRC ?? "");
+        if (s.LabelTag) mp3Tag.SetTextFrame("TPUB", album.Label?.Name ?? "");
+        if (s.TypeTag)
+        {
+            var pt = album.ProductType;
+            mp3Tag.SetTextFrame("TMED", string.IsNullOrEmpty(pt) ? "" : char.ToUpper(pt[0]) + pt[1..].ToLower());
+        }
+
+        if (s.CommentTag && !string.IsNullOrEmpty(s.CommentText))
+        {
+            mp3Tag.Comment = s.CommentText
+                .Replace("%description%", album.Description ?? "")
+                .Replace("<br/>", Environment.NewLine)
+                .Replace("<br />", Environment.NewLine);
+        }
+
+        if (s.TrackTag)
+        {
+            mp3Tag.SetNumberFrame("TRCK", (uint)track.TrackNumber, file.Tag.TrackCount);
+        }
+
+        if (s.UrlTag)
+        {
+            var url = (!string.IsNullOrWhiteSpace(track.Url) ? track.Url : album.Url)?.Replace("/fr-fr/", "/");
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                var data = new ByteVector {
+                    0, ByteVector.FromString("Qobuz URL", StringType.UTF8),
+                    0, ByteVector.FromString(url, StringType.UTF8)
+                };
+                mp3Tag.AddFrame(new UnknownFrame("WXXX", data));
+            }
+        }
+
+        if (s.ReleaseDateTag || s.YearTag)
+        {
+            var date = album.ReleaseDateOriginal?.Trim();
+            if (!string.IsNullOrEmpty(date))
+            {
+                if (s.YearTag && date.Length >= 4 && uint.TryParse(date[..4], out var y))
+                    mp3Tag.Year = y;
+                if (s.ReleaseDateTag)
+                    mp3Tag.SetTextFrame("TDRL", date);
+            }
+        }
+    }
+
+    private void SetCommonTags(TagLib.File file, QobuzAlbum album, QobuzTrack track, AppSettings s)
+    {
+        if (s.GenreTag) file.Tag.Genres = new[] { album.Genre?.Name ?? "" };
+        if (s.AlbumTag) file.Tag.Album = album.Version == null ? album.Title : $"{album.Title.TrimEnd()} ({album.Version})";
+        if (s.ComposerTag) file.Tag.Composers = new[] { track.Composer?.Name ?? "" };
+        if (s.TotalTracksTag) file.Tag.TrackCount = (uint)album.TracksCount;
+        if (s.DiscTag) file.Tag.Disc = (uint)track.MediaNumber;
+        if (s.TotalDiscsTag) file.Tag.DiscCount = (uint)album.MediaCount;
+        if (s.CopyrightTag) file.Tag.Copyright = album.Copyright ?? "";
+
+        if (s.TrackTitleTag)
+        {
+            var title = _templates.FormatTrackTitle(track);
+
+            if (track.ParentalWarning && s.ExplicitTagInTitle && !string.IsNullOrWhiteSpace(s.ExplicitTitleTagText))
+            {
+                if (s.ExplicitTitleTagPrefixOrSuffix == 0)
+                    title = s.ExplicitTitleTagText + title;
+                else
+                    title += s.ExplicitTitleTagText;
+            }
+            else if (!track.ParentalWarning && s.CleanTagInTitle && !string.IsNullOrWhiteSpace(s.CleanTitleTagText))
+            {
+                if (s.CleanTitleTagPrefixOrSuffix == 0)
+                    title = s.CleanTitleTagText + title;
+                else
+                    title += s.CleanTitleTagText;
+            }
+
+            file.Tag.Title = title;
+        }
+
+        if (s.ArtistTag)
+        {
+            file.Tag.Performers = new[] { track.Performer?.Name ?? "" };
+        }
+    }
+
+    private void SetAlbumArtists(TagLib.File file, QobuzAlbum album, AppSettings s)
+    {
+        if (!s.AlbumArtistTag) return;
+
+        var mainArtists = album.Artists?.Where(a => a.Roles.Contains("main-artist")).ToList();
+        if (mainArtists != null && mainArtists.Count > 1)
+        {
+            var allButLast = string.Join(", ", mainArtists.Take(mainArtists.Count - 1).Select(a => a.Name));
+            file.Tag.AlbumArtists = new[] { $"{allButLast} & {mainArtists.Last().Name}" };
+        }
+        else
+        {
+            file.Tag.AlbumArtists = new[] { album.Artist?.Name ?? "" };
+        }
+    }
+
+    private void EmbedArtwork(TagLib.File file, string? artworkPath, AppSettings s)
+    {
+        if (!s.ImageTag || string.IsNullOrEmpty(artworkPath) || !System.IO.File.Exists(artworkPath)) return;
+
+        try
+        {
+            var pic = new AttachedPictureFrame
+            {
+                TextEncoding = StringType.Latin1,
+                MimeType = System.Net.Mime.MediaTypeNames.Image.Jpeg,
+                Type = PictureType.FrontCover,
+                Data = ByteVector.FromPath(artworkPath)
+            };
+            file.Tag.Pictures = new IPicture[] { pic };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to embed artwork: {Error}", ex.Message);
+        }
+    }
+}

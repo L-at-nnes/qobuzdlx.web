@@ -1,0 +1,10 @@
+services:
+  qobuz:
+    build: .
+    image: qobuz:test
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./downloads:/downloads
+      - ./config:/config
+    restart: unless-stopped
