@@ -259,6 +259,49 @@
     </div>
 </div>
 
+<!-- App Access Password -->
+<div class="card">
+    <div class="card-title">App Access Password</div>
+    <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:12px;">
+        Protect your application with a password. Every new connection will need to enter it before accessing the UI.
+    </p>
+
+    @if (string.IsNullOrEmpty(S.AppAccessPasswordHash))
+    {
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span style="color:var(--text-secondary);font-size:0.85em;">Status:</span>
+            <span style="color:var(--text-secondary);font-size:0.85em;">No password set — app is open to anyone with the URL</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin:0;">
+                <label>New password</label>
+                <input type="password" @bind="_newAccessPassword" placeholder="Choose a password..." />
+            </div>
+            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">Enable</button>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span style="color:var(--text-secondary);font-size:0.85em;">Status:</span>
+            <span style="color:var(--success);font-size:0.85em;">Password active — app is protected</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin:0;">
+                <label>New password</label>
+                <input type="password" @bind="_newAccessPassword" placeholder="Change password..." />
+            </div>
+            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">Change</button>
+            <button class="btn btn-danger" style="height:38px;" @onclick="RemoveAccessPassword">Remove</button>
+        </div>
+    }
+
+    @if (_accessPasswordSaved)
+    {
+        <div style="color:var(--success);font-size:0.85em;margin-top:8px;">@_accessPasswordMessage</div>
+    }
+</div>
+
 @if (_showCopied)
 {
     <div class="toast-notification">Copied: @_copiedToken</div>
@@ -268,8 +311,36 @@
     private Models.AppSettings S => SettingsSvc.Settings;
     private bool _showCopied;
     private string _copiedToken = "";
+    private string _newAccessPassword = "";
+    private bool _accessPasswordSaved;
+    private string _accessPasswordMessage = "";
 
     private void Save() => SettingsSvc.Save();
+
+    private async Task SetAccessPassword()
+    {
+        if (string.IsNullOrWhiteSpace(_newAccessPassword)) return;
+        SettingsSvc.Update(s => s.AppAccessPasswordHash = AppGuardService.HashPassword(_newAccessPassword));
+        _newAccessPassword = "";
+        _accessPasswordMessage = "Password saved successfully.";
+        _accessPasswordSaved = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        _accessPasswordSaved = false;
+        StateHasChanged();
+    }
+
+    private async Task RemoveAccessPassword()
+    {
+        SettingsSvc.Update(s => s.AppAccessPasswordHash = "");
+        _newAccessPassword = "";
+        _accessPasswordMessage = "Password removed — app is now open.";
+        _accessPasswordSaved = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        _accessPasswordSaved = false;
+        StateHasChanged();
+    }
 
     private async Task CopyToken(string token)
     {

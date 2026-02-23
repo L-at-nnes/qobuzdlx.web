@@ -12,6 +12,7 @@ builder.Services.AddSingleton<TemplateService>();
 builder.Services.AddSingleton<TaggingService>();
 builder.Services.AddSingleton<DownloadService>();
 builder.Services.AddSingleton<SearchStateService>();
+builder.Services.AddScoped<AppGuardService>();
 
 var app = builder.Build();
 

@@ -2,6 +2,9 @@ namespace QobuzDLX.Web.Models;
 
 public class AppSettings
 {
+    // App access protection
+    public string AppAccessPasswordHash { get; set; } = "";
+
     // Auth
     public string Email { get; set; } = "";
     public string Password { get; set; } = "";

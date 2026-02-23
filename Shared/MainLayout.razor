@@ -1,35 +1,94 @@
 @inherits LayoutComponentBase
 @inject QobuzApiService Api
 @inject SettingsService Settings
+@inject AppGuardService Guard
 
-<div id="app">
-    @if (!Api.IsLoggedIn)
-    {
-        <div style="width:100%;display:flex;align-items:center;justify-content:center;">
-            @Body
-        </div>
-    }
-    else
-    {
-        <nav class="sidebar">
-            <div class="sidebar-logo">QBDLX</div>
-            <div class="sidebar-user">
-                <strong>@Settings.Settings.UserDisplayName</strong>
-                @Settings.Settings.Email
+@{
+    var needsPassword = !string.IsNullOrEmpty(Settings.Settings.AppAccessPasswordHash);
+    var isLocked = needsPassword && !Guard.IsUnlocked;
+}
+
+@if (isLocked)
+{
+    <div id="app">
+        <div style="width:100%;height:100vh;display:flex;align-items:center;justify-content:center;">
+            <div style="width: 400px;">
+                <div class="card">
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
+                        <p style="color:var(--text-secondary);font-size:0.85em;">Access protected — enter password to continue</p>
+                    </div>
+
+                    @if (_lockError)
+                    {
+                        <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
+                            Incorrect password
+                        </div>
+                    }
+
+                    <form @onsubmit="TryUnlock">
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" @bind="_accessPassword" placeholder="password" autofocus />
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">UNLOCK</button>
+                    </form>
+                </div>
             </div>
-            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Downloader</NavLink>
-            <NavLink class="nav-link" href="/search">Search</NavLink>
-            <NavLink class="nav-link" href="/settings">Settings</NavLink>
-            <div class="nav-spacer"></div>
-            <button class="nav-link" @onclick="Logout">Logout</button>
-        </nav>
-        <div class="main-content">
-            @Body
         </div>
-    }
-</div>
+    </div>
+}
+else
+{
+    <div id="app">
+        @if (!Api.IsLoggedIn)
+        {
+            <div style="width:100%;display:flex;align-items:center;justify-content:center;">
+                @Body
+            </div>
+        }
+        else
+        {
+            <nav class="sidebar">
+                <div class="sidebar-logo">QBDLX</div>
+                <div class="sidebar-user">
+                    <strong>@Settings.Settings.UserDisplayName</strong>
+                    @Settings.Settings.Email
+                </div>
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Downloader</NavLink>
+                <NavLink class="nav-link" href="/search">Search</NavLink>
+                <NavLink class="nav-link" href="/settings">Settings</NavLink>
+                <div class="nav-spacer"></div>
+                <button class="nav-link" @onclick="Logout">Logout</button>
+            </nav>
+            <div class="main-content">
+                @Body
+            </div>
+        }
+    </div>
+}
 
 @code {
+    private string _accessPassword = "";
+    private bool _lockError;
+
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+
+    private void TryUnlock()
+    {
+        var hash = Settings.Settings.AppAccessPasswordHash;
+        if (Guard.TryUnlock(_accessPassword, hash))
+        {
+            _lockError = false;
+            _accessPassword = "";
+        }
+        else
+        {
+            _lockError = true;
+            _accessPassword = "";
+        }
+    }
+
     private void Logout()
     {
         Settings.Update(s => {
@@ -38,6 +97,4 @@
         Api.SetCredentials("", "", "");
         NavigationManager.NavigateTo("/login", forceLoad: true);
     }
-
-    [Inject] NavigationManager NavigationManager { get; set; } = default!;
 }
