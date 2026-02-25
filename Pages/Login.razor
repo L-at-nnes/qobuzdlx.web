@@ -132,9 +132,15 @@
 
             Nav.NavigateTo("/", forceLoad: true);
         }
+        catch (HttpRequestException)
+        {
+            _error = "Unable to reach Qobuz servers. Check your connection.";
+        }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = ex.Message.Contains("401") || ex.Message.Contains("Invalid")
+                ? "Invalid credentials. Please check your email/password."
+                : "Login failed. Please try again.";
         }
         finally
         {

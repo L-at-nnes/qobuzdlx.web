@@ -26,6 +26,7 @@ public class DownloadService
 
     private CancellationTokenSource? _cts;
     private bool _skipCurrent;
+    private string _sessionId = "";
     public DownloadProgress Progress { get; } = new();
 
     public event Action? OnProgressChanged;
@@ -82,6 +83,7 @@ public class DownloadService
         Progress.IsComplete = false;
         Progress.Percent = 0;
         Progress.Log.Clear();
+        _sessionId = Guid.NewGuid().ToString("N")[..8];
         Progress.CurrentAlbum = null;
         _skipCurrent = false;
         _cts = new CancellationTokenSource();
@@ -485,7 +487,7 @@ public class DownloadService
         }
 
         // Tag file
-        var embeddedArtPath = Path.Combine(Path.GetTempPath(), $"{s.EmbeddedArtSize}.jpg");
+        var embeddedArtPath = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
         _tagging.WriteToFile(tempFile, System.IO.File.Exists(embeddedArtPath) ? embeddedArtPath : null, album, track);
 
         // Move to final location
@@ -532,7 +534,7 @@ public class DownloadService
             }
 
             // Embedded artwork to temp
-            var embeddedPath = Path.Combine(Path.GetTempPath(), $"{s.EmbeddedArtSize}.jpg");
+            var embeddedPath = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
             if (!System.IO.File.Exists(embeddedPath))
             {
                 var url = album.Image.Large.Replace("_600", $"_{s.EmbeddedArtSize}");
@@ -567,7 +569,7 @@ public class DownloadService
         try
         {
             var s = _settings.Settings;
-            var path = Path.Combine(Path.GetTempPath(), $"{s.EmbeddedArtSize}.jpg");
+            var path = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
             if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
         }
         catch { }

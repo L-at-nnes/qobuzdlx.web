@@ -19,7 +19,13 @@
                         <p style="color:var(--text-secondary);font-size:0.85em;">Access protected — enter password to continue</p>
                     </div>
 
-                    @if (_lockError)
+                    @if (Guard.IsLockedOut)
+                    {
+                        <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
+                            Too many failed attempts. Try again in @Guard.RemainingSeconds seconds.
+                        </div>
+                    }
+                    else if (_lockError)
                     {
                         <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
                             Incorrect password
@@ -29,9 +35,9 @@
                     <form @onsubmit="TryUnlock">
                         <div class="form-group">
                             <label>Password</label>
-                            <input type="password" @bind="_accessPassword" placeholder="password" autofocus />
+                            <input type="password" @bind="_accessPassword" placeholder="password" autofocus disabled="@Guard.IsLockedOut" />
                         </div>
-                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">UNLOCK</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@Guard.IsLockedOut">UNLOCK</button>
                     </form>
                 </div>
             </div>

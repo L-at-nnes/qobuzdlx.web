@@ -28,20 +28,51 @@ public class TemplateService
         string downloadPath;
         if (playlist == null && album != null)
         {
-            var artistConverted = ApplyTemplate(artistTemplate, album, null, null);
-            var albumConverted = ApplyTemplate(albumTemplate, album, null, null);
-            downloadPath = Path.Combine(downloadLocation, artistConverted, albumConverted);
+            var artistConverted = SanitizePathSegment(ApplyTemplate(artistTemplate, album, null, null));
+            var albumConverted = SanitizePathSegment(ApplyTemplate(albumTemplate, album, null, null));
+
+            // Build path, skipping empty segments (user left template blank on purpose)
+            if (!string.IsNullOrEmpty(artistConverted) && !string.IsNullOrEmpty(albumConverted))
+                downloadPath = Path.Combine(downloadLocation, artistConverted, albumConverted);
+            else if (!string.IsNullOrEmpty(artistConverted))
+                downloadPath = Path.Combine(downloadLocation, artistConverted);
+            else if (!string.IsNullOrEmpty(albumConverted))
+                downloadPath = Path.Combine(downloadLocation, albumConverted);
+            else
+                downloadPath = downloadLocation;
         }
         else if (playlist != null && !string.IsNullOrEmpty(playlistTemplate))
         {
-            var playlistConverted = ApplyTemplate(playlistTemplate, album, track, playlist);
-            downloadPath = Path.Combine(downloadLocation, playlistConverted);
+            var playlistConverted = SanitizePathSegment(ApplyTemplate(playlistTemplate, album, track, playlist));
+            downloadPath = !string.IsNullOrEmpty(playlistConverted)
+                ? Path.Combine(downloadLocation, playlistConverted)
+                : downloadLocation;
         }
         else
         {
             downloadPath = downloadLocation;
         }
+
+        // Ensure final path stays within downloadLocation
+        var fullBase = Path.GetFullPath(downloadLocation);
+        var fullPath = Path.GetFullPath(downloadPath);
+        if (!fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
+            downloadPath = downloadLocation;
+
         return downloadPath;
+    }
+
+    /// <summary>
+    /// Remove path traversal sequences from a single path segment.
+    /// Returns empty string if input was empty (intentionally blank template).
+    /// Returns "_" only if input had content but became empty after sanitization.
+    /// </summary>
+    private static string SanitizePathSegment(string segment)
+    {
+        if (string.IsNullOrWhiteSpace(segment)) return "";
+        segment = segment.Replace("..", "").Replace("\0", "");
+        segment = segment.Trim('.', ' ');
+        return string.IsNullOrWhiteSpace(segment) ? "_" : segment;
     }
 
     public string ApplyTemplate(string template, QobuzAlbum? album, QobuzTrack? track, QobuzPlaylist? playlist)
