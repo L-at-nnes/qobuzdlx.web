@@ -31,7 +31,7 @@
                     <img src="@album.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount tracks</div>
+                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                     </div>
                     <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(album.Id)" disabled="@Download.IsRunning">Download</button>
                 </div>
@@ -51,7 +51,7 @@
                     <img src="@track.Album?.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
-                        <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title</div>
+                        <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title &middot; @(track.MaximumBitDepth)bit/@(track.MaximumSamplingRate)kHz</div>
                     </div>
                     <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(track.Id)" disabled="@Download.IsRunning">Download</button>
                 </div>
