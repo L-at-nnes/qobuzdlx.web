@@ -28,7 +28,9 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 
 ## Screenshots
 
-> *The UI features a dark sidebar with navigation (Downloader, Search, Settings), a URL input bar with quality selector, album info display with cover art, and a real-time progress/log panel.*
+| Downloader | Search | Settings |
+|:---:|:---:|:---:|
+| ![Downloader](screenshots/downloader.png) | ![Search](screenshots/search.png) | ![Settings](screenshots/settings.png) |
 
 ---
 
