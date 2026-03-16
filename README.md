@@ -80,6 +80,14 @@ Open your browser at **http://localhost:8080**
 | `/downloads` | Where downloaded music files are saved |
 | `/config` | Persistent configuration (`settings.json`) |
 
+### File permissions
+
+The container runs as a non-root user `qbdlx` with **UID 1000** and **GID 1000**. You must set the correct ownership on your mounted volumes so the container can read and write to them:
+
+```bash
+chown -R 1000:1000 /path/to/downloads /path/to/config
+```
+
 ---
 
 ## Configuration
