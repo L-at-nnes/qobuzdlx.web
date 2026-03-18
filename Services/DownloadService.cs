@@ -45,6 +45,34 @@ public class DownloadService
         _templates = templates;
         _tagging = tagging;
         _logger = logger;
+
+        MigrateTempFolder();
+    }
+
+    /// <summary>
+    /// Migrate qbdlx-temp from /downloads to /config for existing installations.
+    /// </summary>
+    private void MigrateTempFolder()
+    {
+        try
+        {
+            var oldTempDir = Path.Combine(_settings.Settings.DownloadLocation, "qbdlx-temp");
+            var configPath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
+            var newTempDir = Path.Combine(configPath, "qbdlx-temp");
+
+            if (Directory.Exists(oldTempDir) && oldTempDir != newTempDir)
+            {
+                if (Directory.Exists(newTempDir))
+                    Directory.Delete(newTempDir, true);
+
+                Directory.Move(oldTempDir, newTempDir);
+                _logger.LogInformation("Migrated temp folder from {Old} to {New}", oldTempDir, newTempDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to migrate temp folder, it will be recreated in /config");
+        }
     }
 
     public bool IsRunning => Progress.IsRunning;
@@ -436,7 +464,8 @@ public class DownloadService
         Log($"Downloading - {track.TrackNumber.ToString().PadLeft(2, '0')} {titleFormatted}...");
 
         // Download to temp
-        var tempDir = Path.Combine(s.DownloadLocation, "qbdlx-temp");
+        var configPath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
+        var tempDir = Path.Combine(configPath, "qbdlx-temp");
         Directory.CreateDirectory(tempDir);
         var tempFile = Path.Combine(tempDir, $"qbdlx_downloading-{track.Id}{s.AudioFormat}");
 

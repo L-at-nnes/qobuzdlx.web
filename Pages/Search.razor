@@ -23,17 +23,22 @@
 @if (State.Albums != null && State.Albums.Count > 0)
 {
     <div class="card">
-        <div class="card-title">Albums (@State.Albums.Count results)</div>
+        <div class="card-title">
+            Albums (@State.Albums.Count results)
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? "Deselect All" : "Select All")</button>
+        </div>
         <div class="search-results">
             @foreach (var album in State.Albums)
             {
-                <div class="search-result-row">
+                var albumId = album.Id;
+                <div class="search-result-row @(_selectedAlbums.Contains(albumId) ? "selected" : "")">
+                    <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(albumId)" @onchange="() => ToggleAlbum(albumId)" />
                     <img src="@album.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
                         <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(album.Id)" disabled="@Download.IsRunning">Download</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">Download</button>
                 </div>
             }
         </div>
@@ -43,17 +48,22 @@
 @if (State.Tracks != null && State.Tracks.Count > 0)
 {
     <div class="card">
-        <div class="card-title">Tracks (@State.Tracks.Count results)</div>
+        <div class="card-title">
+            Tracks (@State.Tracks.Count results)
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? "Deselect All" : "Select All")</button>
+        </div>
         <div class="search-results">
             @foreach (var track in State.Tracks)
             {
-                <div class="search-result-row">
+                var trackId = track.Id;
+                <div class="search-result-row @(_selectedTracks.Contains(trackId) ? "selected" : "")">
+                    <input type="checkbox" class="select-checkbox" checked="@_selectedTracks.Contains(trackId)" @onchange="() => ToggleTrack(trackId)" />
                     <img src="@track.Album?.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
                         <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title &middot; @(track.MaximumBitDepth)bit/@(track.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(track.Id)" disabled="@Download.IsRunning">Download</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">Download</button>
                 </div>
             }
         </div>
@@ -98,13 +108,15 @@
                             {
                                 @foreach (var album in State.ArtistAlbums)
                                 {
-                                    <div class="search-result-row artist-album-row">
+                                    var aId = album.Id;
+                                    <div class="search-result-row artist-album-row @(_selectedAlbums.Contains(aId) ? "selected" : "")">
+                                        <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(aId)" @onchange="() => ToggleAlbum(aId)" />
                                         <img src="@album.Image?.Thumbnail" alt="" />
                                         <div class="search-result-info">
                                             <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
                                             <div class="artist">@album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                                         </div>
-                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(album.Id)" disabled="@Download.IsRunning">Download</button>
+                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">Download</button>
                                     </div>
                                 }
                             }
@@ -120,9 +132,21 @@
     </div>
 }
 
+@if (TotalSelected > 0)
+{
+    <div class="selection-bar">
+        <span>@TotalSelected selected</span>
+        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">Download Selected</button>
+        <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">Clear</button>
+    </div>
+}
+
 @code {
     private bool _searching;
     private bool _loadingArtistAlbums;
+    private HashSet<string> _selectedAlbums = new();
+    private HashSet<int> _selectedTracks = new();
+    private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
 
     private async Task DoSearch(string type)
     {
@@ -207,6 +231,52 @@
     private async Task DownloadArtist(int artistId)
     {
         await Download.ProcessUrlAsync($"https://play.qobuz.com/artist/{artistId}");
+    }
+
+    private void ToggleAlbum(string id)
+    {
+        if (!_selectedAlbums.Remove(id)) _selectedAlbums.Add(id);
+    }
+
+    private void ToggleTrack(int id)
+    {
+        if (!_selectedTracks.Remove(id)) _selectedTracks.Add(id);
+    }
+
+    private void ToggleSelectAllAlbums()
+    {
+        if (State.Albums == null) return;
+        if (_selectedAlbums.Count == State.Albums.Count)
+            _selectedAlbums.Clear();
+        else
+            _selectedAlbums = new(State.Albums.Select(a => a.Id));
+    }
+
+    private void ToggleSelectAllTracks()
+    {
+        if (State.Tracks == null) return;
+        if (_selectedTracks.Count == State.Tracks.Count)
+            _selectedTracks.Clear();
+        else
+            _selectedTracks = new(State.Tracks.Select(t => t.Id));
+    }
+
+    private void ClearSelection()
+    {
+        _selectedAlbums.Clear();
+        _selectedTracks.Clear();
+    }
+
+    private async Task DownloadSelected()
+    {
+        var urls = new List<string>();
+        foreach (var id in _selectedAlbums)
+            urls.Add($"https://play.qobuz.com/album/{id}");
+        foreach (var id in _selectedTracks)
+            urls.Add($"https://play.qobuz.com/track/{id}");
+
+        ClearSelection();
+        await Download.ProcessBatchAsync(urls);
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
