@@ -1,10 +1,10 @@
 services:
-  qobuzdlx:
-    image: thimble9057/qobuzdlx.web
-    container_name: qobuzdlx
+  qobuz:
+    build: .
+    image: qobuz:test
     ports:
       - "8080:8080"
     volumes:
-      - /path/to/downloads:/downloads
-      - /path/to/config:/config
+      - ./downloads:/downloads
+      - ./config:/config
     restart: unless-stopped

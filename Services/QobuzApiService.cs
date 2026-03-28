@@ -13,6 +13,13 @@ public class QobuzApiService
     private const string BaseUrl = "https://www.qobuz.com/api.json/0.2/";
     private const string PlayBaseUrl = "https://play.qobuz.com";
 
+    private static readonly (string AppId, string AppSecret)[] FallbackCredentials = new[]
+    {
+        ("798273057", "abb21364945c0583309667d13ca3d93a"),  // tokens after 2025-05-06
+        ("579939560", "fa31fc13e7a28e7d70bb61e91aa9e178"),  // tokens after 2024-08-12
+        ("950096963", "979549437fcc4a3faad4867b5cd25dcb"),  // tokens before 2024-08-12
+    };
+
     private string? _appId;
     private string? _appSecret;
     private string? _userAuthToken;
@@ -21,6 +28,7 @@ public class QobuzApiService
     public string? AppSecret => _appSecret;
     public string? UserAuthToken => _userAuthToken;
     public bool IsLoggedIn => !string.IsNullOrEmpty(_userAuthToken);
+    public static (string AppId, string AppSecret)[] GetFallbackCredentials() => FallbackCredentials;
 
     public QobuzApiService(ILogger<QobuzApiService> logger)
     {
@@ -37,7 +45,8 @@ public class QobuzApiService
 
         // Match original DLL: set X-App-Id as default header (like QopenAPI Service.Login)
         _http.DefaultRequestHeaders.Remove("X-App-Id");
-        _http.DefaultRequestHeaders.Add("X-App-Id", appId);
+        if (!string.IsNullOrEmpty(appId))
+            _http.DefaultRequestHeaders.Add("X-App-Id", appId);
     }
 
     // ─── App ID / Secret Retrieval ───
@@ -252,6 +261,11 @@ public class QobuzApiService
     public async Task<QobuzLoginResponse> LoginWithEmailAsync(string appId, string email, string password)
     {
         _appId = appId;
+
+        // Ensure X-App-Id header is set (may have been cleared by logout)
+        _http.DefaultRequestHeaders.Remove("X-App-Id");
+        _http.DefaultRequestHeaders.Add("X-App-Id", appId);
+
         var url = $"{BaseUrl}user/login?app_id={appId}&email={Uri.EscapeDataString(email)}&password={Uri.EscapeDataString(password)}";
         var response = await _http.GetStringAsync(url);
         var result = JsonConvert.DeserializeObject<QobuzLoginResponse>(response)
@@ -269,6 +283,10 @@ public class QobuzApiService
         _appId = appId;
         _userAuthToken = token;
 
+        // Ensure X-App-Id header is set (may have been cleared by logout)
+        _http.DefaultRequestHeaders.Remove("X-App-Id");
+        _http.DefaultRequestHeaders.Add("X-App-Id", appId);
+
         // Validate token by fetching user info
         var url = $"{BaseUrl}user/get?app_id={appId}";
         var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -277,7 +295,10 @@ public class QobuzApiService
         var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
-            throw new Exception($"Token login failed: {json}");
+        {
+            _logger.LogWarning("Token login failed ({Status}): {Body}", response.StatusCode, json);
+            throw new Exception($"Token login failed ({(int)response.StatusCode}): {json}");
+        }
 
         var user = JsonConvert.DeserializeObject<QobuzUserInfo>(json);
         return new QobuzLoginResponse

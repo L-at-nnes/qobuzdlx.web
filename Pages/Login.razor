@@ -95,42 +95,55 @@
 
         try
         {
-            string appId = _customAppId;
-            if (string.IsNullOrEmpty(appId))
-                appId = await Api.GetAppIdAsync();
-
-            Models.QobuzLoginResponse result;
-
+            // Validate inputs early
             if (_useToken)
             {
                 if (string.IsNullOrWhiteSpace(_token)) { _error = "No token provided"; return; }
-                result = await Api.LoginWithTokenAsync(appId, _token);
             }
             else
             {
                 if (string.IsNullOrWhiteSpace(_email)) { _error = "No email provided"; return; }
                 if (string.IsNullOrWhiteSpace(_password)) { _error = "No password provided"; return; }
-                result = await Api.LoginWithEmailAsync(appId, _email, _password);
             }
 
-            string appSecret = _customAppSecret;
-            if (string.IsNullOrEmpty(appSecret))
-                appSecret = await Api.GetAppSecretAsync(appId, result.UserAuthToken!);
+            bool hasCustomCredentials = !string.IsNullOrEmpty(_customAppId) && !string.IsNullOrEmpty(_customAppSecret);
 
-            Api.SetCredentials(appId, appSecret, result.UserAuthToken!);
+            if (hasCustomCredentials)
+            {
+                // User provided custom credentials — use them directly, no fallback
+                await LoginWithCredentials(_customAppId, _customAppSecret);
+                return;
+            }
 
-            Settings.Update(s => {
-                s.AppId = appId;
-                s.AppSecret = appSecret;
-                s.UserAuthToken = result.UserAuthToken!;
-                s.UserId = result.User?.Id.ToString() ?? "";
-                s.UserDisplayName = result.User?.DisplayName ?? "";
-                s.Email = _email;
-                s.UseTokenLogin = _useToken;
-                s.UserLabel = result.User?.Credential?.Parameters?.ShortLabel ?? "";
-            });
+            // Try dynamic resolution first
+            try
+            {
+                string appId = await Api.GetAppIdAsync();
+                string appSecret = await TryLoginAndResolveSecret(appId);
+                ApplyLogin(appId, appSecret);
+                return;
+            }
+            catch (Exception ex)
+            {
+                // Dynamic resolution failed — try fallbacks
+                System.Diagnostics.Debug.WriteLine($"Dynamic resolution failed: {ex.Message}");
+            }
 
-            Nav.NavigateTo("/", forceLoad: true);
+            // Try each fallback pair
+            foreach (var (fbAppId, fbAppSecret) in QobuzApiService.GetFallbackCredentials())
+            {
+                try
+                {
+                    await LoginWithCredentials(fbAppId, fbAppSecret);
+                    return;
+                }
+                catch
+                {
+                    // This pair didn't work, try next
+                }
+            }
+
+            _error = "Login failed: could not find working app credentials. Try providing custom App ID and Secret.";
         }
         catch (HttpRequestException)
         {
@@ -139,12 +152,54 @@
         catch (Exception ex)
         {
             _error = ex.Message.Contains("401") || ex.Message.Contains("Invalid")
-                ? "Invalid credentials. Please check your email/password."
-                : "Login failed. Please try again.";
+                ? "Invalid credentials. Please check your email/password or token."
+                : $"Login failed: {ex.Message}";
         }
         finally
         {
             _loading = false;
         }
     }
+
+    private async Task<string> TryLoginAndResolveSecret(string appId)
+    {
+        Models.QobuzLoginResponse result = _useToken
+            ? await Api.LoginWithTokenAsync(appId, _token)
+            : await Api.LoginWithEmailAsync(appId, _email, _password);
+
+        string appSecret = await Api.GetAppSecretAsync(appId, result.UserAuthToken!);
+        _loginResult = result;
+        return appSecret;
+    }
+
+    private async Task LoginWithCredentials(string appId, string appSecret)
+    {
+        Models.QobuzLoginResponse result = _useToken
+            ? await Api.LoginWithTokenAsync(appId, _token)
+            : await Api.LoginWithEmailAsync(appId, _email, _password);
+
+        _loginResult = result;
+        ApplyLogin(appId, appSecret);
+    }
+
+    private void ApplyLogin(string appId, string appSecret)
+    {
+        var result = _loginResult!;
+        Api.SetCredentials(appId, appSecret, result.UserAuthToken!);
+
+        Settings.Update(s => {
+            s.AppId = appId;
+            s.AppSecret = appSecret;
+            s.UserAuthToken = result.UserAuthToken!;
+            s.UserId = result.User?.Id.ToString() ?? "";
+            s.UserDisplayName = result.User?.DisplayName ?? "";
+            s.Email = _useToken ? "" : _email;
+            s.UseTokenLogin = _useToken;
+            s.UserLabel = result.User?.Credential?.Parameters?.ShortLabel ?? "";
+        });
+
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+
+    private Models.QobuzLoginResponse? _loginResult;
 }
