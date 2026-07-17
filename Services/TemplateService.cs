@@ -349,26 +349,34 @@ public class TemplateService
     {
         if (string.IsNullOrWhiteSpace(name)) return name;
 
-        // Linux-safe: only / is truly invalid, but also strip control chars and some others for compat
+        // Replace Windows/NAS-forbidden characters with readable ASCII substitutes so file and
+        // folder names stay legible and cross-platform safe (the container runs on Linux, but
+        // downloads are frequently stored on SMB/Windows shares).
         var invalid = Path.GetInvalidFileNameChars();
         var sb = new StringBuilder(name.Length);
-        var replacements = new Dictionary<char, char>
+        var replacements = new Dictionary<char, string>
         {
-            { '*', '\u2217' }, { ':', '\u2236' }, { '?', '\u0294' },
-            { '|', '\u01C0' }, { '"', '\u2033' }, { '<', '\u02C2' },
-            { '>', '\u02C3' }, { '\\', '\u29F9' }
+            { ':', " -" },   // "Song: Intro" -> "Song - Intro"
+            { '/', "-" },    // metadata slash (e.g. "AC/DC") -> "AC-DC"; template slashes are protected as {slash} beforehand
+            { '\\', "-" },
+            { '*', "" }, { '?', "" }, { '|', "" }, { '"', "" }, { '<', "" }, { '>', "" }
         };
 
-        foreach (var c in name.Trim(' ', '.'))
+        foreach (var c in name)
         {
             if (replacements.TryGetValue(c, out var replacement))
                 sb.Append(replacement);
-            else if (c != '/' && invalid.Contains(c))
+            else if (invalid.Contains(c))
                 sb.Append('_');
             else
                 sb.Append(c);
         }
-        return sb.ToString();
+
+        // Collapse whitespace left by removed characters and trim leftover separator artifacts
+        // (e.g. a trailing " -" from a title ending in ':'). The main template path also collapses
+        // spaces, but the standalone goodies call does not \u2014 so normalize here too.
+        var result = SpacesRegex.Replace(sb.ToString(), " ");
+        return result.Trim(' ', '.', '-');
     }
 
     public static string TruncateLongName(string name, int reserveLen, int maxLen = 255)

@@ -452,53 +452,81 @@ public class DownloadService
             return;
         }
 
-        // Get stream URL
-        var stream = await _api.GetStreamUrlAsync(track.Id.ToString(), s.QualityFormat);
-        if (stream == null || string.IsNullOrEmpty(stream.Url))
-        {
-            Log($"Track {track.TrackNumber} is not available for download. Skipping.");
-            return;
-        }
-
-        var titleFormatted = _templates.FormatTrackTitle(track);
-        Log($"Downloading - {track.TrackNumber.ToString().PadLeft(2, '0')} {titleFormatted}...");
-
-        // Download to temp
+        // Prepare temp path (reused across retry attempts)
         var configPath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
         var tempDir = Path.Combine(configPath, "qbdlx-temp");
         Directory.CreateDirectory(tempDir);
         var tempFile = Path.Combine(tempDir, $"qbdlx_downloading-{track.Id}{s.AudioFormat}");
 
-        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        using var response = await httpClient.GetAsync(stream.Url, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
+        var titleFormatted = _templates.FormatTrackTitle(track);
+        Log($"Téléchargement - {track.TrackNumber.ToString().PadLeft(2, '0')} {titleFormatted}...");
 
-        var totalBytes = response.Content.Headers.ContentLength ?? -1;
-        long bytesRead = 0;
-        var buffer = new byte[81920];
-        var sw = Stopwatch.StartNew();
+        // Try requested quality, then fall back to lower qualities if download keeps failing.
+        // For each quality we make a few silent attempts (with a fresh signed URL each time)
+        // before giving up and stepping down — most transient CDN cuts are fixed by a quick retry.
+        // Qobuz CDN sometimes throttles / cuts very-high-res files (24bit/192kHz) for certain accounts.
+        const int attemptsPerQuality = 3;
+        var qualityChain = BuildQualityFallbackChain(s.QualityFormat);
+        Exception? lastError = null;
+        bool downloaded = false;
 
-        await using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, true))
-        await using (var contentStream = await response.Content.ReadAsStreamAsync(ct))
+        foreach (var (qFormat, qLabel) in qualityChain)
         {
-            int read;
-            while ((read = await contentStream.ReadAsync(buffer, ct)) > 0)
+            if (qFormat != s.QualityFormat)
             {
-                ct.ThrowIfCancellationRequested();
-                await fs.WriteAsync(buffer.AsMemory(0, read), ct);
-                bytesRead += read;
+                Log($"Qualité {qLabel} indisponible — essai en qualité inférieure...");
+            }
 
-                if (totalBytes > 0 && sw.ElapsedMilliseconds > 250)
+            Exception? qualityError = null;
+            bool qualityUnavailable = false;
+
+            for (int attempt = 1; attempt <= attemptsPerQuality; attempt++)
+            {
+                try
                 {
-                    var pct = (int)(bytesRead * 100 / totalBytes);
-                    var speed = bytesRead / (sw.Elapsed.TotalSeconds + 0.001);
-                    Progress.Speed = speed >= 1024 * 1024
-                        ? $"{speed / (1024 * 1024):F2} MB/s"
-                        : $"{speed / 1024:F2} KB/s";
-                    Progress.Status = $"Downloading - {pct}% [{Progress.Speed}]";
-                    OnProgressChanged?.Invoke();
+                    var stream = await _api.GetStreamUrlAsync(track.Id.ToString(), qFormat);
+                    if (stream == null || string.IsNullOrEmpty(stream.Url))
+                    {
+                        qualityUnavailable = true;
+                        break;
+                    }
+
+                    await DownloadStreamToFileAsync(stream.Url, tempFile, ct);
+                    downloaded = true;
+                    lastError = null;
+                    qualityError = null;
+                    break;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    qualityError = ex;
+                    try { if (System.IO.File.Exists(tempFile)) System.IO.File.Delete(tempFile); } catch { }
+
+                    if (attempt < attemptsPerQuality)
+                    {
+                        // Silent retry — short backoff, no log noise
+                        await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
+                    }
                 }
             }
+
+            if (downloaded) break;
+
+            if (qualityUnavailable)
+            {
+                Log($"Track {track.TrackNumber} non disponible en qualité {qLabel}.");
+            }
+            else if (qualityError != null)
+            {
+                lastError = qualityError;
+                Log($"Qualité {qLabel} échec après {attemptsPerQuality} tentatives : {qualityError.Message}");
+            }
+        }
+
+        if (!downloaded)
+        {
+            throw lastError ?? new IOException("Téléchargement impossible (toutes qualités échouées)");
         }
 
         // Fix MD5 for FLAC
@@ -538,6 +566,90 @@ public class DownloadService
 
         System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
         Log(" DONE");
+    }
+
+    // ─── HTTP stream download helpers ───
+
+    /// <summary>
+    /// Returns the chain of (format_id, label) to try for downloading a track.
+    /// Starts with the user's chosen quality, then falls back to lower qualities
+    /// if Qobuz refuses or throttles the high-res stream.
+    /// </summary>
+    private static IEnumerable<(string format, string label)> BuildQualityFallbackChain(string requested)
+    {
+        // Quality order from highest to lowest:
+        //  27 = FLAC 24bit 192kHz, 7 = FLAC 24bit 96kHz, 6 = FLAC 16bit 44.1kHz, 5 = MP3 320
+        var allQualities = new (string format, string label)[]
+        {
+            ("27", "FLAC 24bit/192kHz"),
+            ("7",  "FLAC 24bit/96kHz"),
+            ("6",  "FLAC 16bit/44.1kHz"),
+            ("5",  "MP3 320"),
+        };
+
+        // Find requested quality, then yield it followed by lower ones
+        bool foundRequested = false;
+        foreach (var q in allQualities)
+        {
+            if (q.format == requested) foundRequested = true;
+            if (foundRequested) yield return q;
+        }
+        // If the requested quality wasn't in our list (e.g. unknown id), just try it raw
+        if (!foundRequested)
+        {
+            yield return (requested, $"format {requested}");
+            foreach (var q in allQualities) yield return q;
+        }
+    }
+
+    /// <summary>
+    /// Downloads a signed Qobuz stream URL to a local temp file in one shot.
+    /// Throws on any failure (caller handles fallback to a lower quality).
+    /// </summary>
+    private async Task DownloadStreamToFileAsync(string url, string tempFile, CancellationToken ct)
+    {
+        // Start clean — never resume; signed URLs are essentially single-use here.
+        if (System.IO.File.Exists(tempFile))
+        {
+            try { System.IO.File.Delete(tempFile); } catch { }
+        }
+
+        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        long totalBytes = response.Content.Headers.ContentLength ?? -1;
+        long bytesRead = 0;
+        var buffer = new byte[81920];
+        var sw = Stopwatch.StartNew();
+
+        await using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.Read, 81920, true))
+        await using (var contentStream = await response.Content.ReadAsStreamAsync(ct))
+        {
+            int read;
+            while ((read = await contentStream.ReadAsync(buffer, ct)) > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                await fs.WriteAsync(buffer.AsMemory(0, read), ct);
+                bytesRead += read;
+
+                if (totalBytes > 0 && sw.ElapsedMilliseconds > 250)
+                {
+                    var pct = (int)(bytesRead * 100 / totalBytes);
+                    var speed = bytesRead / (sw.Elapsed.TotalSeconds + 0.001);
+                    Progress.Speed = speed >= 1024 * 1024
+                        ? $"{speed / (1024 * 1024):F2} MB/s"
+                        : $"{speed / 1024:F2} KB/s";
+                    Progress.Status = $"Téléchargement - {pct}% [{Progress.Speed}]";
+                    OnProgressChanged?.Invoke();
+                }
+            }
+        }
+
+        if (totalBytes > 0 && bytesRead < totalBytes)
+        {
+            throw new IOException($"Téléchargement incomplet : {bytesRead}/{totalBytes} octets");
+        }
     }
 
     // ─── Artwork ───

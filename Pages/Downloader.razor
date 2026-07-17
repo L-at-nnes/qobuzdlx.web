@@ -6,33 +6,33 @@
 @inject NavigationManager Nav
 @implements IDisposable
 
-<h3 style="margin-bottom:16px;">Downloader</h3>
+<h3 style="margin-bottom:16px;">Téléchargeur</h3>
 
 <!-- URL Input -->
 <div class="card">
     <div class="url-bar">
-        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder="Paste a Qobuz URL..." @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
-        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">Download</button>
-        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">Bulk</button>
+        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder="Coller une URL Qobuz..." @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
+        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">Télécharger</button>
+        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">En lot</button>
         @if (Download.IsRunning)
         {
-            <button class="btn btn-danger" @onclick="Download.Abort">ABORT</button>
-            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">SKIP</button>
+            <button class="btn btn-danger" @onclick="Download.Abort">ANNULER</button>
+            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">PASSER</button>
         }
     </div>
 
     @if (_showBatch)
     {
         <div style="margin-top:8px;">
-            <textarea @bind="_batchUrls" rows="5" placeholder="Paste one or more Qobuz URLs (one per line)..." style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
-            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">Download All</button>
+            <textarea @bind="_batchUrls" rows="5" placeholder="Coller une ou plusieurs URL Qobuz (une par ligne)..." style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">Tout télécharger</button>
         </div>
     }
 </div>
 
 <!-- Quality Selector -->
 <div class="card">
-    <div class="card-title">Quality</div>
+    <div class="card-title">Qualité</div>
     <div class="quality-group">
         <button class="quality-btn @(Settings.Settings.QualityFormat == "5" ? "active" : "")" @onclick='() => SetQuality("5", ".mp3")'>MP3 320</button>
         <button class="quality-btn @(Settings.Settings.QualityFormat == "6" ? "active" : "")" @onclick='() => SetQuality("6", ".flac")'>FLAC 16bit</button>
@@ -54,7 +54,7 @@
             <div class="album-details">
                 <h3>@album.Title @(album.Version != null ? $"({album.Version})" : "")</h3>
                 <p>@album.Artist?.Name</p>
-                <p>@album.ReleaseDateOriginal &middot; @album.TracksCount tracks</p>
+                <p>@album.ReleaseDateOriginal &middot; @album.TracksCount pistes</p>
                 <p>@album.Genre?.Name &middot; @album.Label?.Name</p>
                 <p style="font-size:0.8em;color:var(--text-secondary);">@(album.MaximumBitDepth)bit / @(album.MaximumSamplingRate)kHz</p>
             </div>
@@ -83,7 +83,7 @@
 
 <!-- Log -->
 <div class="card">
-    <div class="card-title">Output</div>
+    <div class="card-title">Journal</div>
     <div class="log-output" @ref="_logRef">
         @foreach (var line in Download.Progress.Log)
         {
@@ -91,7 +91,7 @@
         }
         @if (Download.Progress.Log.Count == 0)
         {
-            <div style="color:var(--text-secondary);">Paste a Qobuz URL and click Download to start.</div>
+            <div style="color:var(--text-secondary);">Collez une URL Qobuz et cliquez sur Télécharger pour commencer.</div>
         }
     </div>
 </div>

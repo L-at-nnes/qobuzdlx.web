@@ -4,28 +4,28 @@
 @inject SettingsService Settings
 @inject SearchStateService State
 
-<h3 style="margin-bottom:16px;">Search</h3>
+<h3 style="margin-bottom:16px;">Recherche</h3>
 
 <div class="card">
     <div class="url-bar">
-        <input type="text" @bind="State.Query" @bind:event="oninput" placeholder="Search albums, tracks or artists..." @onkeydown="OnKeyDown" />
+        <input type="text" @bind="State.Query" @bind:event="oninput" placeholder="Rechercher albums, pistes ou artistes..." @onkeydown="OnKeyDown" />
         <button class="btn btn-primary" @onclick='() => DoSearch("albums")' disabled="@_searching">Albums</button>
-        <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">Tracks</button>
-        <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">Artists</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">Pistes</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">Artistes</button>
     </div>
 </div>
 
 @if (_searching)
 {
-    <div class="card" style="text-align:center;color:var(--text-secondary);">Searching...</div>
+    <div class="card" style="text-align:center;color:var(--text-secondary);">Recherche en cours...</div>
 }
 
 @if (State.Albums != null && State.Albums.Count > 0)
 {
     <div class="card">
         <div class="card-title">
-            Albums (@State.Albums.Count results)
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? "Deselect All" : "Select All")</button>
+            Albums (@State.Albums.Count résultats)
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? "Tout désélectionner" : "Tout sélectionner")</button>
         </div>
         <div class="search-results">
             @foreach (var album in State.Albums)
@@ -36,9 +36,9 @@
                     <img src="@album.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount pistes &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">Download</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">Télécharger</button>
                 </div>
             }
         </div>
@@ -49,8 +49,8 @@
 {
     <div class="card">
         <div class="card-title">
-            Tracks (@State.Tracks.Count results)
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? "Deselect All" : "Select All")</button>
+            Pistes (@State.Tracks.Count résultats)
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? "Tout désélectionner" : "Tout sélectionner")</button>
         </div>
         <div class="search-results">
             @foreach (var track in State.Tracks)
@@ -63,7 +63,7 @@
                         <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
                         <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title &middot; @(track.MaximumBitDepth)bit/@(track.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">Download</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">Télécharger</button>
                 </div>
             }
         </div>
@@ -73,7 +73,7 @@
 @if (State.Artists != null && State.Artists.Count > 0)
 {
     <div class="card">
-        <div class="card-title">Artists (@State.Artists.Count results)</div>
+        <div class="card-title">Artistes (@State.Artists.Count résultats)</div>
         <div class="search-results">
             @foreach (var artist in State.Artists)
             {
@@ -94,7 +94,7 @@
                             <div class="artist">@artist.AlbumsCount albums</div>
                         </div>
                         <span class="expand-icon">@(isExpanded ? "▾" : "▸")</span>
-                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">Download All</button>
+                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">Tout télécharger</button>
                     </div>
 
                     @if (isExpanded)
@@ -102,7 +102,7 @@
                         <div class="artist-albums">
                             @if (_loadingArtistAlbums)
                             {
-                                <div class="artist-albums-loading">Loading albums...</div>
+                                <div class="artist-albums-loading">Chargement des albums...</div>
                             }
                             else if (State.ArtistAlbums != null && State.ArtistAlbums.Count > 0)
                             {
@@ -114,15 +114,15 @@
                                         <img src="@album.Image?.Thumbnail" alt="" />
                                         <div class="search-result-info">
                                             <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                                            <div class="artist">@album.ReleaseDateOriginal &middot; @album.TracksCount tracks &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                                            <div class="artist">@album.ReleaseDateOriginal &middot; @album.TracksCount pistes &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                                         </div>
-                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">Download</button>
+                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">Télécharger</button>
                                     </div>
                                 }
                             }
                             else
                             {
-                                <div class="artist-albums-loading">No albums found.</div>
+                                <div class="artist-albums-loading">Aucun album trouvé.</div>
                             }
                         </div>
                     }
@@ -135,9 +135,9 @@
 @if (TotalSelected > 0)
 {
     <div class="selection-bar">
-        <span>@TotalSelected selected</span>
-        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">Download Selected</button>
-        <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">Clear</button>
+        <span>@TotalSelected sélectionné(s)</span>
+        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">Télécharger la sélection</button>
+        <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">Effacer</button>
     </div>
 }
 

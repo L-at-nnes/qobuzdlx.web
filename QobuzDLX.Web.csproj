@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>QobuzDLX.Web</RootNamespace>
+    <Version>1.2.52</Version>
   </PropertyGroup>
 
   <ItemGroup>

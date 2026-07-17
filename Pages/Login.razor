@@ -7,7 +7,7 @@
     <div class="card">
         <div style="text-align:center;margin-bottom:20px;">
             <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
-            <p style="color:var(--text-secondary);font-size:0.85em;">Qobuz Downloader - Web Edition</p>
+            <p style="color:var(--text-secondary);font-size:0.85em;">Qobuz Downloader - Édition Web</p>
         </div>
 
         @if (!string.IsNullOrEmpty(_error))
@@ -20,8 +20,8 @@
         @if (_useToken)
         {
             <div class="form-group">
-                <label>Auth Token</label>
-                <input type="password" @bind="_token" placeholder="token" />
+                <label>Jeton d'authentification</label>
+                <input type="password" @bind="_token" placeholder="jeton" />
             </div>
         }
         else
@@ -31,30 +31,30 @@
                 <input type="email" @bind="_email" placeholder="e-mail" />
             </div>
             <div class="form-group">
-                <label>Password</label>
-                <input type="password" @bind="_password" placeholder="password" />
+                <label>Mot de passe</label>
+                <input type="password" @bind="_password" placeholder="mot de passe" />
             </div>
         }
 
         <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="DoLogin" disabled="@_loading">
-            @(_loading ? "Logging in..." : "LOGIN")
+            @(_loading ? "Connexion..." : "CONNEXION")
         </button>
 
         <div style="text-align:center;margin-top:12px;">
             <button class="btn btn-sm btn-secondary" @onclick="() => _useToken = !_useToken">
-                @(_useToken ? "Login with email" : "Login with token")
+                @(_useToken ? "Connexion par e-mail" : "Connexion par jeton")
             </button>
         </div>
 
         <details style="margin-top:16px;">
-            <summary style="color:var(--text-secondary);font-size:0.85em;cursor:pointer;">Custom App ID / Secret</summary>
+            <summary style="color:var(--text-secondary);font-size:0.85em;cursor:pointer;">App ID / Secret personnalisés</summary>
             <div style="margin-top:8px;">
                 <div class="form-group">
-                    <label>App ID (leave blank for auto)</label>
+                    <label>App ID (laisser vide pour auto)</label>
                     <input type="text" @bind="_customAppId" placeholder="App ID" />
                 </div>
                 <div class="form-group">
-                    <label>App Secret (leave blank for auto)</label>
+                    <label>App Secret (laisser vide pour auto)</label>
                     <input type="text" @bind="_customAppSecret" placeholder="App Secret" />
                 </div>
             </div>
@@ -98,12 +98,12 @@
             // Validate inputs early
             if (_useToken)
             {
-                if (string.IsNullOrWhiteSpace(_token)) { _error = "No token provided"; return; }
+                if (string.IsNullOrWhiteSpace(_token)) { _error = "Aucun jeton fourni"; return; }
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(_email)) { _error = "No email provided"; return; }
-                if (string.IsNullOrWhiteSpace(_password)) { _error = "No password provided"; return; }
+                if (string.IsNullOrWhiteSpace(_email)) { _error = "Aucun e-mail fourni"; return; }
+                if (string.IsNullOrWhiteSpace(_password)) { _error = "Aucun mot de passe fourni"; return; }
             }
 
             bool hasCustomCredentials = !string.IsNullOrEmpty(_customAppId) && !string.IsNullOrEmpty(_customAppSecret);
@@ -143,17 +143,17 @@
                 }
             }
 
-            _error = "Login failed: could not find working app credentials. Try providing custom App ID and Secret.";
+            _error = "Échec de connexion : aucun identifiant d'application valide trouvé. Essayez de fournir un App ID et Secret personnalisés.";
         }
         catch (HttpRequestException)
         {
-            _error = "Unable to reach Qobuz servers. Check your connection.";
+            _error = "Impossible de joindre les serveurs Qobuz. Vérifiez votre connexion.";
         }
         catch (Exception ex)
         {
             _error = ex.Message.Contains("401") || ex.Message.Contains("Invalid")
-                ? "Invalid credentials. Please check your email/password or token."
-                : $"Login failed: {ex.Message}";
+                ? "Identifiants invalides. Vérifiez votre e-mail/mot de passe ou jeton."
+                : $"Échec de connexion : {ex.Message}";
         }
         finally
         {

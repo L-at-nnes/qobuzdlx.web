@@ -16,28 +16,28 @@
                 <div class="card">
                     <div style="text-align:center;margin-bottom:20px;">
                         <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
-                        <p style="color:var(--text-secondary);font-size:0.85em;">Access protected — enter password to continue</p>
+                        <p style="color:var(--text-secondary);font-size:0.85em;">Accès protégé — entrez le mot de passe pour continuer</p>
                     </div>
 
                     @if (Guard.IsLockedOut)
                     {
                         <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
-                            Too many failed attempts. Try again in @Guard.RemainingSeconds seconds.
+                            Trop de tentatives. Réessayez dans @Guard.RemainingSeconds secondes.
                         </div>
                     }
                     else if (_lockError)
                     {
                         <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
-                            Incorrect password
+                            Mot de passe incorrect
                         </div>
                     }
 
                     <form @onsubmit="TryUnlock">
                         <div class="form-group">
-                            <label>Password</label>
-                            <input type="password" @bind="_accessPassword" placeholder="password" autofocus disabled="@Guard.IsLockedOut" />
+                            <label>Mot de passe</label>
+                            <input type="password" @bind="_accessPassword" placeholder="mot de passe" autofocus disabled="@Guard.IsLockedOut" />
                         </div>
-                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@Guard.IsLockedOut">UNLOCK</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@Guard.IsLockedOut">DÉVERROUILLER</button>
                     </form>
                 </div>
             </div>
@@ -64,11 +64,12 @@ else
                         <span class="user-label">@Settings.Settings.UserLabel</span>
                     }
                 </div>
-                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Downloader</NavLink>
-                <NavLink class="nav-link" href="/search">Search</NavLink>
-                <NavLink class="nav-link" href="/settings">Settings</NavLink>
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Téléchargeur</NavLink>
+                <NavLink class="nav-link" href="/search">Recherche</NavLink>
+                <NavLink class="nav-link" href="/settings">Paramètres</NavLink>
                 <div class="nav-spacer"></div>
-                <button class="nav-link" @onclick="Logout">Logout</button>
+                <button class="nav-link" @onclick="Logout">Déconnexion</button>
+                <div class="sidebar-version">v@(AppVersion)</div>
             </nav>
             <div class="main-content">
                 @Body
@@ -80,6 +81,11 @@ else
 @code {
     private string _accessPassword = "";
     private bool _lockError;
+
+    private static readonly string AppVersion =
+        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v
+            ? $"{v.Major}.{v.Minor}.{v.Build}"
+            : "1.2.52";
 
     [Inject] NavigationManager NavigationManager { get; set; } = default!;
 
