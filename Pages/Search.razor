@@ -1,34 +1,50 @@
+@page "/"
 @page "/search"
 @inject QobuzApiService Api
 @inject DownloadService Download
 @inject SettingsService Settings
 @inject SearchStateService State
+@inject NavigationManager Nav
+@inherits LocalizedComponentBase
 
-<h3 style="margin-bottom:16px;">Recherche</h3>
+<h3 style="margin-bottom:16px;">@Loc["search.title"]</h3>
 
 <div class="card">
     <div class="url-bar">
-        <input type="text" @bind="State.Query" @bind:event="oninput" placeholder="Rechercher albums, pistes ou artistes..." @onkeydown="OnKeyDown" />
-        <button class="btn btn-primary" @onclick='() => DoSearch("albums")' disabled="@_searching">Albums</button>
-        <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">Pistes</button>
-        <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">Artistes</button>
+        <input type="text" @bind="State.Query" @bind:event="oninput" placeholder='@Loc["search.placeholder"]' @onkeydown="OnKeyDown" />
+        <button class="btn btn-primary" @onclick='() => DoSearch("albums")' disabled="@_searching">@Loc["search.albums"]</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">@Loc["search.tracks"]</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">@Loc["search.artists"]</button>
     </div>
 </div>
 
 @if (_searching)
 {
-    <div class="card" style="text-align:center;color:var(--text-secondary);">Recherche en cours...</div>
+    <div class="card" style="text-align:center;color:var(--text-secondary);">@Loc["search.searching"]</div>
 }
 
 @if (State.Albums != null && State.Albums.Count > 0)
 {
     <div class="card">
         <div class="card-title">
-            Albums (@State.Albums.Count résultats)
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? "Tout désélectionner" : "Tout sélectionner")</button>
+            @Loc["search.albums"] (@Loc.P("search.results", State.Albums.Count))
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
+            <select class="sort-select" @bind="State.AlbumSort">
+                <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
+                <option value="@SearchSort.TitleAsc">@Loc["sort.titleAsc"]</option>
+                <option value="@SearchSort.TitleDesc">@Loc["sort.titleDesc"]</option>
+                <option value="@SearchSort.ArtistAsc">@Loc["sort.artistAsc"]</option>
+                <option value="@SearchSort.ArtistDesc">@Loc["sort.artistDesc"]</option>
+                <option value="@SearchSort.DateDesc">@Loc["sort.dateDesc"]</option>
+                <option value="@SearchSort.DateAsc">@Loc["sort.dateAsc"]</option>
+                <option value="@SearchSort.QualityDesc">@Loc["sort.qualityDesc"]</option>
+                <option value="@SearchSort.CountDesc">@Loc["sort.tracksDesc"]</option>
+                <option value="@SearchSort.CountAsc">@Loc["sort.tracksAsc"]</option>
+                <option value="@SearchSort.LabelAsc">@Loc["sort.labelAsc"]</option>
+            </select>
         </div>
         <div class="search-results">
-            @foreach (var album in State.Albums)
+            @foreach (var album in SearchSorter.SortAlbums(State.Albums, State.AlbumSort))
             {
                 var albumId = album.Id;
                 <div class="search-result-row @(_selectedAlbums.Contains(albumId) ? "selected" : "")">
@@ -36,9 +52,9 @@
                     <img src="@album.Image?.Thumbnail" alt="" />
                     <div class="search-result-info">
                         <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @album.TracksCount pistes &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">Télécharger</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
                 </div>
             }
         </div>
@@ -49,11 +65,22 @@
 {
     <div class="card">
         <div class="card-title">
-            Pistes (@State.Tracks.Count résultats)
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? "Tout désélectionner" : "Tout sélectionner")</button>
+            @Loc["search.tracks"] (@Loc.P("search.results", State.Tracks.Count))
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
+            <select class="sort-select" @bind="State.TrackSort">
+                <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
+                <option value="@SearchSort.TitleAsc">@Loc["sort.titleAsc"]</option>
+                <option value="@SearchSort.TitleDesc">@Loc["sort.titleDesc"]</option>
+                <option value="@SearchSort.ArtistAsc">@Loc["sort.artistAsc"]</option>
+                <option value="@SearchSort.AlbumAsc">@Loc["sort.albumAsc"]</option>
+                <option value="@SearchSort.DurationAsc">@Loc["sort.durationAsc"]</option>
+                <option value="@SearchSort.DurationDesc">@Loc["sort.durationDesc"]</option>
+                <option value="@SearchSort.QualityDesc">@Loc["sort.qualityDesc"]</option>
+                <option value="@SearchSort.DateDesc">@Loc["sort.dateDesc"]</option>
+            </select>
         </div>
         <div class="search-results">
-            @foreach (var track in State.Tracks)
+            @foreach (var track in SearchSorter.SortTracks(State.Tracks, State.TrackSort))
             {
                 var trackId = track.Id;
                 <div class="search-result-row @(_selectedTracks.Contains(trackId) ? "selected" : "")">
@@ -63,7 +90,7 @@
                         <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
                         <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title &middot; @(track.MaximumBitDepth)bit/@(track.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">Télécharger</button>
+                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
                 </div>
             }
         </div>
@@ -73,9 +100,18 @@
 @if (State.Artists != null && State.Artists.Count > 0)
 {
     <div class="card">
-        <div class="card-title">Artistes (@State.Artists.Count résultats)</div>
+        <div class="card-title">
+            @Loc["search.artists"] (@Loc.P("search.results", State.Artists.Count))
+            <select class="sort-select" @bind="State.ArtistSort">
+                <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
+                <option value="@SearchSort.TitleAsc">@Loc["sort.nameAsc"]</option>
+                <option value="@SearchSort.TitleDesc">@Loc["sort.nameDesc"]</option>
+                <option value="@SearchSort.CountDesc">@Loc["sort.albumsDesc"]</option>
+                <option value="@SearchSort.CountAsc">@Loc["sort.albumsAsc"]</option>
+            </select>
+        </div>
         <div class="search-results">
-            @foreach (var artist in State.Artists)
+            @foreach (var artist in SearchSorter.SortArtists(State.Artists, State.ArtistSort))
             {
                 var artistId = artist.Id;
                 var isExpanded = State.ExpandedArtistId == artistId;
@@ -91,10 +127,10 @@
                         }
                         <div class="search-result-info">
                             <div class="title">@artist.Name</div>
-                            <div class="artist">@artist.AlbumsCount albums</div>
+                            <div class="artist">@Loc.P("search.albumCount", artist.AlbumsCount)</div>
                         </div>
                         <span class="expand-icon">@(isExpanded ? "▾" : "▸")</span>
-                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">Tout télécharger</button>
+                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">@Loc["search.downloadAll"]</button>
                     </div>
 
                     @if (isExpanded)
@@ -102,11 +138,24 @@
                         <div class="artist-albums">
                             @if (_loadingArtistAlbums)
                             {
-                                <div class="artist-albums-loading">Chargement des albums...</div>
+                                <div class="artist-albums-loading">@Loc["search.loadingAlbums"]</div>
                             }
                             else if (State.ArtistAlbums != null && State.ArtistAlbums.Count > 0)
                             {
-                                @foreach (var album in State.ArtistAlbums)
+                                <div class="artist-albums-toolbar">
+                                    <select class="sort-select" @bind="State.ArtistAlbumSort">
+                                        <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
+                                        <option value="@SearchSort.DateAsc">@Loc["sort.dateAsc"]</option>
+                                        <option value="@SearchSort.DateDesc">@Loc["sort.dateDesc"]</option>
+                                        <option value="@SearchSort.TitleAsc">@Loc["sort.titleAsc"]</option>
+                                        <option value="@SearchSort.TitleDesc">@Loc["sort.titleDesc"]</option>
+                                        <option value="@SearchSort.QualityDesc">@Loc["sort.qualityDesc"]</option>
+                                        <option value="@SearchSort.CountDesc">@Loc["sort.tracksDesc"]</option>
+                                        <option value="@SearchSort.CountAsc">@Loc["sort.tracksAsc"]</option>
+                                        <option value="@SearchSort.LabelAsc">@Loc["sort.labelAsc"]</option>
+                                    </select>
+                                </div>
+                                @foreach (var album in SearchSorter.SortAlbums(State.ArtistAlbums, State.ArtistAlbumSort))
                                 {
                                     var aId = album.Id;
                                     <div class="search-result-row artist-album-row @(_selectedAlbums.Contains(aId) ? "selected" : "")">
@@ -114,15 +163,15 @@
                                         <img src="@album.Image?.Thumbnail" alt="" />
                                         <div class="search-result-info">
                                             <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                                            <div class="artist">@album.ReleaseDateOriginal &middot; @album.TracksCount pistes &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                                            <div class="artist">@album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                                         </div>
-                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">Télécharger</button>
+                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
                                     </div>
                                 }
                             }
                             else
                             {
-                                <div class="artist-albums-loading">Aucun album trouvé.</div>
+                                <div class="artist-albums-loading">@Loc["search.noAlbums"]</div>
                             }
                         </div>
                     }
@@ -135,9 +184,9 @@
 @if (TotalSelected > 0)
 {
     <div class="selection-bar">
-        <span>@TotalSelected sélectionné(s)</span>
-        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">Télécharger la sélection</button>
-        <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">Effacer</button>
+        <span>@Loc.P("search.selected", TotalSelected)</span>
+        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">@Loc["search.downloadSelection"]</button>
+        <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">@Loc["search.clearSelection"]</button>
     </div>
 }
 
@@ -147,6 +196,14 @@
     private HashSet<string> _selectedAlbums = new();
     private HashSet<int> _selectedTracks = new();
     private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
+
+    // Cette page est désormais la page d'accueil ("/"), elle doit donc porter le garde de session
+    // qui vivait jusqu'ici uniquement sur le téléchargeur.
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        if (!Api.IsLoggedIn) Nav.NavigateTo("/login");
+    }
 
     private async Task DoSearch(string type)
     {
@@ -269,10 +326,36 @@
 
     private async Task DownloadSelected()
     {
+        // Order the batch like the lists are displayed on screen rather than by the arbitrary
+        // order of the selection HashSets. Anything selected in a previous search (no longer in
+        // the visible lists) is still appended at the end, so nothing is silently dropped.
+        var albumIds = new List<string>();
+        var seenAlbums = new HashSet<string>();
+
+        void AddAlbums(IEnumerable<string> ids)
+        {
+            foreach (var id in ids)
+                if (_selectedAlbums.Contains(id) && seenAlbums.Add(id))
+                    albumIds.Add(id);
+        }
+
+        if (State.Albums != null)
+            AddAlbums(SearchSorter.SortAlbums(State.Albums, State.AlbumSort).Select(a => a.Id));
+        if (State.ArtistAlbums != null)
+            AddAlbums(SearchSorter.SortAlbums(State.ArtistAlbums, State.ArtistAlbumSort).Select(a => a.Id));
+        AddAlbums(_selectedAlbums);
+
+        var trackIds = new List<int>();
+        if (State.Tracks != null)
+            trackIds.AddRange(SearchSorter.SortTracks(State.Tracks, State.TrackSort)
+                .Select(t => t.Id).Where(_selectedTracks.Contains));
+        var seenTracks = trackIds.ToHashSet();
+        trackIds.AddRange(_selectedTracks.Where(id => !seenTracks.Contains(id)));
+
         var urls = new List<string>();
-        foreach (var id in _selectedAlbums)
+        foreach (var id in albumIds)
             urls.Add($"https://play.qobuz.com/album/{id}");
-        foreach (var id in _selectedTracks)
+        foreach (var id in trackIds)
             urls.Add($"https://play.qobuz.com/track/{id}");
 
         ClearSelection();

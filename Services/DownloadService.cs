@@ -22,6 +22,7 @@ public class DownloadService
     private readonly SettingsService _settings;
     private readonly TemplateService _templates;
     private readonly TaggingService _tagging;
+    private readonly LocalizationService _loc;
     private readonly ILogger<DownloadService> _logger;
 
     private CancellationTokenSource? _cts;
@@ -38,12 +39,13 @@ public class DownloadService
     private static readonly Regex QobuzUrlRegex = new(
         @"^https?://(?!.*https?://)(?:[\w\-]+\.)?qobuz\.com/[^\s]+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public DownloadService(QobuzApiService api, SettingsService settings, TemplateService templates, TaggingService tagging, ILogger<DownloadService> logger)
+    public DownloadService(QobuzApiService api, SettingsService settings, TemplateService templates, TaggingService tagging, LocalizationService loc, ILogger<DownloadService> logger)
     {
         _api = api;
         _settings = settings;
         _templates = templates;
         _tagging = tagging;
+        _loc = loc;
         _logger = logger;
 
         MigrateTempFolder();
@@ -124,7 +126,7 @@ public class DownloadService
 
             if (!QobuzUrlRegex.IsMatch(url))
             {
-                Log($"Invalid URL: {url}");
+                Log(_loc.T("log.invalidUrl", url));
                 return;
             }
 
@@ -139,12 +141,12 @@ public class DownloadService
             }
 
             var linkMatch = QobuzLinkIdGrabRegex.Match(url);
-            if (!linkMatch.Success) { Log("Could not parse URL"); return; }
+            if (!linkMatch.Success) { Log(_loc["log.couldNotParseUrl"]); return; }
 
             var linkType = linkMatch.Groups["type"].Value;
             var linkId = linkMatch.Groups["id"].Value;
 
-            Log("Checking link...");
+            Log(_loc["log.checkingLink"]);
 
             var s = _settings.Settings;
 
@@ -173,29 +175,29 @@ public class DownloadService
                     else if (linkId.Contains("artists"))
                         await DownloadFavoritesArtistsAsync(_cts.Token);
                     else
-                        Log("Unsupported user link type");
+                        Log(_loc["log.unsupportedUserLink"]);
                     break;
                 default:
-                    Log($"Link type '{linkType}' not supported");
+                    Log(_loc.T("log.unsupportedLinkType", linkType));
                     break;
             }
 
-            Log("DOWNLOAD COMPLETE");
+            Log(_loc["log.complete"]);
         }
         catch (OperationCanceledException)
         {
-            Log("DOWNLOAD ABORTED BY USER.");
+            Log(_loc["log.aborted"]);
         }
         catch (Exception ex)
         {
-            Log($"ERROR: {ex.Message}");
+            Log(_loc.T("log.error", ex.Message));
             _logger.LogError(ex, "Download failed");
         }
         finally
         {
             Progress.IsRunning = false;
             Progress.IsComplete = true;
-            UpdateProgress(100, "Complete");
+            UpdateProgress(100, _loc["download.status.complete"]);
         }
     }
 
@@ -209,7 +211,7 @@ public class DownloadService
         foreach (var url in urlList)
         {
             idx++;
-            Log($"\n--- Batch {idx}/{total} ---");
+            Log(_loc.T("log.batchHeader", idx, total));
             await ProcessUrlAsync(url);
             if (_cts?.IsCancellationRequested == true) break;
         }
@@ -225,7 +227,7 @@ public class DownloadService
         var s = _settings.Settings;
         if (!album.Streamable && s.StreamableCheck)
         {
-            Log("Release is not available for streaming.");
+            Log(_loc["log.notStreamable"]);
             return;
         }
 
@@ -241,22 +243,22 @@ public class DownloadService
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
-            if (_skipCurrent) { _skipCurrent = false; Log("ALBUM SKIPPED BY USER."); break; }
+            if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); break; }
 
             var track = tracks[i];
-            UpdateProgress((int)((double)i / total * 100), $"Track {i + 1}/{total}", _templates.FormatTrackTitle(track));
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total), _templates.FormatTrackTitle(track));
 
             try
             {
                 // Get full track info
                 var trackInfo = await _api.GetTrackAsync(track.Id.ToString());
-                if (trackInfo == null) { Log($"Track {track.TrackNumber} unavailable, skipping."); continue; }
-                if (!trackInfo.Streamable && s.StreamableCheck) { Log($"Track {track.TrackNumber} not streamable, skipping."); continue; }
+                if (trackInfo == null) { Log(_loc.T("log.trackUnavailable", track.TrackNumber)); continue; }
+                if (!trackInfo.Streamable && s.StreamableCheck) { Log(_loc.T("log.trackNotStreamable", track.TrackNumber)); continue; }
 
                 await DownloadTrackToFileAsync("album", album, trackInfo, downloadPath, null, ct);
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Track {track.Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.trackFailed", track.Id, ex.Message)); }
         }
 
         // Goodies
@@ -277,13 +279,13 @@ public class DownloadService
     private async Task DownloadSingleTrackAsync(string trackId, CancellationToken ct)
     {
         var track = await _api.GetTrackAsync(trackId);
-        if (track == null) { Log("Track not found"); return; }
+        if (track == null) { Log(_loc["log.trackNotFound"]); return; }
 
         QobuzAlbum? album = null;
         if (track.Album != null)
             album = await _api.GetAlbumFullAsync(track.Album.Id);
 
-        if (album == null) { Log("Album info not available"); return; }
+        if (album == null) { Log(_loc["log.albumInfoUnavailable"]); return; }
         Progress.CurrentAlbum = album;
 
         var s = _settings.Settings;
@@ -308,7 +310,7 @@ public class DownloadService
         {
             ct.ThrowIfCancellationRequested();
             var item = tracks[i];
-            UpdateProgress((int)((double)i / total * 100), $"Track {i + 1}/{total}");
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total));
 
             try
             {
@@ -329,7 +331,7 @@ public class DownloadService
                 DeleteTempArtwork();
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Playlist track {item.Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message)); }
         }
     }
 
@@ -344,12 +346,12 @@ public class DownloadService
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
-            if (_skipCurrent) { _skipCurrent = false; Log("ALBUM SKIPPED BY USER."); continue; }
+            if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); continue; }
 
-            UpdateProgress((int)((double)i / total * 100), $"Album {i + 1}/{total}", albums[i].Title);
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
             try { await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Album {albums[i].Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
         }
     }
 
@@ -358,7 +360,7 @@ public class DownloadService
     private async Task DownloadLabelAsync(string labelId, CancellationToken ct)
     {
         var label = await _api.GetLabelAsync(labelId);
-        if (label?.Albums?.Items == null) { Log("Label not found"); return; }
+        if (label?.Albums?.Items == null) { Log(_loc["log.labelNotFound"]); return; }
 
         var albums = label.Albums.Items;
         int total = albums.Count;
@@ -368,10 +370,10 @@ public class DownloadService
             ct.ThrowIfCancellationRequested();
             if (_skipCurrent) { _skipCurrent = false; continue; }
 
-            UpdateProgress((int)((double)i / total * 100), $"Album {i + 1}/{total}", albums[i].Title);
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
             try { await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Album {albums[i].Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
         }
     }
 
@@ -388,10 +390,10 @@ public class DownloadService
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
-            UpdateProgress((int)((double)i / total * 100), $"Fav album {i + 1}/{total}");
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.favAlbum", i + 1, total));
             try { await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Fav album {albums[i].Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.favAlbumFailed", albums[i].Id, ex.Message)); }
         }
     }
 
@@ -406,10 +408,10 @@ public class DownloadService
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
-            UpdateProgress((int)((double)i / total * 100), $"Fav track {i + 1}/{total}");
+            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.favTrack", i + 1, total));
             try { await DownloadSingleTrackAsync(tracks[i].Id.ToString(), ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Fav track {tracks[i].Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.favTrackFailed", tracks[i].Id, ex.Message)); }
         }
     }
 
@@ -424,7 +426,7 @@ public class DownloadService
             ct.ThrowIfCancellationRequested();
             try { await DownloadArtistAsync(artist.Id.ToString(), ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log($"Fav artist {artist.Id} failed: {ex.Message}"); }
+            catch (Exception ex) { Log(_loc.T("log.favArtistFailed", artist.Id, ex.Message)); }
         }
     }
 
@@ -448,7 +450,7 @@ public class DownloadService
         // Skip existing
         if (s.DuplicateFileMode == "skip" && System.IO.File.Exists(filePath))
         {
-            Log($"File for track {track.TrackNumber} already exists, skipping.");
+            Log(_loc.T("log.fileExists", track.TrackNumber));
             return;
         }
 
@@ -459,7 +461,7 @@ public class DownloadService
         var tempFile = Path.Combine(tempDir, $"qbdlx_downloading-{track.Id}{s.AudioFormat}");
 
         var titleFormatted = _templates.FormatTrackTitle(track);
-        Log($"Téléchargement - {track.TrackNumber.ToString().PadLeft(2, '0')} {titleFormatted}...");
+        Log(_loc.T("log.downloadingTrack", track.TrackNumber.ToString().PadLeft(2, '0'), titleFormatted));
 
         // Try requested quality, then fall back to lower qualities if download keeps failing.
         // For each quality we make a few silent attempts (with a fresh signed URL each time)
@@ -474,7 +476,7 @@ public class DownloadService
         {
             if (qFormat != s.QualityFormat)
             {
-                Log($"Qualité {qLabel} indisponible — essai en qualité inférieure...");
+                Log(_loc.T("log.qualityUnavailable", qLabel));
             }
 
             Exception? qualityError = null;
@@ -515,12 +517,12 @@ public class DownloadService
 
             if (qualityUnavailable)
             {
-                Log($"Track {track.TrackNumber} non disponible en qualité {qLabel}.");
+                Log(_loc.T("log.trackNotInQuality", track.TrackNumber, qLabel));
             }
             else if (qualityError != null)
             {
                 lastError = qualityError;
-                Log($"Qualité {qLabel} échec après {attemptsPerQuality} tentatives : {qualityError.Message}");
+                Log(_loc.T("log.qualityFailed", qLabel, attemptsPerQuality, qualityError.Message));
             }
         }
 
@@ -565,7 +567,7 @@ public class DownloadService
         }
 
         System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
-        Log(" DONE");
+        Log(_loc["log.done"]);
     }
 
     // ─── HTTP stream download helpers ───
@@ -640,7 +642,7 @@ public class DownloadService
                     Progress.Speed = speed >= 1024 * 1024
                         ? $"{speed / (1024 * 1024):F2} MB/s"
                         : $"{speed / 1024:F2} KB/s";
-                    Progress.Status = $"Téléchargement - {pct}% [{Progress.Speed}]";
+                    Progress.Status = _loc.T("download.status.downloading", pct, Progress.Speed);
                     OnProgressChanged?.Invoke();
                 }
             }
@@ -692,17 +694,17 @@ public class DownloadService
         var ext = Path.GetExtension(goody.Url ?? ".pdf");
         var filePath = Path.Combine(downloadPath, $"{fileName} ({goody.Id}){ext}");
 
-        if (System.IO.File.Exists(filePath)) { Log("Goody already exists"); return; }
+        if (System.IO.File.Exists(filePath)) { Log(_loc["log.goodyExists"]); return; }
 
         try
         {
-            Log("Goody found, downloading...");
+            Log(_loc["log.goodyFound"]);
             using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             var data = await http.GetByteArrayAsync(goody.Url, ct);
             await System.IO.File.WriteAllBytesAsync(filePath, data, ct);
-            Log(" DONE");
+            Log(_loc["log.done"]);
         }
-        catch (Exception ex) { Log($"Goody failed: {ex.Message}"); }
+        catch (Exception ex) { Log(_loc.T("log.goodyFailed", ex.Message)); }
     }
 
     private void DeleteTempArtwork()

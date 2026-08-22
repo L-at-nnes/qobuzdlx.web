@@ -1,13 +1,17 @@
 @page "/"
 @namespace QobuzDLX.Web.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using QobuzDLX.Web.Services
+@inject LocalizationService Loc
+@* La détection de la langue du navigateur se fait dans un middleware (Program.cs), avant que
+   cette page ne soit rendue : la vue n'a plus qu'à lire la langue courante. *@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@Loc.Current">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QobuzDLX</title>
+    <title>@Loc["app.title"]</title>
     <base href="~/" />
     <link rel="stylesheet" href="css/app.css" />
 </head>
@@ -28,6 +32,12 @@
             document.execCommand("copy");
             document.body.removeChild(ta);
             return Promise.resolve();
+        };
+
+        // Appelé par LanguageSwitch : la bascule ne rechargeant pas la page, l'attribut lang du
+        // document doit être mis à jour ici.
+        window.setHtmlLang = function (lang) {
+            document.documentElement.lang = lang;
         };
     </script>
 </body>

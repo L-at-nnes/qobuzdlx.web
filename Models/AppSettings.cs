@@ -76,6 +76,9 @@ public class AppSettings
     public bool UseItemPosInPlaylist { get; set; }
     public bool LogFailedDownloads { get; set; } = true;
     public string DuplicateFileMode { get; set; } = "skip"; // skip, rename, overwrite
-    public string Language { get; set; } = "en";
+    // Langue de l'interface : "fr" | "en". Vide = pas encore choisie, on détecte alors la langue
+    // du navigateur au premier rendu. Nom volontairement différent de l'ancien "Language" (vestige
+    // inutilisé du portage desktop, sérialisé à "en") pour ne pas hériter de sa valeur.
+    public string UiLanguage { get; set; } = "";
     public string Theme { get; set; } = "dark";
 }

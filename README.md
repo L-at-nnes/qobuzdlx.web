@@ -12,7 +12,9 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 
 - **Web-based UI** — Dark theme, responsive, accessible from any browser
 - **Multiple download types** — Albums, tracks, playlists, artists, labels, favorites
-- **Search** — Search Qobuz by albums, tracks, or artists directly from the UI
+- **Bilingual UI** — French and English, one-click switch, browser language detected on first run
+- **Search** — Search Qobuz by albums, tracks, or artists directly from the UI, with sorting by
+  title, artist, release date, quality or track count
 - **Batch downloads** — Paste multiple URLs and download them all at once
 - **4 quality levels** — MP3 320, FLAC 16-bit, FLAC 24-bit (up to 96kHz), FLAC 24-bit (up to 192kHz)
 - **Full metadata tagging** — ID3v2.4 (MP3) and Vorbis Comments (FLAC) with 25+ configurable tags
@@ -105,7 +107,7 @@ The app automatically retrieves the required `app_id` and `app_secret` from Qobu
 
 ### Quality
 
-Select your preferred audio quality from the downloader page:
+Select your preferred audio quality from the settings page:
 
 | Option | Format | Quality ID |
 |--------|--------|------------|

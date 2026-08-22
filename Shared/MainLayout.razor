@@ -2,6 +2,8 @@
 @inject QobuzApiService Api
 @inject SettingsService Settings
 @inject AppGuardService Guard
+@inject LocalizationService Loc
+@implements IDisposable
 
 @{
     var needsPassword = !string.IsNullOrEmpty(Settings.Settings.AppAccessPasswordHash);
@@ -16,30 +18,31 @@
                 <div class="card">
                     <div style="text-align:center;margin-bottom:20px;">
                         <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
-                        <p style="color:var(--text-secondary);font-size:0.85em;">Accès protégé — entrez le mot de passe pour continuer</p>
+                        <p style="color:var(--text-secondary);font-size:0.85em;">@Loc["lock.subtitle"]</p>
                     </div>
 
                     @if (Guard.IsLockedOut)
                     {
                         <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
-                            Trop de tentatives. Réessayez dans @Guard.RemainingSeconds secondes.
+                            @Loc.P("lock.retrySeconds", Guard.RemainingSeconds)
                         </div>
                     }
                     else if (_lockError)
                     {
                         <div style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.85em;color:#e74c3c;">
-                            Mot de passe incorrect
+                            @Loc["lock.wrongPassword"]
                         </div>
                     }
 
                     <form @onsubmit="TryUnlock">
                         <div class="form-group">
-                            <label>Mot de passe</label>
-                            <input type="password" @bind="_accessPassword" placeholder="mot de passe" autofocus disabled="@Guard.IsLockedOut" />
+                            <label>@Loc["lock.password"]</label>
+                            <input type="password" @bind="_accessPassword" placeholder='@Loc["lock.passwordPlaceholder"]' autofocus disabled="@Guard.IsLockedOut" />
                         </div>
-                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@Guard.IsLockedOut">DÉVERROUILLER</button>
+                        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@Guard.IsLockedOut">@Loc["lock.unlock"]</button>
                     </form>
                 </div>
+                <LanguageSwitch />
             </div>
         </div>
     </div>
@@ -49,8 +52,9 @@ else
     <div id="app">
         @if (!Api.IsLoggedIn)
         {
-            <div style="width:100%;display:flex;align-items:center;justify-content:center;">
+            <div style="width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
                 @Body
+                <LanguageSwitch />
             </div>
         }
         else
@@ -64,11 +68,12 @@ else
                         <span class="user-label">@Settings.Settings.UserLabel</span>
                     }
                 </div>
-                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Téléchargeur</NavLink>
-                <NavLink class="nav-link" href="/search">Recherche</NavLink>
-                <NavLink class="nav-link" href="/settings">Paramètres</NavLink>
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">@Loc["nav.search"]</NavLink>
+                <NavLink class="nav-link" href="/telechargement">@Loc["nav.download"]</NavLink>
+                <NavLink class="nav-link" href="/settings">@Loc["nav.settings"]</NavLink>
                 <div class="nav-spacer"></div>
-                <button class="nav-link" @onclick="Logout">Déconnexion</button>
+                <button class="nav-link" @onclick="Logout">@Loc["nav.logout"]</button>
+                <LanguageSwitch />
                 <div class="sidebar-version">v@(AppVersion)</div>
             </nav>
             <div class="main-content">
@@ -85,9 +90,23 @@ else
     private static readonly string AppVersion =
         System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v
             ? $"{v.Major}.{v.Minor}.{v.Build}"
-            : "1.2.52";
+            : "1.3.0";
 
     [Inject] NavigationManager NavigationManager { get; set; } = default!;
+
+    // Le layout est un LayoutComponentBase : il ne peut pas hériter de LocalizedComponentBase et
+    // s'abonne donc lui-même au changement de langue (barre latérale, écran de verrouillage).
+    protected override void OnInitialized()
+    {
+        Loc.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= OnLanguageChanged;
+    }
 
     private void TryUnlock()
     {

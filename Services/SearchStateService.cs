@@ -11,4 +11,12 @@ public class SearchStateService
     public List<QobuzArtist>? Artists { get; set; }
     public int ExpandedArtistId { get; set; }
     public List<QobuzAlbum>? ArtistAlbums { get; set; }
+
+    // Sort order of each result list. Kept here (like the results themselves) so it survives
+    // navigating away from the search page and back.
+    public SearchSort AlbumSort { get; set; } = SearchSort.Relevance;
+    public SearchSort TrackSort { get; set; } = SearchSort.Relevance;
+    public SearchSort ArtistSort { get; set; } = SearchSort.Relevance;
+    // A discography reads best chronologically.
+    public SearchSort ArtistAlbumSort { get; set; } = SearchSort.DateAsc;
 }

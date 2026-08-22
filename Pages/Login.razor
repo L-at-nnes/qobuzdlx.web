@@ -2,12 +2,13 @@
 @inject QobuzApiService Api
 @inject SettingsService Settings
 @inject NavigationManager Nav
+@inherits LocalizedComponentBase
 
 <div style="width: 400px;">
     <div class="card">
         <div style="text-align:center;margin-bottom:20px;">
             <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
-            <p style="color:var(--text-secondary);font-size:0.85em;">Qobuz Downloader - Édition Web</p>
+            <p style="color:var(--text-secondary);font-size:0.85em;">@Loc["login.subtitle"]</p>
         </div>
 
         @if (!string.IsNullOrEmpty(_error))
@@ -20,41 +21,41 @@
         @if (_useToken)
         {
             <div class="form-group">
-                <label>Jeton d'authentification</label>
-                <input type="password" @bind="_token" placeholder="jeton" />
+                <label>@Loc["login.token"]</label>
+                <input type="password" @bind="_token" placeholder='@Loc["login.tokenPlaceholder"]' />
             </div>
         }
         else
         {
             <div class="form-group">
-                <label>Email</label>
-                <input type="email" @bind="_email" placeholder="e-mail" />
+                <label>@Loc["login.email"]</label>
+                <input type="email" @bind="_email" placeholder='@Loc["login.emailPlaceholder"]' />
             </div>
             <div class="form-group">
-                <label>Mot de passe</label>
-                <input type="password" @bind="_password" placeholder="mot de passe" />
+                <label>@Loc["login.password"]</label>
+                <input type="password" @bind="_password" placeholder='@Loc["login.passwordPlaceholder"]' />
             </div>
         }
 
         <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="DoLogin" disabled="@_loading">
-            @(_loading ? "Connexion..." : "CONNEXION")
+            @(_loading ? Loc["login.submitting"] : Loc["login.submit"])
         </button>
 
         <div style="text-align:center;margin-top:12px;">
             <button class="btn btn-sm btn-secondary" @onclick="() => _useToken = !_useToken">
-                @(_useToken ? "Connexion par e-mail" : "Connexion par jeton")
+                @(_useToken ? Loc["login.useEmail"] : Loc["login.useToken"])
             </button>
         </div>
 
         <details style="margin-top:16px;">
-            <summary style="color:var(--text-secondary);font-size:0.85em;cursor:pointer;">App ID / Secret personnalisés</summary>
+            <summary style="color:var(--text-secondary);font-size:0.85em;cursor:pointer;">@Loc["login.customCredentials"]</summary>
             <div style="margin-top:8px;">
                 <div class="form-group">
-                    <label>App ID (laisser vide pour auto)</label>
+                    <label>@Loc["login.appId"]</label>
                     <input type="text" @bind="_customAppId" placeholder="App ID" />
                 </div>
                 <div class="form-group">
-                    <label>App Secret (laisser vide pour auto)</label>
+                    <label>@Loc["login.appSecret"]</label>
                     <input type="text" @bind="_customAppSecret" placeholder="App Secret" />
                 </div>
             </div>
@@ -74,6 +75,8 @@
 
     protected override void OnInitialized()
     {
+        base.OnInitialized();
+
         var s = Settings.Settings;
         _email = s.Email;
         _customAppId = s.AppId;
@@ -98,12 +101,12 @@
             // Validate inputs early
             if (_useToken)
             {
-                if (string.IsNullOrWhiteSpace(_token)) { _error = "Aucun jeton fourni"; return; }
+                if (string.IsNullOrWhiteSpace(_token)) { _error = Loc["login.error.noToken"]; return; }
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(_email)) { _error = "Aucun e-mail fourni"; return; }
-                if (string.IsNullOrWhiteSpace(_password)) { _error = "Aucun mot de passe fourni"; return; }
+                if (string.IsNullOrWhiteSpace(_email)) { _error = Loc["login.error.noEmail"]; return; }
+                if (string.IsNullOrWhiteSpace(_password)) { _error = Loc["login.error.noPassword"]; return; }
             }
 
             bool hasCustomCredentials = !string.IsNullOrEmpty(_customAppId) && !string.IsNullOrEmpty(_customAppSecret);
@@ -143,17 +146,17 @@
                 }
             }
 
-            _error = "Échec de connexion : aucun identifiant d'application valide trouvé. Essayez de fournir un App ID et Secret personnalisés.";
+            _error = Loc["login.error.noAppCredentials"];
         }
         catch (HttpRequestException)
         {
-            _error = "Impossible de joindre les serveurs Qobuz. Vérifiez votre connexion.";
+            _error = Loc["login.error.network"];
         }
         catch (Exception ex)
         {
             _error = ex.Message.Contains("401") || ex.Message.Contains("Invalid")
-                ? "Identifiants invalides. Vérifiez votre e-mail/mot de passe ou jeton."
-                : $"Échec de connexion : {ex.Message}";
+                ? Loc["login.error.invalidCredentials"]
+                : Loc.T("login.error.generic", ex.Message);
         }
         finally
         {

@@ -1,43 +1,36 @@
-@page "/"
+@page "/telechargement"
 @page "/downloader"
 @inject DownloadService Download
 @inject SettingsService Settings
 @inject QobuzApiService Api
 @inject NavigationManager Nav
-@implements IDisposable
+@inherits LocalizedComponentBase
 
-<h3 style="margin-bottom:16px;">Téléchargeur</h3>
+<h3 style="margin-bottom:16px;">@Loc["download.title"]</h3>
 
 <!-- URL Input -->
 <div class="card">
     <div class="url-bar">
-        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder="Coller une URL Qobuz..." @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
-        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">Télécharger</button>
-        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">En lot</button>
+        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder='@Loc["download.urlPlaceholder"]' @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
+        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">@Loc["download.start"]</button>
+        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">@Loc["download.batch"]</button>
         @if (Download.IsRunning)
         {
-            <button class="btn btn-danger" @onclick="Download.Abort">ANNULER</button>
-            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">PASSER</button>
+            <button class="btn btn-danger" @onclick="Download.Abort">@Loc["download.cancel"]</button>
+            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">@Loc["download.skip"]</button>
         }
     </div>
 
     @if (_showBatch)
     {
         <div style="margin-top:8px;">
-            <textarea @bind="_batchUrls" rows="5" placeholder="Coller une ou plusieurs URL Qobuz (une par ligne)..." style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
-            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">Tout télécharger</button>
+            <textarea @bind="_batchUrls" rows="5" placeholder='@Loc["download.batchPlaceholder"]' style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">@Loc["download.batchStart"]</button>
         </div>
     }
-</div>
 
-<!-- Quality Selector -->
-<div class="card">
-    <div class="card-title">Qualité</div>
-    <div class="quality-group">
-        <button class="quality-btn @(Settings.Settings.QualityFormat == "5" ? "active" : "")" @onclick='() => SetQuality("5", ".mp3")'>MP3 320</button>
-        <button class="quality-btn @(Settings.Settings.QualityFormat == "6" ? "active" : "")" @onclick='() => SetQuality("6", ".flac")'>FLAC 16bit</button>
-        <button class="quality-btn @(Settings.Settings.QualityFormat == "7" ? "active" : "")" @onclick='() => SetQuality("7", ".flac")'>FLAC 24bit &le;96kHz</button>
-        <button class="quality-btn @(Settings.Settings.QualityFormat == "27" ? "active" : "")" @onclick='() => SetQuality("27", ".flac")'>FLAC 24bit 192kHz</button>
+    <div style="margin-top:10px;font-size:0.8em;color:var(--text-secondary);">
+        @Loc["download.qualityLabel"] <strong>@QualityLabel</strong> — <a href="/settings">@Loc["download.qualityEdit"]</a>
     </div>
 </div>
 
@@ -54,7 +47,7 @@
             <div class="album-details">
                 <h3>@album.Title @(album.Version != null ? $"({album.Version})" : "")</h3>
                 <p>@album.Artist?.Name</p>
-                <p>@album.ReleaseDateOriginal &middot; @album.TracksCount pistes</p>
+                <p>@album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount)</p>
                 <p>@album.Genre?.Name &middot; @album.Label?.Name</p>
                 <p style="font-size:0.8em;color:var(--text-secondary);">@(album.MaximumBitDepth)bit / @(album.MaximumSamplingRate)kHz</p>
             </div>
@@ -83,7 +76,7 @@
 
 <!-- Log -->
 <div class="card">
-    <div class="card-title">Journal</div>
+    <div class="card-title">@Loc["download.log"]</div>
     <div class="log-output" @ref="_logRef">
         @foreach (var line in Download.Progress.Log)
         {
@@ -91,7 +84,7 @@
         }
         @if (Download.Progress.Log.Count == 0)
         {
-            <div style="color:var(--text-secondary);">Collez une URL Qobuz et cliquez sur Télécharger pour commencer.</div>
+            <div style="color:var(--text-secondary);">@Loc["download.logEmpty"]</div>
         }
     </div>
 </div>
@@ -104,6 +97,7 @@
 
     protected override void OnInitialized()
     {
+        base.OnInitialized();
         if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
         Download.OnProgressChanged += OnProgress;
     }
@@ -127,10 +121,15 @@
         await Download.ProcessBatchAsync(urls);
     }
 
-    private void SetQuality(string formatId, string audioFormat)
+    // Le choix de la qualité vit désormais dans les Paramètres ; on n'affiche ici qu'un rappel.
+    private string QualityLabel => Settings.Settings.QualityFormat switch
     {
-        Settings.Update(s => { s.QualityFormat = formatId; s.AudioFormat = audioFormat; });
-    }
+        "5" => "MP3 320",
+        "6" => "FLAC 16bit",
+        "7" => "FLAC 24bit ≤96kHz",
+        "27" => "FLAC 24bit 192kHz",
+        _ => Loc["download.quality.unknown"]
+    };
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
@@ -138,8 +137,9 @@
             await StartDownload();
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         Download.OnProgressChanged -= OnProgress;
     }
 }

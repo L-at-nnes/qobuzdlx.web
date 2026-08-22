@@ -1,59 +1,74 @@
 @page "/settings"
 @inject SettingsService SettingsSvc
 @inject IJSRuntime JS
+@inherits LocalizedComponentBase
 
-<h3 style="margin-bottom:16px;">Paramètres</h3>
+<h3 style="margin-bottom:16px;">@Loc["settings.title"]</h3>
 
 <!-- Download Folder -->
 <div class="card">
-    <div class="card-title">Dossier de téléchargement</div>
+    <div class="card-title">@Loc["settings.folder.title"]</div>
     <div class="form-group">
-        <label>Emplacement (volume Docker)</label>
+        <label>@Loc["settings.folder.location"]</label>
         <input type="text" @bind="S.DownloadLocation" @bind:after="Save" />
+    </div>
+</div>
+
+<!-- Quality -->
+<div class="card">
+    <div class="card-title">@Loc["settings.quality.title"]</div>
+    <div class="quality-group">
+        <button class="quality-btn @(S.QualityFormat == "5" ? "active" : "")" @onclick='() => SetQuality("5", ".mp3")'>MP3 320</button>
+        <button class="quality-btn @(S.QualityFormat == "6" ? "active" : "")" @onclick='() => SetQuality("6", ".flac")'>FLAC 16bit</button>
+        <button class="quality-btn @(S.QualityFormat == "7" ? "active" : "")" @onclick='() => SetQuality("7", ".flac")'>FLAC 24bit &le;96kHz</button>
+        <button class="quality-btn @(S.QualityFormat == "27" ? "active" : "")" @onclick='() => SetQuality("27", ".flac")'>FLAC 24bit 192kHz</button>
+    </div>
+    <div style="font-size:0.8em;color:var(--text-secondary);margin-top:8px;">
+        @Loc["settings.quality.hint"]
     </div>
 </div>
 
 <!-- Templates -->
 <div class="card">
-    <div class="card-title">Modèles</div>
+    <div class="card-title">@Loc["settings.templates.title"]</div>
     <div class="settings-grid">
         <div class="form-group">
-            <label>Modèle Artiste</label>
+            <label>@Loc["settings.templates.artist"]</label>
             <input type="text" @bind="S.ArtistTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle Album</label>
+            <label>@Loc["settings.templates.album"]</label>
             <input type="text" @bind="S.AlbumTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle Piste (par défaut)</label>
+            <label>@Loc["settings.templates.track"]</label>
             <input type="text" @bind="S.TrackTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle Piste (V/A)</label>
+            <label>@Loc["settings.templates.vaTrack"]</label>
             <input type="text" @bind="S.VaTrackTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle Playlist</label>
+            <label>@Loc["settings.templates.playlist"]</label>
             <input type="text" @bind="S.PlaylistTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle Favoris</label>
+            <label>@Loc["settings.templates.favorites"]</label>
             <input type="text" @bind="S.FavoritesTemplate" @bind:after="Save" />
         </div>
         <div class="form-group">
-            <label>Modèle CD</label>
+            <label>@Loc["settings.templates.cd"]</label>
             <input type="text" @bind="S.CdTemplate" @bind:after="Save" />
         </div>
     </div>
 
     <!-- Template Variables Reference -->
     <details class="template-help" style="margin-top:16px;">
-        <summary class="template-help-toggle">Variables de modèle disponibles</summary>
+        <summary class="template-help-toggle">@Loc["settings.templates.varsToggle"]</summary>
         <div class="template-help-content">
 
             <div class="template-section">
-                <div class="template-section-title">Spécifique à la sortie</div>
+                <div class="template-section-title">@Loc["settings.templates.section.release"]</div>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%AlbumID%")'>%AlbumID%</span>
                     <span class="token" @onclick='() => CopyToken("%AlbumURL%")'>%AlbumURL%</span>
@@ -76,7 +91,7 @@
             </div>
 
             <details class="template-subsection">
-                <summary>Contrôle parental (sortie)</summary>
+                <summary>@Loc["settings.templates.section.parentalRelease"]</summary>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%AlbumPA%")'>%AlbumPA%</span>
                     <span class="token" @onclick='() => CopyToken("%AlbumPAShort%")'>%AlbumPAShort%</span>
@@ -100,7 +115,7 @@
             </details>
 
             <div class="template-section">
-                <div class="template-section-title">Spécifique à la piste</div>
+                <div class="template-section-title">@Loc["settings.templates.section.track"]</div>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%TrackArtist%")'>%TrackArtist%</span>
                     <span class="token" @onclick='() => CopyToken("%TrackComposer%")'>%TrackComposer%</span>
@@ -117,7 +132,7 @@
             </div>
 
             <details class="template-subsection">
-                <summary>Contrôle parental (piste)</summary>
+                <summary>@Loc["settings.templates.section.parentalTrack"]</summary>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%TrackPA%")'>%TrackPA%</span>
                     <span class="token" @onclick='() => CopyToken("%TrackPAShort%")'>%TrackPAShort%</span>
@@ -141,7 +156,7 @@
             </details>
 
             <div class="template-section">
-                <div class="template-section-title">Spécifique à la playlist</div>
+                <div class="template-section-title">@Loc["settings.templates.section.playlist"]</div>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%PlaylistID%")'>%PlaylistID%</span>
                     <span class="token" @onclick='() => CopyToken("%PlaylistTitle%")'>%PlaylistTitle%</span>
@@ -152,67 +167,67 @@
             </div>
 
             <div class="template-section">
-                <div class="template-section-title">Spécifique au CD</div>
+                <div class="template-section-title">@Loc["settings.templates.section.cd"]</div>
                 <div class="template-tokens">
                     <span class="token" @onclick='() => CopyToken("%DiscNumber%")'>%DiscNumber%</span>
                 </div>
             </div>
 
-            <div class="template-hint">Cliquez sur une variable pour la copier</div>
+            <div class="template-hint">@Loc["settings.templates.hint"]</div>
         </div>
     </details>
 </div>
 
 <!-- Tagging Options -->
 <div class="card">
-    <div class="card-title">Options de tagage</div>
+    <div class="card-title">@Loc["settings.tagging.title"]</div>
     <div class="settings-grid">
-        <div class="setting-item"><input type="checkbox" @bind="S.AlbumTag" @bind:after="Save" /><label>Titre de l'album</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.AlbumArtistTag" @bind:after="Save" /><label>Artiste de l'album</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.ArtistTag" @bind:after="Save" /><label>Artiste de la piste</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.TrackTitleTag" @bind:after="Save" /><label>Titre de la piste</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.TrackTag" @bind:after="Save" /><label>Numéro de piste</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.TotalTracksTag" @bind:after="Save" /><label>Total des pistes</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.DiscTag" @bind:after="Save" /><label>Numéro de disque</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.TotalDiscsTag" @bind:after="Save" /><label>Total des disques</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.GenreTag" @bind:after="Save" /><label>Genre</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.YearTag" @bind:after="Save" /><label>Année</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.ReleaseDateTag" @bind:after="Save" /><label>Date de sortie</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.ComposerTag" @bind:after="Save" /><label>Compositeur</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.CopyrightTag" @bind:after="Save" /><label>Copyright</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.LabelTag" @bind:after="Save" /><label>Label</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.IsrcTag" @bind:after="Save" /><label>ISRC</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.UpcTag" @bind:after="Save" /><label>UPC / Code-barres</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.TypeTag" @bind:after="Save" /><label>Type de sortie</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.ExplicitTag" @bind:after="Save" /><label>Avertissement explicite</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.ImageTag" @bind:after="Save" /><label>Pochette</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.UrlTag" @bind:after="Save" /><label>URL</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.MergeArtistNames" @bind:after="Save" /><label>Fusionner les noms d'artistes</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.MergeArtistNamesInDirNames" @bind:after="Save" /><label>Fusionner dans les noms de dossiers</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.AlbumTag" @bind:after="Save" /><label>@Loc["settings.tag.album"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.AlbumArtistTag" @bind:after="Save" /><label>@Loc["settings.tag.albumArtist"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ArtistTag" @bind:after="Save" /><label>@Loc["settings.tag.artist"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.TrackTitleTag" @bind:after="Save" /><label>@Loc["settings.tag.trackTitle"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.TrackTag" @bind:after="Save" /><label>@Loc["settings.tag.trackNumber"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.TotalTracksTag" @bind:after="Save" /><label>@Loc["settings.tag.totalTracks"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.DiscTag" @bind:after="Save" /><label>@Loc["settings.tag.disc"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.TotalDiscsTag" @bind:after="Save" /><label>@Loc["settings.tag.totalDiscs"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.GenreTag" @bind:after="Save" /><label>@Loc["settings.tag.genre"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.YearTag" @bind:after="Save" /><label>@Loc["settings.tag.year"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ReleaseDateTag" @bind:after="Save" /><label>@Loc["settings.tag.releaseDate"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ComposerTag" @bind:after="Save" /><label>@Loc["settings.tag.composer"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.CopyrightTag" @bind:after="Save" /><label>@Loc["settings.tag.copyright"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.LabelTag" @bind:after="Save" /><label>@Loc["settings.tag.label"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.IsrcTag" @bind:after="Save" /><label>@Loc["settings.tag.isrc"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.UpcTag" @bind:after="Save" /><label>@Loc["settings.tag.upc"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.TypeTag" @bind:after="Save" /><label>@Loc["settings.tag.type"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ExplicitTag" @bind:after="Save" /><label>@Loc["settings.tag.explicit"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ImageTag" @bind:after="Save" /><label>@Loc["settings.tag.artwork"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.UrlTag" @bind:after="Save" /><label>@Loc["settings.tag.url"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.MergeArtistNames" @bind:after="Save" /><label>@Loc["settings.tag.mergeArtists"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.MergeArtistNamesInDirNames" @bind:after="Save" /><label>@Loc["settings.tag.mergeArtistsDirs"]</label></div>
     </div>
 
     <div style="margin-top:12px;">
-        <div class="setting-item"><input type="checkbox" @bind="S.CommentTag" @bind:after="Save" /><label>Commentaire personnalisé</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.CommentTag" @bind:after="Save" /><label>@Loc["settings.tag.comment"]</label></div>
         @if (S.CommentTag)
         {
             <div class="form-group" style="margin-top:8px;">
-                <input type="text" @bind="S.CommentText" @bind:after="Save" placeholder="Texte du commentaire (%description% pour la description de l'album)" />
+                <input type="text" @bind="S.CommentText" @bind:after="Save" placeholder='@Loc["settings.tag.commentPlaceholder"]' />
             </div>
         }
     </div>
 
     <div style="margin-top:12px;">
-        <div class="setting-item"><input type="checkbox" @bind="S.ExplicitTagInTitle" @bind:after="Save" /><label>Tag 'Explicit' dans le titre</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.CleanTagInTitle" @bind:after="Save" /><label>Tag 'Clean' dans le titre</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.ExplicitTagInTitle" @bind:after="Save" /><label>@Loc["settings.tag.explicitInTitle"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.CleanTagInTitle" @bind:after="Save" /><label>@Loc["settings.tag.cleanInTitle"]</label></div>
     </div>
 </div>
 
 <!-- Artwork -->
 <div class="card">
-    <div class="card-title">Pochette</div>
+    <div class="card-title">@Loc["settings.artwork.title"]</div>
     <div class="settings-grid">
         <div class="form-group">
-            <label>Taille pochette intégrée</label>
+            <label>@Loc["settings.artwork.embedded"]</label>
             <select @bind="S.EmbeddedArtSize" @bind:after="Save">
                 <option value="50">50</option>
                 <option value="100">100</option>
@@ -223,7 +238,7 @@
             </select>
         </div>
         <div class="form-group">
-            <label>Taille pochette sauvegardée</label>
+            <label>@Loc["settings.artwork.saved"]</label>
             <select @bind="S.SavedArtSize" @bind:after="Save">
                 <option value="50">50</option>
                 <option value="100">100</option>
@@ -234,65 +249,65 @@
             </select>
         </div>
     </div>
-    <div class="setting-item"><input type="checkbox" @bind="S.DontSaveArtworkToDisk" @bind:after="Save" /><label>Ne pas sauvegarder la pochette sur le disque</label></div>
+    <div class="setting-item"><input type="checkbox" @bind="S.DontSaveArtworkToDisk" @bind:after="Save" /><label>@Loc["settings.artwork.dontSave"]</label></div>
 </div>
 
 <!-- Advanced -->
 <div class="card">
-    <div class="card-title">Options avancées</div>
+    <div class="card-title">@Loc["settings.advanced.title"]</div>
     <div class="settings-grid">
-        <div class="setting-item"><input type="checkbox" @bind="S.StreamableCheck" @bind:after="Save" /><label>Vérification de disponibilité</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.FixMD5s" @bind:after="Save" /><label>Corriger auto. les MD5 manquants</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.DownloadGoodies" @bind:after="Save" /><label>Télécharger les bonus</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.DownloadSpeed" @bind:after="Save" /><label>Afficher la vitesse</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.UseItemPosInPlaylist" @bind:after="Save" /><label>Utiliser les positions dans la playlist</label></div>
-        <div class="setting-item"><input type="checkbox" @bind="S.LogFailedDownloads" @bind:after="Save" /><label>Journaliser les échecs</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.StreamableCheck" @bind:after="Save" /><label>@Loc["settings.advanced.streamable"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.FixMD5s" @bind:after="Save" /><label>@Loc["settings.advanced.fixMd5"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.DownloadGoodies" @bind:after="Save" /><label>@Loc["settings.advanced.goodies"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.DownloadSpeed" @bind:after="Save" /><label>@Loc["settings.advanced.speed"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.UseItemPosInPlaylist" @bind:after="Save" /><label>@Loc["settings.advanced.playlistPos"]</label></div>
+        <div class="setting-item"><input type="checkbox" @bind="S.LogFailedDownloads" @bind:after="Save" /><label>@Loc["settings.advanced.logFailed"]</label></div>
     </div>
 
     <div class="form-group" style="margin-top:12px;">
-        <label>Fichiers en double</label>
+        <label>@Loc["settings.duplicates.label"]</label>
         <select @bind="S.DuplicateFileMode" @bind:after="Save">
-            <option value="skip">Ignorer le téléchargement</option>
-            <option value="rename">Renommer automatiquement</option>
-            <option value="overwrite">Écraser le fichier existant</option>
+            <option value="skip">@Loc["settings.duplicates.skip"]</option>
+            <option value="rename">@Loc["settings.duplicates.rename"]</option>
+            <option value="overwrite">@Loc["settings.duplicates.overwrite"]</option>
         </select>
     </div>
 </div>
 
 <!-- App Access Password -->
 <div class="card">
-    <div class="card-title">Mot de passe d'accès</div>
+    <div class="card-title">@Loc["settings.access.title"]</div>
     <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:12px;">
-        Protégez votre application avec un mot de passe. Chaque nouvelle connexion devra le saisir avant d'accéder à l'interface.
+        @Loc["settings.access.description"]
     </p>
 
     @if (string.IsNullOrEmpty(S.AppAccessPasswordHash))
     {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-            <span style="color:var(--text-secondary);font-size:0.85em;">Statut :</span>
-            <span style="color:var(--text-secondary);font-size:0.85em;">Aucun mot de passe — l'application est accessible à tous</span>
+            <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
+            <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.none"]</span>
         </div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
             <div class="form-group" style="flex:1;margin:0;">
-                <label>Nouveau mot de passe</label>
-                <input type="password" @bind="_newAccessPassword" placeholder="Choisir un mot de passe..." />
+                <label>@Loc["settings.access.newPassword"]</label>
+                <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.choosePlaceholder"]' />
             </div>
-            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">Activer</button>
+            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.enable"]</button>
         </div>
     }
     else
     {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-            <span style="color:var(--text-secondary);font-size:0.85em;">Statut :</span>
-            <span style="color:var(--success);font-size:0.85em;">Mot de passe actif — application protégée</span>
+            <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
+            <span style="color:var(--success);font-size:0.85em;">@Loc["settings.access.active"]</span>
         </div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
             <div class="form-group" style="flex:1;margin:0;">
-                <label>Nouveau mot de passe</label>
-                <input type="password" @bind="_newAccessPassword" placeholder="Changer le mot de passe..." />
+                <label>@Loc["settings.access.newPassword"]</label>
+                <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.changePlaceholder"]' />
             </div>
-            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">Modifier</button>
-            <button class="btn btn-danger" style="height:38px;" @onclick="RemoveAccessPassword">Supprimer</button>
+            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.change"]</button>
+            <button class="btn btn-danger" style="height:38px;" @onclick="RemoveAccessPassword">@Loc["settings.access.remove"]</button>
         </div>
     }
 
@@ -304,7 +319,7 @@
 
 @if (_showCopied)
 {
-    <div class="toast-notification">Copié : @_copiedToken</div>
+    <div class="toast-notification">@Loc.T("settings.copied", _copiedToken)</div>
 }
 
 @code {
@@ -317,12 +332,19 @@
 
     private void Save() => SettingsSvc.Save();
 
+    // Format Qobuz (5 = MP3 320, 6 = FLAC 16bit, 7 = FLAC 24bit <=96kHz, 27 = FLAC 24bit 192kHz)
+    // et extension du fichier produit, enregistrés ensemble pour rester cohérents.
+    private void SetQuality(string formatId, string audioFormat)
+    {
+        SettingsSvc.Update(s => { s.QualityFormat = formatId; s.AudioFormat = audioFormat; });
+    }
+
     private async Task SetAccessPassword()
     {
         if (string.IsNullOrWhiteSpace(_newAccessPassword)) return;
         SettingsSvc.Update(s => s.AppAccessPasswordHash = AppGuardService.HashPassword(_newAccessPassword));
         _newAccessPassword = "";
-        _accessPasswordMessage = "Mot de passe enregistré.";
+        _accessPasswordMessage = Loc["settings.access.saved"];
         _accessPasswordSaved = true;
         StateHasChanged();
         await Task.Delay(3000);
@@ -334,7 +356,7 @@
     {
         SettingsSvc.Update(s => s.AppAccessPasswordHash = "");
         _newAccessPassword = "";
-        _accessPasswordMessage = "Mot de passe supprimé — application ouverte.";
+        _accessPasswordMessage = Loc["settings.access.removed"];
         _accessPasswordSaved = true;
         StateHasChanged();
         await Task.Delay(3000);
