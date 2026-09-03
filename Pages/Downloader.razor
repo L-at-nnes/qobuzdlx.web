@@ -4,34 +4,123 @@
 @inject SettingsService Settings
 @inject QobuzApiService Api
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @inherits LocalizedComponentBase
+
+@* Instantanés pris UNE fois par rendu : les collections vives du service sont mutées par le worker
+   sur un autre thread, les énumérer directement lèverait « Collection was modified ». *@
+@{
+    var queue = Download.QueueSnapshot();
+    var log = Download.LogSnapshot();
+    var firstPending = queue.FirstOrDefault(i => i.Status == QueueItemStatus.Pending);
+    var lastPending = queue.LastOrDefault(i => i.Status == QueueItemStatus.Pending);
+    var pendingCount = queue.Count(i => i.Status == QueueItemStatus.Pending);
+    var finishedCount = queue.Count(i => i.IsFinished);
+}
 
 <h3 style="margin-bottom:16px;">@Loc["download.title"]</h3>
 
 <!-- URL Input -->
 <div class="card">
     <div class="url-bar">
-        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder='@Loc["download.urlPlaceholder"]' @onkeydown="OnKeyDown" disabled="@Download.IsRunning" />
-        <button class="btn btn-primary" @onclick="StartDownload" disabled="@(Download.IsRunning || string.IsNullOrWhiteSpace(_inputUrl))">@Loc["download.start"]</button>
-        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch" disabled="@Download.IsRunning">@Loc["download.batch"]</button>
-        @if (Download.IsRunning)
-        {
-            <button class="btn btn-danger" @onclick="Download.Abort">@Loc["download.cancel"]</button>
-            <button class="btn btn-secondary" @onclick="Download.SkipCurrent">@Loc["download.skip"]</button>
-        }
+        @* Plus aucun disabled lié au téléchargement en cours : c'est tout l'objet de la file. *@
+        <input type="text" @bind="_inputUrl" @bind:event="oninput" placeholder='@Loc["download.urlPlaceholder"]' @onkeydown="OnKeyDown" />
+        <button class="btn btn-primary" @onclick="StartDownload" disabled="@string.IsNullOrWhiteSpace(_inputUrl)">@Loc["download.start"]</button>
+        <button class="btn btn-secondary" @onclick="() => _showBatch = !_showBatch">@Loc["download.batch"]</button>
     </div>
 
     @if (_showBatch)
     {
         <div style="margin-top:8px;">
-            <textarea @bind="_batchUrls" rows="5" placeholder='@Loc["download.batchPlaceholder"]' style="resize:vertical;" disabled="@Download.IsRunning"></textarea>
-            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch" disabled="@Download.IsRunning">@Loc["download.batchStart"]</button>
+            <textarea @bind="_batchUrls" rows="5" placeholder='@Loc["download.batchPlaceholder"]' style="resize:vertical;"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:8px;" @onclick="StartBatch">@Loc["download.batchStart"]</button>
         </div>
     }
 
     <div style="margin-top:10px;font-size:0.8em;color:var(--text-secondary);">
         @Loc["download.qualityLabel"] <strong>@QualityLabel</strong> — <a href="/settings">@Loc["download.qualityEdit"]</a>
     </div>
+</div>
+
+<!-- File d'attente : placée avant la carte album pour être visible sans défiler. -->
+<div class="card">
+    <div class="card-title">
+        <span>@Loc["queue.title"]</span>
+        @if (queue.Count > 0)
+        {
+            <span class="queue-count">@Loc.P("queue.count", queue.Count)</span>
+        }
+        <div class="queue-toolbar">
+            @if (pendingCount > 0)
+            {
+                <button class="btn btn-secondary btn-sm" @onclick="Download.ClearPending">@Loc["queue.clearPending"]</button>
+            }
+            @if (finishedCount > 0)
+            {
+                <button class="btn btn-secondary btn-sm" @onclick="Download.ClearFinished">@Loc["queue.clearFinished"]</button>
+            }
+        </div>
+    </div>
+
+    @if (queue.Count == 0)
+    {
+        <div class="queue-empty">@Loc["queue.empty"]</div>
+    }
+    else
+    {
+        <div class="queue-list">
+            @* @key est indispensable : sans lui, réordonner fait réutiliser les nœuds en place par
+               Blazor et les états disabled des flèches se désynchronisent de la ligne affichée. *@
+            @foreach (var it in queue)
+            {
+                <div class="queue-row @RowClass(it)" @key="it.Id">
+                    @if (!string.IsNullOrEmpty(it.Thumbnail))
+                    {
+                        <img src="@it.Thumbnail" alt="" />
+                    }
+                    else
+                    {
+                        <div class="queue-thumb-placeholder">@(Loc[$"queue.kind.{it.Kind}"])</div>
+                    }
+
+                    <div class="queue-info">
+                        <div class="title">@it.Label</div>
+                        @if (!string.IsNullOrEmpty(it.SubLabel))
+                        {
+                            <div class="sub">@it.SubLabel</div>
+                        }
+                        @if (it.Status == QueueItemStatus.Failed && !string.IsNullOrEmpty(it.Error))
+                        {
+                            <div class="err">@it.Error</div>
+                        }
+                    </div>
+
+                    <span class="queue-status @RowClass(it)">@(Loc[$"queue.status.{StatusKey(it.Status)}"])</span>
+
+                    @* Jamais plus de trois boutons par ligne, quel que soit l'état : c'est ce qui
+                       rend la ligne tenable à 375px. *@
+                    <div class="queue-actions">
+                        @if (it.Status == QueueItemStatus.Running)
+                        {
+                            <button class="btn btn-danger btn-sm" @onclick="Download.CancelCurrent" title='@Loc["queue.cancelCurrentHint"]'>@Loc["download.cancel"]</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="Download.SkipCurrent" title='@Loc["queue.skipHint"]'>@Loc["download.skip"]</button>
+                        }
+                        else if (it.Status == QueueItemStatus.Pending)
+                        {
+                            <button class="queue-btn" @onclick="() => Download.MoveUp(it.Id)" disabled="@(it == firstPending)" title='@Loc["queue.action.up"]'>&#9650;</button>
+                            <button class="queue-btn" @onclick="() => Download.MoveDown(it.Id)" disabled="@(it == lastPending)" title='@Loc["queue.action.down"]'>&#9660;</button>
+                            <button class="queue-btn danger" @onclick="() => Download.Remove(it.Id)" title='@Loc["queue.action.remove"]'>&#10005;</button>
+                        }
+                        else
+                        {
+                            <button class="queue-btn" @onclick="() => Download.Retry(it.Id)" title='@Loc["queue.action.retry"]'>&#8635;</button>
+                            <button class="queue-btn danger" @onclick="() => Download.Remove(it.Id)" title='@Loc["queue.action.remove"]'>&#10005;</button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
 
 <!-- Album Info + Progress -->
@@ -56,7 +145,7 @@
 }
 
 <!-- Progress Bar -->
-@if (Download.IsRunning || Download.Progress.IsComplete)
+@if (Download.IsRunning)
 {
     <div class="card">
         <div style="display:flex;justify-content:space-between;font-size:0.85em;margin-bottom:4px;">
@@ -76,13 +165,21 @@
 
 <!-- Log -->
 <div class="card">
-    <div class="card-title">@Loc["download.log"]</div>
+    <div class="card-title">
+        <span>@Loc["download.log"]</span>
+        @if (log.Count > 0)
+        {
+            <div class="queue-toolbar">
+                <button class="btn btn-secondary btn-sm" @onclick="Download.ClearLog">@Loc["queue.clearLog"]</button>
+            </div>
+        }
+    </div>
     <div class="log-output" @ref="_logRef">
-        @foreach (var line in Download.Progress.Log)
+        @foreach (var line in log)
         {
             <div>@line</div>
         }
-        @if (Download.Progress.Log.Count == 0)
+        @if (log.Count == 0)
         {
             <div style="color:var(--text-secondary);">@Loc["download.logEmpty"]</div>
         }
@@ -94,31 +191,48 @@
     private string _batchUrls = "";
     private bool _showBatch;
     private ElementReference _logRef;
+    private int _lastLogCount = -1;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
         if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
         Download.OnProgressChanged += OnProgress;
+        Download.OnQueueChanged += OnProgress;
     }
 
-    private void OnProgress()
+    private void OnProgress() => InvokeAsync(StateHasChanged);
+
+    // Le journal ne défilait pas : _logRef était déclaré mais jamais utilisé. Avec une file qui
+    // enchaîne les éléments, le défaut devient criant.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        InvokeAsync(StateHasChanged);
+        var count = Download.LogCount;
+        if (count == _lastLogCount) return;
+        _lastLogCount = count;
+        try { await JS.InvokeVoidAsync("scrollToBottom", _logRef); }
+        catch (JSDisconnectedException) { /* circuit fermé pendant le rendu */ }
+        catch (TaskCanceledException) { /* idem, côté interop */ }
     }
 
-    private async Task StartDownload()
+    // Fire-and-forget : Enqueue rend la main tout de suite, le worker de fond draine. C'est ce qui
+    // permet de continuer à naviguer pendant un téléchargement.
+    private void StartDownload()
     {
         if (string.IsNullOrWhiteSpace(_inputUrl)) return;
-        await Download.ProcessUrlAsync(_inputUrl);
+        // On ne vide le champ qu'en cas de succès : sur une URL invalide, l'utilisateur doit
+        // pouvoir la corriger plutôt que la retaper.
+        if (Download.Enqueue(_inputUrl.Trim()) != EnqueueResult.InvalidUrl)
+            _inputUrl = "";
     }
 
-    private async Task StartBatch()
+    private void StartBatch()
     {
         var urls = _batchUrls.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(u => !string.IsNullOrWhiteSpace(u)).ToList();
         if (urls.Count == 0) return;
-        await Download.ProcessBatchAsync(urls);
+        Download.EnqueueMany(urls.Select(u => new QueueRequest(u)));
+        _batchUrls = "";
     }
 
     // Le choix de la qualité vit désormais dans les Paramètres ; on n'affiche ici qu'un rappel.
@@ -131,15 +245,33 @@
         _ => Loc["download.quality.unknown"]
     };
 
-    private async Task OnKeyDown(KeyboardEventArgs e)
+    private void OnKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !Download.IsRunning)
-            await StartDownload();
+        if (e.Key == "Enter") StartDownload();
     }
+
+    private static string StatusKey(QueueItemStatus s) => s switch
+    {
+        QueueItemStatus.Pending => "pending",
+        QueueItemStatus.Running => "running",
+        QueueItemStatus.Completed => "done",
+        QueueItemStatus.Failed => "failed",
+        _ => "cancelled"
+    };
+
+    private static string RowClass(QueueItem it) => it.Status switch
+    {
+        QueueItemStatus.Running => "running",
+        QueueItemStatus.Completed => "done",
+        QueueItemStatus.Failed => "failed",
+        QueueItemStatus.Cancelled => "cancelled",
+        _ => ""
+    };
 
     public override void Dispose()
     {
         base.Dispose();
         Download.OnProgressChanged -= OnProgress;
+        Download.OnQueueChanged -= OnProgress;
     }
 }

@@ -10,6 +10,9 @@
     --success: #4caf50;
     --border: #2a2a4a;
     --scrollbar: #2a2a4a;
+    /* Référencées par .selection-bar et la barre supérieure mobile. */
+    --sidebar-width: 220px;
+    --topbar-height: 52px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,11 +25,17 @@ html, body {
     overflow: hidden;
 }
 
-#app { display: flex; height: 100vh; }
+/* 100dvh : la hauteur suit l'apparition/disparition de la barre d'adresse mobile.
+   La ligne 100vh reste comme repli pour les navigateurs qui ignorent dvh. */
+#app {
+    display: flex;
+    height: 100vh;
+    height: 100dvh;
+}
 
 /* Sidebar */
 .sidebar {
-    width: 220px;
+    width: var(--sidebar-width);
     background: var(--bg-secondary);
     border-right: 1px solid var(--border);
     display: flex;
@@ -124,10 +133,76 @@ html, body {
     opacity: 0.4;
 }
 
+/* Barre supérieure mobile (burger). Masquée au-dessus du palier, cf. @media plus bas. */
+.app-topbar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    height: var(--topbar-height);
+    flex-shrink: 0;
+    padding: 0 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.topbar-burger {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5em;
+    line-height: 1;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.topbar-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+/* Voile derrière le tiroir. Comme la barre supérieure, inactif sur grand écran. */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+/* Écrans de connexion et de verrouillage */
+.auth-shell {
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* « safe » évite que le haut du formulaire soit rogné (et donc inatteignable) quand le
+       contenu dépasse la hauteur de l'écran ; le centrage reste effectif sinon. */
+    justify-content: safe center;
+    padding: 16px 0;
+    /* body est en overflow:hidden : sans cela, un formulaire plus haut que l'écran (connexion
+       par jeton sur un petit téléphone) ne pourrait pas défiler. */
+    overflow-y: auto;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
 /* Main content */
 .main-content {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 24px;
 }
 
@@ -140,13 +215,18 @@ html, body {
     margin-bottom: 16px;
 }
 
+/* Flex plutôt que des flottants : les outils (tri, tout sélectionner) peuvent ainsi passer à la
+   ligne sur écran étroit au lieu de chevaucher le titre. */
 .card-title {
     font-size: 0.8em;
     text-transform: uppercase;
     color: var(--text-secondary);
     letter-spacing: 1px;
     margin-bottom: 12px;
-    display: flow-root; /* contient les éléments flottants (tri, tout sélectionner) */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 /* Inputs */
@@ -190,11 +270,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 /* URL input bar */
 .url-bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 16px;
 }
 
-.url-bar input { flex: 1; }
+.url-bar input { flex: 1; min-width: 0; }
+
+/* Rangée « champ + bouton(s) » réutilisable (ex. mot de passe d'accès dans les Paramètres). */
+.field-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.field-row .form-group { flex: 1 1 200px; margin: 0; }
+.field-row .btn { height: 38px; }
 
 /* Progress bar */
 .progress-bar-container {
@@ -233,6 +325,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     max-height: 300px;
     overflow-y: auto;
     white-space: pre-wrap;
+    /* pre-wrap ne coupe pas un mot insécable : une URL longue déborderait horizontalement. */
+    overflow-wrap: anywhere;
     line-height: 1.5;
 }
 
@@ -255,9 +349,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .album-details p { color: var(--text-secondary); font-size: 0.9em; margin: 2px 0; }
 
 /* Settings grid */
+/* min(280px, 100%) : la grille retombe d'elle-même sur une colonne quand le conteneur est plus
+   étroit que 280px, sans media query. */
 .settings-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
     gap: 12px;
 }
 
@@ -288,14 +384,19 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 .search-result-row:hover { background: rgba(233,69,96,0.05); }
 
+.search-result-row > .btn { flex-shrink: 0; }
+
 .search-result-row img {
     width: 50px;
     height: 50px;
     border-radius: 4px;
     object-fit: cover;
+    flex-shrink: 0;
 }
 
-.search-result-info { flex: 1; }
+/* min-width:0 est indispensable : sans lui un élément flex refuse de descendre sous la largeur
+   de son contenu, et text-overflow:ellipsis n'a aucun effet. */
+.search-result-info { flex: 1; min-width: 0; }
 .search-result-info .title { font-weight: 600; }
 .search-result-info .artist { color: var(--text-secondary); font-size: 0.85em; }
 
@@ -304,6 +405,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     height: 50px;
     border-radius: 50%;
     object-fit: cover;
+    flex-shrink: 0;
 }
 
 .artist-avatar-placeholder {
@@ -369,8 +471,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 .search-result-row.selected { background: rgba(233,69,96,0.1); }
 
+/* margin-left:auto pousse le groupe d'outils à droite du titre (ex-float). */
 .select-all-btn {
-    float: right;
+    margin-left: auto;
     color: var(--accent) !important;
     font-size: 0.85em !important;
     padding: 0 !important;
@@ -384,22 +487,21 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 /* Sorting */
 .sort-select {
-    float: right;
     width: auto;
+    max-width: 100%;
     padding: 3px 8px;
-    margin: -4px 16px 0 0;
     font-size: 0.85em;
     text-transform: none;
     letter-spacing: normal;
     cursor: pointer;
 }
 
+/* Seul dans sa barre : pas de titre pour le pousser, on s'en charge ici. */
 .artist-albums-toolbar {
-    display: flow-root;
+    display: flex;
+    justify-content: flex-end;
     padding: 8px 0 4px;
 }
-
-.artist-albums-toolbar .sort-select { margin-right: 0; }
 
 .selection-bar {
     position: fixed;
@@ -571,6 +673,153 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     font-style: italic;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   File d'attente de téléchargement
+
+   .queue-row est volontairement distincte de .search-result-row : sous 640px, la règle
+   `.search-result-row .btn::before` remplace le contenu de TOUT .btn descendant par une flèche ⬇,
+   ce qui écraserait les glyphes ▲ ▼ ✕ ↻ des actions de la file.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.queue-toolbar { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+.queue-count {
+    color: var(--text-primary);
+    background: var(--bg-card);
+    border-radius: 10px;
+    padding: 2px 8px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.queue-list { display: flex; flex-direction: column; }
+
+.queue-empty {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+    font-style: italic;
+    padding: 6px 2px;
+}
+
+.queue-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+}
+
+.queue-row:last-child { border-bottom: none; }
+
+.queue-row.running { background: rgba(233,69,96,0.08); border-left-color: var(--accent); }
+.queue-row.done { opacity: 0.6; }
+.queue-row.failed { border-left-color: #c0392b; }
+.queue-row.cancelled { opacity: 0.6; border-left-color: var(--text-secondary); }
+
+.queue-row img,
+.queue-thumb-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.queue-thumb-placeholder {
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 2px;
+    overflow: hidden;
+}
+
+/* min-width:0 : sans lui, un élément flex refuse de descendre sous la largeur de son contenu et
+   l'ellipse ne se déclenche jamais. */
+.queue-info { flex: 1; min-width: 0; }
+
+.queue-info .title,
+.queue-info .sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-info .title { font-weight: 600; font-size: 0.9em; }
+.queue-info .sub { color: var(--text-secondary); font-size: 0.8em; }
+.queue-info .err { color: #e74c3c; font-size: 0.75em; }
+
+.queue-status {
+    flex-shrink: 0;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.queue-status.running { background: var(--accent); color: white; }
+.queue-status.done { background: var(--success); color: white; }
+.queue-status.failed { background: #c0392b; color: white; }
+
+.queue-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.queue-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--border);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+    line-height: 1;
+    transition: background 0.2s;
+}
+
+.queue-btn:hover:not(:disabled) { background: #3a3a5a; }
+.queue-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.queue-btn.danger:hover:not(:disabled) { background: #c0392b; }
+
+/* Pastille du menu : le compteur des éléments restants. .nav-link est déjà en flex, un
+   margin-left:auto suffit à la pousser contre le bord droit, tiroir mobile compris. */
+.nav-badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-size: 0.7em;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Marque « déjà téléchargé » en page Recherche. Toujours posée en FRÈRE du bouton, jamais en
+   enfant : à l'intérieur, la règle ::before du palier 640px l'avalerait. */
+.queue-done-mark {
+    color: var(--success);
+    font-size: 0.95em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
 /* Toast notification */
 .toast-notification {
     position: fixed;
@@ -586,6 +835,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     animation: toastIn 0.3s ease, toastOut 0.3s ease 1.2s forwards;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
+
+/* Un « URL invalide » sur fond vert serait trompeur. */
+.toast-notification.error { background: #c0392b; }
 
 @keyframes toastIn {
     from { transform: translateY(20px); opacity: 0; }
@@ -603,11 +855,146 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a5a; }
 
-/* Responsive */
+/* ──────────────────────────────────────────────────────────────────────────
+   Responsive
+   768px : bascule en tiroir, la barre latérale sort du flux.
+   640px : densité des listes de résultats.
+   480px : téléphone, boutons pleine largeur.
+   ────────────────────────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
-    .sidebar { width: 60px; }
-    .sidebar-logo { font-size: 0.9em; padding: 0 4px 12px; }
-    .sidebar-user { display: none; }
-    .nav-link { padding: 10px; justify-content: center; font-size: 0.8em; }
-    .selection-bar { left: 60px; }
+    /* Barre supérieure au-dessus du contenu, tiroir par-dessus le tout. */
+    #app { flex-direction: column; }
+
+    .app-topbar { display: flex; }
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(78vw, 260px);
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        overflow-y: auto;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .sidebar.open { transform: translateX(0); }
+
+    .sidebar-backdrop { display: block; pointer-events: none; }
+    .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .main-content { padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
+
+    /* Plus de barre latérale dans le flux : la barre de sélection part du bord. */
+    .selection-bar {
+        left: 0;
+        flex-wrap: wrap;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    }
+
+    .selection-bar span { flex: 1 1 100%; }
+    .selection-bar .btn { flex: 1 1 auto; }
+
+    /* La barre est fixe : sans réserve, elle masque la dernière ligne de résultats. Elle passe
+       sur deux lignes ici (libellé, puis boutons), d'où les 110px. */
+    .main-content:has(.selection-bar) {
+        padding-bottom: calc(110px + env(safe-area-inset-bottom));
+    }
+
+    /* Le champ prend la ligne, les boutons se partagent la suivante. */
+    .url-bar input { flex: 1 1 100%; }
+    .url-bar .btn { flex: 1 1 auto; }
+
+    /* Sous 16px, iOS Safari zoome sur le champ au focus et ne revient jamais en arrière. */
+    input[type="text"], input[type="password"], input[type="email"], input[type="number"],
+    textarea, select { font-size: 16px; }
+
+    .sort-select { font-size: 14px; }
+}
+
+@media (max-width: 640px) {
+    .search-result-row { gap: 8px; padding: 8px 4px; }
+
+    .search-result-row img,
+    .artist-avatar,
+    .artist-avatar-placeholder { width: 40px; height: 40px; }
+
+    .artist-avatar-placeholder { font-size: 1em; }
+    .artist-album-row img { width: 36px !important; height: 36px !important; }
+
+    /* Une seule ligne chacun, tronquée : le bouton garde ainsi sa place. */
+    .search-result-info .title,
+    .search-result-info .artist {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Le libellé cède la place à une flèche : « Télécharger tout » est intenable ici. */
+    .search-result-row .btn .btn-label { display: none; }
+    .search-result-row .btn::before { content: "\2B07"; font-size: 1.1em; line-height: 1; }
+    .search-result-row .btn-sm { padding: 8px 10px; }
+
+    .artist-albums { padding: 0 4px 10px 16px; }
+
+    .album-info img { width: 80px; height: 80px; }
+    .album-details h3 { font-size: 1.05em; }
+
+    .queue-row { gap: 8px; padding: 8px 4px; }
+    .queue-row img,
+    .queue-thumb-placeholder { width: 34px; height: 34px; }
+    .queue-status { font-size: 0.62em; padding: 2px 6px; }
+}
+
+@media (max-width: 480px) {
+    .card { padding: 14px 12px; }
+
+    /* Le tri passe sous le titre plutôt que de le comprimer. */
+    .sort-select { flex: 1 1 100%; width: 100%; }
+
+    .quality-group { display: grid; grid-template-columns: 1fr 1fr; }
+    .quality-btn { padding: 10px 8px; }
+
+    .field-row .form-group { flex: 1 1 100%; }
+    .field-row .btn { flex: 1 1 auto; }
+
+    .toast-notification {
+        left: 12px;
+        right: 12px;
+        bottom: calc(16px + env(safe-area-inset-bottom));
+        text-align: center;
+    }
+
+    /* Les actions passent sur leur propre ligne : trois boutons de 30px tiennent alors même à
+       320px, alors qu'en ligne ils comprimeraient le libellé jusqu'à l'illisible. */
+    .queue-row { flex-wrap: wrap; }
+    .queue-actions { flex: 1 1 100%; justify-content: flex-end; }
+    .queue-toolbar { margin-left: 0; flex: 1 1 100%; }
+    .queue-toolbar .btn { flex: 1 1 auto; }
+}
+
+/* Écrans tactiles : cibles élargies et surbrillances de survol neutralisées — sur mobile un
+   :hover reste « collé » après un tap. */
+@media (hover: none) {
+    .btn { min-height: 40px; }
+    .queue-btn { width: 36px; height: 36px; }
+    .select-checkbox { width: 22px; height: 22px; }
+    .token { padding: 6px 10px; }
+
+    .queue-btn:hover:not(:disabled) { background: var(--border); }
+    .queue-btn.danger:hover:not(:disabled) { background: var(--border); }
+    .search-result-row:hover { background: transparent; }
+    .search-result-row.selected:hover { background: rgba(233,69,96,0.1); }
+    .artist-row.expanded:hover { background: rgba(233,69,96,0.08); }
+    .nav-link:hover { background: none; color: var(--text-secondary); }
+    .nav-link.active:hover { background: rgba(233,69,96,0.2); color: var(--accent); }
+    .token:hover {
+        border-color: var(--border);
+        color: #7ec8e3;
+        background: var(--bg-input);
+        transform: none;
+    }
 }

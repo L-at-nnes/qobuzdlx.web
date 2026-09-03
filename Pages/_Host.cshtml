@@ -10,7 +10,11 @@
 <html lang="@Loc.Current">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @* viewport-fit=cover : sans lui, env(safe-area-inset-*) vaut zéro sur les écrans à encoche.
+       Le zoom utilisateur reste autorisé (pas de maximum-scale) pour l'accessibilité. *@
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#16213e" />
+    <meta name="color-scheme" content="dark" />
     <title>@Loc["app.title"]</title>
     <base href="~/" />
     <link rel="stylesheet" href="css/app.css" />
@@ -38,6 +42,13 @@
         // document doit être mis à jour ici.
         window.setHtmlLang = function (lang) {
             document.documentElement.lang = lang;
+        };
+
+        // Journal de téléchargement : avec une file qui enchaîne les éléments, les nouvelles lignes
+        // sortent sans arrêt du cadre visible. Le garde-fou sur l'élément évite une exception si le
+        // rendu a retiré le nœud entre-temps.
+        window.scrollToBottom = function (el) {
+            if (el) el.scrollTop = el.scrollHeight;
         };
     </script>
 </body>

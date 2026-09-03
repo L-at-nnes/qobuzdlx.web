@@ -287,12 +287,12 @@
             <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
             <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.none"]</span>
         </div>
-        <div style="display:flex;gap:8px;align-items:flex-end;">
-            <div class="form-group" style="flex:1;margin:0;">
+        <div class="field-row">
+            <div class="form-group">
                 <label>@Loc["settings.access.newPassword"]</label>
                 <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.choosePlaceholder"]' />
             </div>
-            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.enable"]</button>
+            <button class="btn btn-primary" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.enable"]</button>
         </div>
     }
     else
@@ -301,13 +301,13 @@
             <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
             <span style="color:var(--success);font-size:0.85em;">@Loc["settings.access.active"]</span>
         </div>
-        <div style="display:flex;gap:8px;align-items:flex-end;">
-            <div class="form-group" style="flex:1;margin:0;">
+        <div class="field-row">
+            <div class="form-group">
                 <label>@Loc["settings.access.newPassword"]</label>
                 <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.changePlaceholder"]' />
             </div>
-            <button class="btn btn-primary" style="height:38px;" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.change"]</button>
-            <button class="btn btn-danger" style="height:38px;" @onclick="RemoveAccessPassword">@Loc["settings.access.remove"]</button>
+            <button class="btn btn-primary" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.change"]</button>
+            <button class="btn btn-danger" @onclick="RemoveAccessPassword">@Loc["settings.access.remove"]</button>
         </div>
     }
 

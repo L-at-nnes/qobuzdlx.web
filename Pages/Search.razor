@@ -47,6 +47,7 @@
             @foreach (var album in SearchSorter.SortAlbums(State.Albums, State.AlbumSort))
             {
                 var albumId = album.Id;
+                var albumUrl = AlbumUrl(albumId);
                 <div class="search-result-row @(_selectedAlbums.Contains(albumId) ? "selected" : "")">
                     <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(albumId)" @onchange="() => ToggleAlbum(albumId)" />
                     <img src="@album.Image?.Thumbnail" alt="" />
@@ -54,7 +55,13 @@
                         <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
                         <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(albumId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
+                    @* La marque ✓ est FRÈRE du bouton, jamais enfant : à l'intérieur, la règle
+                       `.search-result-row .btn::before` du palier 640px l'écraserait. *@
+                    @if (Download.IsDone(albumUrl))
+                    {
+                        <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                    }
+                    <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" disabled="@Download.IsQueued(albumUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                 </div>
             }
         </div>
@@ -83,6 +90,7 @@
             @foreach (var track in SearchSorter.SortTracks(State.Tracks, State.TrackSort))
             {
                 var trackId = track.Id;
+                var trackUrl = TrackUrl(trackId);
                 <div class="search-result-row @(_selectedTracks.Contains(trackId) ? "selected" : "")">
                     <input type="checkbox" class="select-checkbox" checked="@_selectedTracks.Contains(trackId)" @onchange="() => ToggleTrack(trackId)" />
                     <img src="@track.Album?.Image?.Thumbnail" alt="" />
@@ -90,7 +98,11 @@
                         <div class="title">@track.Title @(track.Version != null ? $"({track.Version})" : "")</div>
                         <div class="artist">@track.Performer?.Name &middot; @track.Album?.Title &middot; @(track.MaximumBitDepth)bit/@(track.MaximumSamplingRate)kHz</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="() => DownloadTrack(trackId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
+                    @if (Download.IsDone(trackUrl))
+                    {
+                        <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                    }
+                    <button class="btn btn-primary btn-sm" @onclick="() => QueueTrack(track)" disabled="@Download.IsQueued(trackUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                 </div>
             }
         </div>
@@ -114,6 +126,7 @@
             @foreach (var artist in SearchSorter.SortArtists(State.Artists, State.ArtistSort))
             {
                 var artistId = artist.Id;
+                var artistUrl = ArtistUrl(artistId);
                 var isExpanded = State.ExpandedArtistId == artistId;
                 <div class="artist-block">
                     <div class="search-result-row artist-row @(isExpanded ? "expanded" : "")" @onclick="() => ToggleArtist(artistId)">
@@ -130,7 +143,11 @@
                             <div class="artist">@Loc.P("search.albumCount", artist.AlbumsCount)</div>
                         </div>
                         <span class="expand-icon">@(isExpanded ? "▾" : "▸")</span>
-                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadArtist(artistId)" @onclick:stopPropagation="true" disabled="@Download.IsRunning">@Loc["search.downloadAll"]</button>
+                        @if (Download.IsDone(artistUrl))
+                        {
+                            <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                        }
+                        <button class="btn btn-primary btn-sm" @onclick="() => QueueArtist(artist)" @onclick:stopPropagation="true" disabled="@Download.IsQueued(artistUrl)" title='@Loc["search.downloadAll"]'><span class="btn-label">@Loc["search.downloadAll"]</span></button>
                     </div>
 
                     @if (isExpanded)
@@ -158,6 +175,7 @@
                                 @foreach (var album in SearchSorter.SortAlbums(State.ArtistAlbums, State.ArtistAlbumSort))
                                 {
                                     var aId = album.Id;
+                                    var aUrl = AlbumUrl(aId);
                                     <div class="search-result-row artist-album-row @(_selectedAlbums.Contains(aId) ? "selected" : "")">
                                         <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(aId)" @onchange="() => ToggleAlbum(aId)" />
                                         <img src="@album.Image?.Thumbnail" alt="" />
@@ -165,7 +183,11 @@
                                             <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
                                             <div class="artist">@album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
                                         </div>
-                                        <button class="btn btn-primary btn-sm" @onclick="() => DownloadAlbum(aId)" disabled="@Download.IsRunning">@Loc["search.download"]</button>
+                                        @if (Download.IsDone(aUrl))
+                                        {
+                                            <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                                        }
+                                        <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" disabled="@Download.IsQueued(aUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                                     </div>
                                 }
                             }
@@ -185,9 +207,16 @@
 {
     <div class="selection-bar">
         <span>@Loc.P("search.selected", TotalSelected)</span>
-        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected" disabled="@Download.IsRunning">@Loc["search.downloadSelection"]</button>
+        <button class="btn btn-primary btn-sm" @onclick="DownloadSelected">@Loc["search.downloadSelection"]</button>
         <button class="btn btn-secondary btn-sm" @onclick="ClearSelection">@Loc["search.clearSelection"]</button>
     </div>
+}
+
+@* @key incrémental : l'animation CSS ne se déclenche qu'à la création du nœud. Sans lui, Blazor
+   réutiliserait le même <div> pour un second toast et celui-ci apparaîtrait déjà effacé. *@
+@if (_toast != null)
+{
+    <div class="toast-notification @(_toastIsError ? "error" : "")" @key="_toastSeq">@_toast</div>
 }
 
 @code {
@@ -197,12 +226,30 @@
     private HashSet<int> _selectedTracks = new();
     private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
 
+    private string? _toast;
+    private bool _toastIsError;
+    private int _toastSeq;
+    private int _toastGen;
+
     // Cette page est désormais la page d'accueil ("/"), elle doit donc porter le garde de session
     // qui vivait jusqu'ici uniquement sur le téléchargeur.
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        if (!Api.IsLoggedIn) Nav.NavigateTo("/login");
+        if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
+
+        // OnQueueChanged uniquement : sans cet abonnement, ni le grisage ni la marque ✓ ne se
+        // rafraîchiraient quand un élément se termine. S'abonner en plus à OnProgressChanged
+        // redessinerait cette page à chaque bloc téléchargé, pour rien.
+        Download.OnQueueChanged += OnQueueChanged;
+    }
+
+    private void OnQueueChanged() => InvokeAsync(StateHasChanged);
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        Download.OnQueueChanged -= OnQueueChanged;
     }
 
     private async Task DoSearch(string type)
@@ -275,19 +322,73 @@
         }
     }
 
-    private async Task DownloadAlbum(string albumId)
+    // ─── File d'attente ───
+    //
+    // Ces trois méthodes sont synchrones : Enqueue rend la main immédiatement, le worker du service
+    // draine en arrière-plan. C'est ce qui permet de continuer à chercher pendant un téléchargement,
+    // là où l'ancien `await ProcessUrlAsync` bloquait le gestionnaire de clic jusqu'au bout.
+    // La variable d'itération d'un foreach étant capturée par itération depuis C# 5,
+    // `@onclick="() => QueueAlbum(album)"` désigne bien l'album de la ligne.
+
+    private static string AlbumUrl(string id) => $"https://play.qobuz.com/album/{id}";
+    private static string TrackUrl(int id) => $"https://play.qobuz.com/track/{id}";
+    private static string ArtistUrl(int id) => $"https://play.qobuz.com/artist/{id}";
+
+    private static QueueRequest AlbumRequest(QobuzAlbum a) => new(
+        AlbumUrl(a.Id),
+        a.Title + (a.Version != null ? $" ({a.Version})" : ""),
+        a.Artist?.Name,
+        a.Image?.Thumbnail);
+
+    private static QueueRequest TrackRequest(QobuzTrack t) => new(
+        TrackUrl(t.Id),
+        t.Title + (t.Version != null ? $" ({t.Version})" : ""),
+        t.Performer?.Name,
+        t.Album?.Image?.Thumbnail);
+
+    private void QueueAlbum(QobuzAlbum album) => ToastFor(Enqueue(AlbumRequest(album)));
+
+    private void QueueTrack(QobuzTrack track) => ToastFor(Enqueue(TrackRequest(track)));
+
+    private void QueueArtist(QobuzArtist artist) => ToastFor(Download.Enqueue(
+        ArtistUrl(artist.Id), artist.Name, null, artist.Picture));
+
+    private EnqueueResult Enqueue(QueueRequest r) =>
+        Download.Enqueue(r.Url, r.Label, r.SubLabel, r.Thumbnail);
+
+    private void ToastFor(EnqueueResult result)
     {
-        await Download.ProcessUrlAsync($"https://play.qobuz.com/album/{albumId}");
+        var (msg, isError) = result switch
+        {
+            EnqueueResult.Added => (Loc.P("queue.added", 1), false),
+            EnqueueResult.Requeued => (Loc["queue.requeued"], false),
+            EnqueueResult.AlreadyQueued => (Loc["queue.alreadyQueued"], false),
+            _ => (Loc["queue.invalidUrl"], true)
+        };
+        ShowToast(msg, isError);
     }
 
-    private async Task DownloadTrack(int trackId)
+    private void ShowToast(string message, bool isError = false)
     {
-        await Download.ProcessUrlAsync($"https://play.qobuz.com/track/{trackId}");
+        _toast = message;
+        _toastIsError = isError;
+        _toastSeq++;
+
+        // Compteur de génération : un toast plus récent neutralise le Task.Delay du précédent, qui
+        // sinon effacerait le message affiché avant l'heure.
+        var gen = ++_toastGen;
+        _ = HideToastLater(gen);
     }
 
-    private async Task DownloadArtist(int artistId)
+    private async Task HideToastLater(int gen)
     {
-        await Download.ProcessUrlAsync($"https://play.qobuz.com/artist/{artistId}");
+        await Task.Delay(1600);   // l'animation toastOut se termine à 1,5 s
+        if (gen != _toastGen) return;
+        _toast = null;
+        // L'utilisateur a pu quitter la page entre-temps : le circuit est alors fermé et il n'y a
+        // plus rien à redessiner.
+        try { await InvokeAsync(StateHasChanged); }
+        catch (ObjectDisposedException) { }
     }
 
     private void ToggleAlbum(string id)
@@ -324,7 +425,7 @@
         _selectedTracks.Clear();
     }
 
-    private async Task DownloadSelected()
+    private void DownloadSelected()
     {
         // Order the batch like the lists are displayed on screen rather than by the arbitrary
         // order of the selection HashSets. Anything selected in a previous search (no longer in
@@ -352,14 +453,34 @@
         var seenTracks = trackIds.ToHashSet();
         trackIds.AddRange(_selectedTracks.Where(id => !seenTracks.Contains(id)));
 
-        var urls = new List<string>();
+        // Retrouver les objets pour alimenter libellé, artiste et vignette de la file. Un identifiant
+        // sélectionné lors d'une recherche précédente n'est plus dans les listes visibles : on
+        // l'enfile alors sur sa seule URL, plutôt que de le perdre en route.
+        var albumById = new Dictionary<string, QobuzAlbum>();
+        foreach (var a in (State.Albums ?? new()).Concat(State.ArtistAlbums ?? new()))
+            albumById[a.Id] = a;
+
+        var trackById = new Dictionary<int, QobuzTrack>();
+        foreach (var t in State.Tracks ?? new())
+            trackById[t.Id] = t;
+
+        var requests = new List<QueueRequest>();
         foreach (var id in albumIds)
-            urls.Add($"https://play.qobuz.com/album/{id}");
+            requests.Add(albumById.TryGetValue(id, out var a)
+                ? AlbumRequest(a)
+                : new QueueRequest(AlbumUrl(id)));
         foreach (var id in trackIds)
-            urls.Add($"https://play.qobuz.com/track/{id}");
+            requests.Add(trackById.TryGetValue(id, out var t)
+                ? TrackRequest(t)
+                : new QueueRequest(TrackUrl(id)));
 
         ClearSelection();
-        await Download.ProcessBatchAsync(urls);
+
+        var (added, requeued, duplicates, invalid) = Download.EnqueueMany(requests);
+        var queued = added + requeued;
+        if (queued > 0) ShowToast(Loc.P("queue.added", queued));
+        else if (duplicates > 0) ShowToast(Loc["queue.alreadyQueued"]);
+        else if (invalid > 0) ShowToast(Loc["queue.invalidUrl"], isError: true);
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

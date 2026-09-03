@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using QobuzDLX.Web.Models;
@@ -11,6 +12,10 @@ public class TemplateService
     private static readonly Regex PercentRegex = new(@"%(.*?)%", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SpacesRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex RepeatedParenthesesRegex = new(@"\(([^()]+)\)\s*(\(\1\))+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Les noms de fichiers ne suivent pas la langue de l'interface : la culture du processus est
+    // fr-FR quand l'utilisateur est en français, ce qui écrirait « 44,1kHz » au lieu de « 44.1kHz ».
+    private static string Rate(double khz) => khz.ToString(CultureInfo.InvariantCulture);
 
     private static readonly string[] VariousArtistsNames = {
         "Various Artists, Array", "Various Artists", "Various Aritsts",
@@ -110,7 +115,7 @@ public class TemplateService
                 .Replace("%tracknumber%", track.TrackNumber.ToString().PadLeft(padLen, '0'))
                 .Replace("%isrc%", track.ISRC ?? "")
                 .Replace("%trackbitdepth%", track.MaximumBitDepth.ToString())
-                .Replace("%tracksamplerate%", track.MaximumSamplingRate.ToString());
+                .Replace("%tracksamplerate%", Rate(track.MaximumSamplingRate));
 
             var titleFormatted = FormatTrackTitle(track);
             template = template.Replace("%tracktitle%", titleFormatted);
@@ -150,7 +155,7 @@ public class TemplateService
                 .Replace("%year%", year)
                 .Replace("%releasetype%", productType)
                 .Replace("%bitdepth%", album.MaximumBitDepth.ToString())
-                .Replace("%samplerate%", album.MaximumSamplingRate.ToString())
+                .Replace("%samplerate%", Rate(album.MaximumSamplingRate))
                 .Replace("%albumtitle%", albumTitle)
                 .Replace("%format%", fileFormat);
 
@@ -214,7 +219,7 @@ public class TemplateService
             case "6": // FLAC 16bit
                 template = template
                     .Replace(hiResPlaceholder, fileFormat)
-                    .Replace(qualityPlaceholder, $"{fileFormat} ({maximumBitDepth}bit-{maximumSamplingRate}kHz)");
+                    .Replace(qualityPlaceholder, $"{fileFormat} ({maximumBitDepth}bit-{Rate(maximumSamplingRate)}kHz)");
                 break;
 
             case "7":  // FLAC 24bit <=96kHz
@@ -224,7 +229,7 @@ public class TemplateService
                     // Not actually hi-res
                     template = template
                         .Replace(hiResPlaceholder, fileFormat)
-                        .Replace(qualityPlaceholder, $"{fileFormat} ({maximumBitDepth}bit-{maximumSamplingRate}kHz)");
+                        .Replace(qualityPlaceholder, $"{fileFormat} ({maximumBitDepth}bit-{Rate(maximumSamplingRate)}kHz)");
                 }
                 else if (maximumSamplingRate < 192)
                 {
@@ -234,7 +239,7 @@ public class TemplateService
                     if (maximumSamplingRate < 96)
                     {
                         template = template.Replace(hiResPlaceholder,
-                            $"{fileFormat} ({maximumBitDepth}bit-{maximumSamplingRate}kHz)");
+                            $"{fileFormat} ({maximumBitDepth}bit-{Rate(maximumSamplingRate)}kHz)");
                     }
                     else if (maximumSamplingRate > 96 && maximumSamplingRate < 192)
                     {
@@ -249,13 +254,13 @@ public class TemplateService
                         else
                         {
                             template = template.Replace(hiResPlaceholder,
-                                $"{fileFormat} ({maximumBitDepth}bit-{maximumSamplingRate}kHz)");
+                                $"{fileFormat} ({maximumBitDepth}bit-{Rate(maximumSamplingRate)}kHz)");
                         }
                     }
                     else // exactly 96
                     {
                         template = template.Replace(hiResPlaceholder,
-                            $"{fileFormat} ({maximumBitDepth}bit-{maximumSamplingRate}kHz)");
+                            $"{fileFormat} ({maximumBitDepth}bit-{Rate(maximumSamplingRate)}kHz)");
                     }
                 }
                 else // >= 192

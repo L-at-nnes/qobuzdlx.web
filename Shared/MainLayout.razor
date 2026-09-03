@@ -3,6 +3,7 @@
 @inject SettingsService Settings
 @inject AppGuardService Guard
 @inject LocalizationService Loc
+@inject DownloadService Download
 @implements IDisposable
 
 @{
@@ -13,8 +14,8 @@
 @if (isLocked)
 {
     <div id="app">
-        <div style="width:100%;height:100vh;display:flex;align-items:center;justify-content:center;">
-            <div style="width: 400px;">
+        <div class="auth-shell">
+            <div class="auth-card">
                 <div class="card">
                     <div style="text-align:center;margin-bottom:20px;">
                         <h2 style="color:var(--accent);font-size:1.8em;">QBDLX</h2>
@@ -52,14 +53,22 @@ else
     <div id="app">
         @if (!Api.IsLoggedIn)
         {
-            <div style="width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div class="auth-shell">
                 @Body
                 <LanguageSwitch />
             </div>
         }
         else
         {
-            <nav class="sidebar">
+            @* Barre supérieure et voile : masqués par CSS au-dessus de 768px, où la barre
+               latérale reprend sa place dans le flux. *@
+            <header class="app-topbar">
+                <button class="topbar-burger" @onclick="ToggleMenu" aria-label='@Loc["nav.menu"]'>&#9776;</button>
+                <span class="topbar-title">QBDLX</span>
+            </header>
+            <div class="sidebar-backdrop @(_menuOpen ? "open" : "")" @onclick="CloseMenu"></div>
+
+            <nav class="sidebar @(_menuOpen ? "open" : "")">
                 <div class="sidebar-logo">QBDLX</div>
                 <div class="sidebar-user">
                     <strong>@Settings.Settings.UserDisplayName</strong>
@@ -69,7 +78,16 @@ else
                     }
                 </div>
                 <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">@Loc["nav.search"]</NavLink>
-                <NavLink class="nav-link" href="/telechargement">@Loc["nav.download"]</NavLink>
+                @* Le libellé est enveloppé dans un <span> : entre deux éléments, l'espacement du
+                   source est ignoré par le flex, alors qu'un nœud texte nu deviendrait un item
+                   anonyme avec ses blancs d'indentation. *@
+                <NavLink class="nav-link" href="/telechargement">
+                    <span>@Loc["nav.download"]</span>
+                    @if (Download.RemainingCount > 0)
+                    {
+                        <span class="nav-badge">@Download.RemainingCount</span>
+                    }
+                </NavLink>
                 <NavLink class="nav-link" href="/settings">@Loc["nav.settings"]</NavLink>
                 <div class="nav-spacer"></div>
                 <button class="nav-link" @onclick="Logout">@Loc["nav.logout"]</button>
@@ -87,10 +105,13 @@ else
     private string _accessPassword = "";
     private bool _lockError;
 
+    // Tiroir de navigation : n'a d'effet que sous 768px, où le CSS sort la barre latérale du flux.
+    private bool _menuOpen;
+
     private static readonly string AppVersion =
         System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v
             ? $"{v.Major}.{v.Minor}.{v.Build}"
-            : "1.3.0";
+            : "1.4.0";
 
     [Inject] NavigationManager NavigationManager { get; set; } = default!;
 
@@ -99,13 +120,35 @@ else
     protected override void OnInitialized()
     {
         Loc.OnLanguageChanged += OnLanguageChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+        // OnQueueChanged et non OnProgressChanged : la pastille n'a besoin de savoir que lorsque la
+        // file change, quelques fois par minute. L'autre événement redessinerait la barre latérale
+        // de tous les circuits ouverts à chaque bloc de 80 Ko reçu.
+        Download.OnQueueChanged += OnQueueChanged;
     }
 
     private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
 
+    private void OnQueueChanged() => InvokeAsync(StateHasChanged);
+
+    // Un seul point de branchement pour refermer le tiroir après une navigation, plutôt qu'un
+    // @onclick sur chacun des liens.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (!_menuOpen) return;
+        _menuOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private void CloseMenu() => _menuOpen = false;
+
     public void Dispose()
     {
         Loc.OnLanguageChanged -= OnLanguageChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        Download.OnQueueChanged -= OnQueueChanged;
     }
 
     private void TryUnlock()

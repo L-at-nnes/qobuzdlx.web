@@ -4,17 +4,62 @@ using QobuzDLX.Web.Models;
 
 namespace QobuzDLX.Web.Services;
 
+public enum QueueItemStatus { Pending, Running, Completed, Failed, Cancelled }
+
+public enum EnqueueResult { Added, Requeued, AlreadyQueued, InvalidUrl }
+
+public class QueueItem
+{
+    /// <summary>Identité interne stable : sert de @key Blazor et de cible aux actions de l'UI.
+    /// Ne participe jamais à l'unicité, qui repose sur <see cref="Url"/>.</summary>
+    public string Id { get; init; } = Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>Clé métier : URL canonique play.qobuz.com/{kind}/{refId}, sans requête ni fragment.
+    /// C'est elle qui porte l'unicité, le grisage des boutons et la marque « déjà téléchargé ».</summary>
+    public string Url { get; init; } = "";
+
+    public string Kind { get; init; } = "";   // album | track | artist | playlist | label | user
+    public string RefId { get; init; } = "";
+
+    // Affichage. Renseignés par l'appelant quand il les a sous la main (page Recherche) ; repli sur
+    // l'URL quand l'ajout vient du champ libre de la page Téléchargement.
+    public string Label { get; set; } = "";
+    public string? SubLabel { get; set; }
+    public string? Thumbnail { get; set; }
+
+    public QueueItemStatus Status { get; set; } = QueueItemStatus.Pending;
+    public string? Error { get; set; }
+
+    public DateTime EnqueuedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+
+    public bool IsFinished =>
+        Status is QueueItemStatus.Completed or QueueItemStatus.Failed or QueueItemStatus.Cancelled;
+}
+
 public class DownloadProgress
 {
     public int Percent { get; set; }
     public string Status { get; set; } = "";
     public string CurrentItem { get; set; } = "";
     public string Speed { get; set; } = "";
+
+    /// <summary>Un élément de la file est en cours de traitement.</summary>
     public bool IsRunning { get; set; }
+
+    /// <summary>La file a été drainée au moins une fois et est au repos.</summary>
     public bool IsComplete { get; set; }
-    public List<string> Log { get; set; } = new();
+
     public QobuzAlbum? CurrentAlbum { get; set; }
+
+    /// <summary>Identifiant de l'élément en cours, pour surligner sa ligne sans comparer de libellé.</summary>
+    public string? CurrentQueueItemId { get; set; }
 }
+
+/// <summary>Demande d'ajout à la file. Les champs d'affichage sont facultatifs : la page Recherche
+/// les connaît, le champ libre de la page Téléchargement non.</summary>
+public record QueueRequest(string Url, string? Label = null, string? SubLabel = null, string? Thumbnail = null);
 
 public class DownloadService
 {
@@ -25,12 +70,50 @@ public class DownloadService
     private readonly LocalizationService _loc;
     private readonly ILogger<DownloadService> _logger;
 
-    private CancellationTokenSource? _cts;
+    // ─── État partagé ───
+    //
+    // Un verrou unique protège la file, le journal et les deux index dérivés. Le service est
+    // Singleton et le worker tourne hors du circuit Blazor : toute lecture destinée au rendu passe
+    // par un instantané (QueueSnapshot / LogSnapshot), jamais par la collection vive, sinon
+    // l'énumération concurrente lève « Collection was modified ».
+    private readonly object _gate = new();
+    private readonly List<QueueItem> _queue = new();
+    private readonly List<string> _log = new();
+
+    // Index dérivés de _queue, pour que le grisage des boutons de la page Recherche ne soit pas
+    // un balayage linéaire par bouton rendu.
+    private readonly HashSet<string> _activeUrls = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _doneUrls = new(StringComparer.OrdinalIgnoreCase);
+
+    // Trois portées d'annulation, trois gestes distincts :
+    //   _appCts      → l'application s'arrête (docker stop) : on abandonne tout, immédiatement
+    //   _itemCts     → « ANNULER » : l'élément courant est abandonné, le worker enchaîne
+    //   _skipCurrent → « PASSER » : saute l'album courant, reste dans le même élément
+    private readonly CancellationTokenSource _appCts = new();
+    private readonly CancellationToken _appCt;
+    private CancellationTokenSource? _itemCts;
     private bool _skipCurrent;
+
+    // Réveil du worker. Borné à 1 : enfiler cinquante éléments d'un coup ne provoque pas cinquante
+    // réveils, et le worker draine de toute façon jusqu'à ne plus rien trouver.
+    private readonly SemaphoreSlim _signal = new(0, 1);
+    private Task? _worker;
+
     private string _sessionId = "";
+    private long _lastProgressTick;
+
+    private const int LogMaxLines = 1200;
+    private const int LogTrimLines = 400;
+
     public DownloadProgress Progress { get; } = new();
 
+    /// <summary>Haute fréquence (pourcentage, vitesse) : étranglé à 200 ms, sauf appel forcé.</summary>
     public event Action? OnProgressChanged;
+
+    /// <summary>Basse fréquence (ajout, fin, réordonnancement) : jamais étranglé. C'est celui-là
+    /// qu'écoutent la pastille du menu et le grisage des boutons de recherche — les abonner à
+    /// OnProgressChanged redessinerait tous les circuits ouverts à chaque bloc reçu.</summary>
+    public event Action? OnQueueChanged;
 
     private static readonly Regex QobuzStoreLinkRegex = new(
         @"https://(?:.*?).qobuz.com/(?<region>.*?)/(?<type>.*?)/(?<name>.*?)/(?<id>.*?)$", RegexOptions.Compiled);
@@ -39,7 +122,7 @@ public class DownloadService
     private static readonly Regex QobuzUrlRegex = new(
         @"^https?://(?!.*https?://)(?:[\w\-]+\.)?qobuz\.com/[^\s]+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public DownloadService(QobuzApiService api, SettingsService settings, TemplateService templates, TaggingService tagging, LocalizationService loc, ILogger<DownloadService> logger)
+    public DownloadService(QobuzApiService api, SettingsService settings, TemplateService templates, TaggingService tagging, LocalizationService loc, IHostApplicationLifetime lifetime, ILogger<DownloadService> logger)
     {
         _api = api;
         _settings = settings;
@@ -47,6 +130,11 @@ public class DownloadService
         _tagging = tagging;
         _loc = loc;
         _logger = logger;
+
+        _appCt = _appCts.Token;
+        // Sans cela, `docker stop` attendrait le délai de grâce complet pendant qu'un téléchargement
+        // continue dans le vide.
+        lifetime.ApplicationStopping.Register(() => { try { _appCts.Cancel(); } catch { } });
 
         MigrateTempFolder();
     }
@@ -77,22 +165,360 @@ public class DownloadService
         }
     }
 
+    // ─── Lecture pour l'interface ───
+
+    /// <summary>Un élément de la file est en cours de traitement. Ne grise plus aucun bouton
+    /// d'ajout : c'est tout l'intérêt de la file.</summary>
     public bool IsRunning => Progress.IsRunning;
 
-    public void Abort()
+    /// <summary>Copie sous verrou. Les champs des QueueItem retournés sont mutés par le worker sous
+    /// ce même verrou ; la barrière mémoire prise ici garantit donc qu'on les lit à jour, et les
+    /// relire hors verrou après l'instantané est sûr. Ne pas « optimiser » en retournant _queue.</summary>
+    public IReadOnlyList<QueueItem> QueueSnapshot()
     {
-        _cts?.Cancel();
+        lock (_gate) return _queue.ToList();
     }
 
-    public void SkipCurrent()
+    public IReadOnlyList<string> LogSnapshot()
     {
-        _skipCurrent = true;
+        lock (_gate) return _log.ToList();
+    }
+
+    /// <summary>Pour détecter l'arrivée de nouvelles lignes sans recopier tout le journal.</summary>
+    public int LogCount
+    {
+        get { lock (_gate) return _log.Count; }
+    }
+
+    /// <summary>En attente + en cours : ce qu'affiche la pastille du menu.</summary>
+    public int RemainingCount
+    {
+        get { lock (_gate) return _queue.Count(i => !i.IsFinished); }
+    }
+
+    /// <summary>Déjà en file (en attente ou en cours) : le bouton correspondant est grisé.</summary>
+    public bool IsQueued(string url)
+    {
+        if (!TryParseQobuzUrl(url, out var canonical, out _, out _)) return false;
+        lock (_gate) return _activeUrls.Contains(canonical);
+    }
+
+    /// <summary>Terminé avec succès : le bouton reste cliquable, avec une marque ✓.</summary>
+    public bool IsDone(string url)
+    {
+        if (!TryParseQobuzUrl(url, out var canonical, out _, out _)) return false;
+        lock (_gate) return _doneUrls.Contains(canonical);
+    }
+
+    // ─── Analyse d'URL ───
+
+    /// <summary>
+    /// Valide une URL Qobuz et en extrait la forme canonique play.qobuz.com/{kind}/{refId}.
+    /// Pure et statique : appelée à l'ajout, jamais au traitement, pour que deux écritures de la
+    /// même adresse (avec ou sans ?utm_source=…) produisent la même clé et donc un seul élément.
+    /// </summary>
+    public static bool TryParseQobuzUrl(string? input, out string canonicalUrl, out string kind, out string refId)
+    {
+        canonicalUrl = ""; kind = ""; refId = "";
+        if (string.IsNullOrWhiteSpace(input)) return false;
+
+        var url = input.Trim();
+
+        // Couper requête et fragment AVANT toute chose : QobuzUrlRegex se termine par [^\s]+$ et
+        // les laisserait passer jusque dans l'identifiant, créant un doublon invisible.
+        var cut = url.IndexOfAny(new[] { '?', '#' });
+        if (cut >= 0) url = url[..cut];
+
+        url = url.TrimEnd('/');
+        if (url.EndsWith("/releases", StringComparison.OrdinalIgnoreCase))
+            url = url[..^"/releases".Length];
+
+        if (!QobuzUrlRegex.IsMatch(url)) return false;
+
+        // Lien boutique (qobuz.com/fr-fr/album/nom/id) → lien lecteur
+        var storeMatch = QobuzStoreLinkRegex.Match(url);
+        if (storeMatch.Success)
+        {
+            var storeType = storeMatch.Groups["type"].Value;
+            var storeId = storeMatch.Groups["id"].Value;
+            if (storeType == "album") url = $"https://play.qobuz.com/album/{storeId}";
+            else if (storeType == "interpreter") url = $"https://play.qobuz.com/artist/{storeId}";
+        }
+
+        var linkMatch = QobuzLinkIdGrabRegex.Match(url);
+        if (!linkMatch.Success) return false;
+
+        kind = linkMatch.Groups["type"].Value;
+        refId = linkMatch.Groups["id"].Value;   // pour « user », contient des « / » (library/favorites/albums)
+        if (string.IsNullOrEmpty(kind) || string.IsNullOrEmpty(refId)) return false;
+
+        canonicalUrl = $"https://play.qobuz.com/{kind}/{refId}";
+        return true;
+    }
+
+    // ─── Ajout à la file ───
+
+    public EnqueueResult Enqueue(string url, string? label = null, string? subLabel = null, string? thumbnail = null)
+    {
+        if (!TryParseQobuzUrl(url, out var canonical, out var kind, out var refId))
+        {
+            Log(_loc.T("log.invalidUrl", url));
+            return EnqueueResult.InvalidUrl;
+        }
+
+        EnqueueResult result;
+        lock (_gate)
+        {
+            var existing = _queue.FirstOrDefault(i =>
+                string.Equals(i.Url, canonical, StringComparison.OrdinalIgnoreCase));
+
+            if (existing is { IsFinished: false })
+            {
+                result = EnqueueResult.AlreadyQueued;
+            }
+            else if (existing != null)
+            {
+                // Déjà traité : le remettre en attente en fin de file plutôt que d'en créer un
+                // doublon, sinon l'unicité par URL ne tiendrait plus.
+                existing.Status = QueueItemStatus.Pending;
+                existing.Error = null;
+                existing.StartedAt = null;
+                existing.FinishedAt = null;
+                existing.EnqueuedAt = DateTime.UtcNow;
+                if (!string.IsNullOrWhiteSpace(label)) existing.Label = label!;
+                if (!string.IsNullOrWhiteSpace(subLabel)) existing.SubLabel = subLabel;
+                if (!string.IsNullOrWhiteSpace(thumbnail)) existing.Thumbnail = thumbnail;
+                _queue.Remove(existing);
+                _queue.Add(existing);
+                ReindexLocked();
+                result = EnqueueResult.Requeued;
+            }
+            else
+            {
+                _queue.Add(new QueueItem
+                {
+                    Url = canonical,
+                    Kind = kind,
+                    RefId = refId,
+                    Label = string.IsNullOrWhiteSpace(label) ? canonical : label!,
+                    SubLabel = subLabel,
+                    Thumbnail = thumbnail
+                });
+                ReindexLocked();
+                result = EnqueueResult.Added;
+            }
+
+            // Démarrage paresseux : aucun thread ne tourne tant que rien n'a été demandé.
+            // Task.Run se contente de mettre en file d'attente du pool, donc pas de réentrance ici.
+            if (result != EnqueueResult.AlreadyQueued)
+                _worker ??= Task.Run(WorkerLoopAsync);
+        }
+
+        // Hors verrou : un abonné Blazor poste sur le dispatcher de son circuit, lever l'événement
+        // sous _gate inviterait l'interblocage.
+        if (result != EnqueueResult.AlreadyQueued)
+        {
+            Signal();
+            RaiseQueueChanged();
+        }
+        return result;
+    }
+
+    public (int added, int requeued, int duplicates, int invalid) EnqueueMany(IEnumerable<QueueRequest> requests)
+    {
+        int added = 0, requeued = 0, duplicates = 0, invalid = 0;
+        foreach (var r in requests)
+        {
+            switch (Enqueue(r.Url, r.Label, r.SubLabel, r.Thumbnail))
+            {
+                case EnqueueResult.Added: added++; break;
+                case EnqueueResult.Requeued: requeued++; break;
+                case EnqueueResult.AlreadyQueued: duplicates++; break;
+                default: invalid++; break;
+            }
+        }
+        return (added, requeued, duplicates, invalid);
+    }
+
+    // ─── Gestes ───
+
+    /// <summary>Saute l'album courant à l'intérieur de l'élément en cours (un artiste en compte
+    /// souvent des dizaines). L'élément, lui, poursuit.</summary>
+    public void SkipCurrent() => _skipCurrent = true;
+
+    /// <summary>Abandonne l'élément en cours dans son entier ; le worker enchaîne sur le suivant.</summary>
+    public void CancelCurrent()
+    {
+        try { _itemCts?.Cancel(); } catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>Purge les éléments en attente. Celui qui tourne va au bout — c'est la différence
+    /// avec « ANNULER », et elle est volontaire.</summary>
+    public void ClearPending()
+    {
+        bool changed;
+        lock (_gate)
+        {
+            changed = _queue.RemoveAll(i => i.Status == QueueItemStatus.Pending) > 0;
+            if (changed) ReindexLocked();
+        }
+        if (changed) RaiseQueueChanged();
+    }
+
+    public void ClearFinished()
+    {
+        bool changed;
+        lock (_gate)
+        {
+            changed = _queue.RemoveAll(i => i.IsFinished) > 0;
+            if (changed) ReindexLocked();
+        }
+        if (changed) RaiseQueueChanged();
+    }
+
+    public void Remove(string itemId)
+    {
+        bool changed;
+        lock (_gate)
+        {
+            // L'élément en cours ne se retire pas : il faut d'abord l'annuler.
+            changed = _queue.RemoveAll(i => i.Id == itemId && i.Status != QueueItemStatus.Running) > 0;
+            if (changed) ReindexLocked();
+        }
+        if (changed) RaiseQueueChanged();
+    }
+
+    public void MoveUp(string itemId) => Move(itemId, -1);
+    public void MoveDown(string itemId) => Move(itemId, +1);
+
+    private void Move(string itemId, int direction)
+    {
+        bool changed = false;
+        lock (_gate)
+        {
+            var idx = _queue.FindIndex(i => i.Id == itemId);
+            if (idx >= 0 && _queue[idx].Status == QueueItemStatus.Pending)
+            {
+                // On n'échange qu'avec un autre élément en attente : les terminés et celui qui
+                // tourne gardent leur place, sinon l'ordre affiché sauterait sans raison visible.
+                var target = idx + direction;
+                while (target >= 0 && target < _queue.Count && _queue[target].Status != QueueItemStatus.Pending)
+                    target += direction;
+
+                if (target >= 0 && target < _queue.Count)
+                {
+                    (_queue[idx], _queue[target]) = (_queue[target], _queue[idx]);
+                    changed = true;   // l'ordre change, pas les statuts : pas de réindexation
+                }
+            }
+        }
+        if (changed) RaiseQueueChanged();
+    }
+
+    public void Retry(string itemId)
+    {
+        bool changed = false;
+        lock (_gate)
+        {
+            var item = _queue.FirstOrDefault(i => i.Id == itemId);
+            if (item is { IsFinished: true })
+            {
+                item.Status = QueueItemStatus.Pending;
+                item.Error = null;
+                item.StartedAt = null;
+                item.FinishedAt = null;
+                item.EnqueuedAt = DateTime.UtcNow;
+                _queue.Remove(item);
+                _queue.Add(item);
+                ReindexLocked();
+                _worker ??= Task.Run(WorkerLoopAsync);
+                changed = true;
+            }
+        }
+        if (changed) { Signal(); RaiseQueueChanged(); }
+    }
+
+    public void ClearLog()
+    {
+        lock (_gate) _log.Clear();
+        RaiseProgress(force: true);
+    }
+
+    // ─── Mécanique interne ───
+
+    /// <summary>À appeler sous _gate après toute mutation de statut ou de composition de la file.
+    /// Reconstruire les index plutôt que d'y appliquer des deltas : la file compte quelques
+    /// dizaines d'éléments au plus, et un index dérivé ne peut alors pas diverger de sa source.</summary>
+    private void ReindexLocked()
+    {
+        _activeUrls.Clear();
+        _doneUrls.Clear();
+        foreach (var it in _queue)
+        {
+            if (!it.IsFinished) _activeUrls.Add(it.Url);
+            else if (it.Status == QueueItemStatus.Completed) _doneUrls.Add(it.Url);
+        }
+    }
+
+    private void Signal()
+    {
+        // Borné à 1 : le sémaphore est un drapeau « il y a du travail », pas un compteur.
+        try { _signal.Release(); } catch (SemaphoreFullException) { }
+    }
+
+    /// <summary>Mute le statut sous verrou puis notifie hors verrou. Toutes les transitions passent
+    /// par ici, c'est ce qui garantit que les index restent cohérents.</summary>
+    private void SetStatus(QueueItem item, QueueItemStatus status, string? error = null)
+    {
+        lock (_gate)
+        {
+            item.Status = status;
+            item.Error = error;
+            if (item.IsFinished) item.FinishedAt = DateTime.UtcNow;
+            ReindexLocked();
+        }
+        RaiseQueueChanged();
+    }
+
+    private void RaiseProgress(bool force = false)
+    {
+        // Sans cet étranglement, la boucle d'octets de DownloadStreamToFileAsync redessinerait tous
+        // les circuits ouverts à chaque bloc de 80 Ko, soit des dizaines de fois par seconde.
+        if (!force && Environment.TickCount64 - _lastProgressTick < 200) return;
+        _lastProgressTick = Environment.TickCount64;
+        RaiseSafely(OnProgressChanged, nameof(OnProgressChanged));
+    }
+
+    private void RaiseQueueChanged() => RaiseSafely(OnQueueChanged, nameof(OnQueueChanged));
+
+    /// <summary>
+    /// Invoque chaque abonné séparément, en absorbant ses exceptions. Deux raisons, toutes deux
+    /// vécues : un abonné Blazor dont le circuit vient de se fermer lève ObjectDisposedException,
+    /// et une exception remontant depuis le worker le tuerait — ou, pire, ferait passer l'élément
+    /// en cours pour un échec. Parcourir la liste d'invocation plutôt que d'appeler le délégué
+    /// multicast évite qu'un onglet mort prive les autres de leur notification.
+    /// </summary>
+    private void RaiseSafely(Action? handler, string name)
+    {
+        if (handler == null) return;
+        foreach (var d in handler.GetInvocationList())
+        {
+            try { ((Action)d)(); }
+            catch (Exception ex) { _logger.LogDebug(ex, "{Event}: un abonné a levé une exception", name); }
+        }
     }
 
     private void Log(string msg)
     {
-        Progress.Log.Add(msg);
-        OnProgressChanged?.Invoke();
+        lock (_gate)
+        {
+            _log.Add(msg);
+            // Purge par tranches : un RemoveRange de 400 lignes toutes les 400 lignes coûte bien
+            // moins qu'un décalage du tableau à chaque ajout. Aucun effacement automatique en
+            // dehors de cette borne — avec une file qui enchaîne, il serait toujours arbitraire.
+            if (_log.Count > LogMaxLines) _log.RemoveRange(0, LogTrimLines);
+        }
+        RaiseProgress(force: true);
     }
 
     private void UpdateProgress(int percent, string status, string currentItem = "")
@@ -100,120 +526,157 @@ public class DownloadService
         Progress.Percent = percent;
         Progress.Status = status;
         if (!string.IsNullOrEmpty(currentItem)) Progress.CurrentItem = currentItem;
-        OnProgressChanged?.Invoke();
+        RaiseProgress(force: true);
     }
 
-    // ─── Main entry: process a Qobuz URL ───
+    // ─── Worker ───
 
-    public async Task ProcessUrlAsync(string inputUrl)
+    private async Task WorkerLoopAsync()
     {
-        if (Progress.IsRunning) return;
+        while (!_appCt.IsCancellationRequested)
+        {
+            try { await _signal.WaitAsync(_appCt); }
+            catch (OperationCanceledException) { return; }
+
+            // Drainer jusqu'à ne plus rien trouver : le sémaphore signale « il y a du travail »
+            // sans dire combien.
+            var processedAny = false;
+            while (!_appCt.IsCancellationRequested)
+            {
+                QueueItem? item;
+                lock (_gate)
+                {
+                    item = _queue.FirstOrDefault(i => i.Status == QueueItemStatus.Pending);
+                    if (item != null)
+                    {
+                        item.Status = QueueItemStatus.Running;
+                        item.StartedAt = DateTime.UtcNow;
+                        ReindexLocked();
+                    }
+                }
+                if (item == null) break;
+
+                processedAny = true;
+                RaiseQueueChanged();
+
+                try
+                {
+                    await RunItemAsync(item);
+                }
+                catch (Exception ex)
+                {
+                    // Filet de sécurité : le worker ne meurt jamais sur l'échec d'un élément,
+                    // sans quoi toute la file resterait bloquée en attente pour toujours.
+                    _logger.LogError(ex, "Queue worker: unhandled failure on {Url}", item.Url);
+                    try { SetStatus(item, QueueItemStatus.Failed, ex.Message); } catch { }
+                }
+            }
+
+            if (_appCt.IsCancellationRequested) return;
+
+            // Le sémaphore étant borné à 1, un réveil peut survenir alors que la file a déjà été
+            // drainée au tour précédent : sans ce garde, le message de fin serait écrit deux fois.
+            if (!processedAny) continue;
+
+            // File vidée : remettre la carte de progression au repos. Sans cela l'album et la
+            // vitesse du dernier téléchargement resteraient affichés indéfiniment.
+            Progress.IsRunning = false;
+            Progress.IsComplete = true;
+            Progress.CurrentQueueItemId = null;
+            Progress.CurrentAlbum = null;
+            Progress.CurrentItem = "";
+            Progress.Speed = "";
+            Progress.Percent = 0;
+            Progress.Status = "";
+            Log(_loc["log.queueDrained"]);
+            RaiseProgress(force: true);
+            RaiseQueueChanged();
+        }
+    }
+
+    private async Task RunItemAsync(QueueItem item)
+    {
+        // Lié au jeton applicatif : l'arrêt du conteneur interrompt le téléchargement au lieu
+        // d'attendre le délai de grâce de docker stop.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_appCt);
+        _itemCts = cts;
+        var ct = cts.Token;
+
+        _sessionId = Guid.NewGuid().ToString("N")[..8];
+        _skipCurrent = false;
 
         Progress.IsRunning = true;
         Progress.IsComplete = false;
         Progress.Percent = 0;
-        Progress.Log.Clear();
-        _sessionId = Guid.NewGuid().ToString("N")[..8];
+        Progress.Speed = "";
         Progress.CurrentAlbum = null;
-        _skipCurrent = false;
-        _cts = new CancellationTokenSource();
+        Progress.CurrentItem = item.Label;
+        Progress.CurrentQueueItemId = item.Id;
+        RaiseProgress(force: true);
+
+        // Séparateur par élément : remplace l'effacement automatique du journal, qui n'a plus de
+        // sens dès lors que plusieurs téléchargements s'enchaînent.
+        Log(_loc.T("log.queueItemStart", item.Label));
 
         try
         {
-            var url = inputUrl.Trim().TrimEnd('/');
-            if (url.EndsWith("/releases", StringComparison.OrdinalIgnoreCase))
-                url = url[..^"/releases".Length];
-
-            if (!QobuzUrlRegex.IsMatch(url))
-            {
-                Log(_loc.T("log.invalidUrl", url));
-                return;
-            }
-
-            // Normalize store links
-            var storeMatch = QobuzStoreLinkRegex.Match(url);
-            if (storeMatch.Success)
-            {
-                var storeType = storeMatch.Groups["type"].Value;
-                var storeId = storeMatch.Groups["id"].Value;
-                if (storeType == "album") url = $"https://play.qobuz.com/album/{storeId}";
-                else if (storeType == "interpreter") url = $"https://play.qobuz.com/artist/{storeId}";
-            }
-
-            var linkMatch = QobuzLinkIdGrabRegex.Match(url);
-            if (!linkMatch.Success) { Log(_loc["log.couldNotParseUrl"]); return; }
-
-            var linkType = linkMatch.Groups["type"].Value;
-            var linkId = linkMatch.Groups["id"].Value;
-
             Log(_loc["log.checkingLink"]);
 
-            var s = _settings.Settings;
-
-            switch (linkType)
+            switch (item.Kind)
             {
                 case "album":
-                    await DownloadAlbumAsync(linkId, _cts.Token);
+                    await DownloadAlbumAsync(item.RefId, ct);
                     break;
                 case "track":
-                    await DownloadSingleTrackAsync(linkId, _cts.Token);
+                    await DownloadSingleTrackAsync(item.RefId, ct);
                     break;
                 case "playlist":
-                    await DownloadPlaylistAsync(linkId, _cts.Token);
+                    await DownloadPlaylistAsync(item.RefId, ct);
                     break;
                 case "artist":
-                    await DownloadArtistAsync(linkId, _cts.Token);
+                    await DownloadArtistAsync(item.RefId, ct);
                     break;
                 case "label":
-                    await DownloadLabelAsync(linkId, _cts.Token);
+                    await DownloadLabelAsync(item.RefId, ct);
                     break;
                 case "user":
-                    if (linkId.Contains("albums"))
-                        await DownloadFavoritesAlbumsAsync(_cts.Token);
-                    else if (linkId.Contains("tracks"))
-                        await DownloadFavoritesTracksAsync(_cts.Token);
-                    else if (linkId.Contains("artists"))
-                        await DownloadFavoritesArtistsAsync(_cts.Token);
+                    if (item.RefId.Contains("albums"))
+                        await DownloadFavoritesAlbumsAsync(ct);
+                    else if (item.RefId.Contains("tracks"))
+                        await DownloadFavoritesTracksAsync(ct);
+                    else if (item.RefId.Contains("artists"))
+                        await DownloadFavoritesArtistsAsync(ct);
                     else
-                        Log(_loc["log.unsupportedUserLink"]);
+                        throw new NotSupportedException(_loc["log.unsupportedUserLink"]);
                     break;
                 default:
-                    Log(_loc.T("log.unsupportedLinkType", linkType));
-                    break;
+                    throw new NotSupportedException(_loc.T("log.unsupportedLinkType", item.Kind));
             }
 
             Log(_loc["log.complete"]);
+            SetStatus(item, QueueItemStatus.Completed);
         }
         catch (OperationCanceledException)
         {
-            Log(_loc["log.aborted"]);
+            // Annulation utilisateur : on le signale et on enchaîne. Arrêt applicatif : inutile de
+            // journaliser, le processus s'éteint et la boucle sortira sur _appCt.
+            if (!_appCt.IsCancellationRequested) Log(_loc["log.aborted"]);
+            SetStatus(item, QueueItemStatus.Cancelled);
         }
         catch (Exception ex)
         {
             Log(_loc.T("log.error", ex.Message));
-            _logger.LogError(ex, "Download failed");
+            _logger.LogError(ex, "Download failed for {Url}", item.Url);
+            SetStatus(item, QueueItemStatus.Failed, ex.Message);
         }
         finally
         {
-            Progress.IsRunning = false;
-            Progress.IsComplete = true;
-            UpdateProgress(100, _loc["download.status.complete"]);
-        }
-    }
-
-    // ─── Batch download ───
-
-    public async Task ProcessBatchAsync(IEnumerable<string> urls)
-    {
-        var urlList = urls.ToList();
-        int total = urlList.Count, idx = 0;
-
-        foreach (var url in urlList)
-        {
-            idx++;
-            Log(_loc.T("log.batchHeader", idx, total));
-            await ProcessUrlAsync(url);
-            if (_cts?.IsCancellationRequested == true) break;
+            _itemCts = null;
+            cts.Dispose();
+            Progress.CurrentQueueItemId = null;
+            Progress.CurrentAlbum = null;
+            Progress.Speed = "";
+            RaiseProgress(force: true);
         }
     }
 
@@ -635,6 +1098,9 @@ public class DownloadService
                 await fs.WriteAsync(buffer.AsMemory(0, read), ct);
                 bytesRead += read;
 
+                // sw n'est jamais redémarré : il sert à calculer la vitesse *moyenne* depuis le
+                // début du fichier. Le cadencement de l'affichage, lui, est assuré par
+                // RaiseProgress(force: false) — d'où l'horodatage séparé côté service.
                 if (totalBytes > 0 && sw.ElapsedMilliseconds > 250)
                 {
                     var pct = (int)(bytesRead * 100 / totalBytes);
@@ -643,7 +1109,7 @@ public class DownloadService
                         ? $"{speed / (1024 * 1024):F2} MB/s"
                         : $"{speed / 1024:F2} KB/s";
                     Progress.Status = _loc.T("download.status.downloading", pct, Progress.Speed);
-                    OnProgressChanged?.Invoke();
+                    RaiseProgress(force: false);
                 }
             }
         }
