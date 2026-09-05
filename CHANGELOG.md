@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   échouait, la pochette temporaire n'était pas supprimée et la piste suivante — d'un autre album —
   l'embarquait à son tour. Le nettoyage est désormais garanti (`finally`), et le fichier temporaire
   porte l'identifiant de l'album pour qu'un résidu ne puisse plus être réutilisé.
+- **Un `settings.json` corrompu n'empêche plus le démarrage.** L'écriture n'était pas atomique et
+  la lecture ne gérait aucune erreur : une coupure pendant la sauvegarde laissait un JSON tronqué,
+  et le conteneur redémarrait en boucle. Les réglages sont désormais écrits dans un fichier voisin
+  puis substitués à l'original (l'ancienne version reste dans `settings.json.bak`). Au démarrage,
+  un fichier illisible est mis de côté sous `settings.json.corrupt-<date>` et la dernière version
+  saine est restaurée, au lieu de faire planter l'application.
 
 ## [1.5.1] - 2026-09-28
 

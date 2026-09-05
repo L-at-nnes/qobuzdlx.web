@@ -82,7 +82,7 @@ Open your browser at **http://localhost:8080**
 | Path | Description |
 |------|-------------|
 | `/downloads` | Where downloaded music files are saved |
-| `/config` | Persistent configuration (`settings.json`) |
+| `/config` | Persistent configuration (`settings.json`, plus its `.bak` backup) |
 
 ### File permissions
 
