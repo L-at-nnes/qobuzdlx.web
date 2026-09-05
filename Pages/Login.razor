@@ -1,4 +1,5 @@
 @page "/login"
+@using System.Net
 @inject QobuzApiService Api
 @inject SettingsService Settings
 @inject NavigationManager Nav
@@ -91,6 +92,9 @@
         }
     }
 
+    private bool HasCustomCredentials =>
+        !string.IsNullOrEmpty(_customAppId) && !string.IsNullOrEmpty(_customAppSecret);
+
     private async Task DoLogin()
     {
         _error = "";
@@ -109,44 +113,30 @@
                 if (string.IsNullOrWhiteSpace(_password)) { _error = Loc["login.error.noPassword"]; return; }
             }
 
-            bool hasCustomCredentials = !string.IsNullOrEmpty(_customAppId) && !string.IsNullOrEmpty(_customAppSecret);
+            // Le couple app_id / app_secret est établi avant le login, puis le login n'est tenté
+            // qu'une fois : un 401 ne peut plus signifier qu'un app_id refusé, il désigne donc de
+            // mauvais identifiants — et un mauvais mot de passe ne se rejoue plus sur chaque repli.
+            (string AppId, string AppSecret)? app = HasCustomCredentials
+                ? (_customAppId, _customAppSecret)
+                : await Api.ResolveAppCredentialsAsync();
 
-            if (hasCustomCredentials)
+            if (app is not var (appId, appSecret))
             {
-                // User provided custom credentials — use them directly, no fallback
-                await LoginWithCredentials(_customAppId, _customAppSecret);
+                _error = Loc["login.error.noAppCredentials"];
                 return;
             }
 
-            // Try dynamic resolution first
-            try
-            {
-                string appId = await Api.GetAppIdAsync();
-                string appSecret = await TryLoginAndResolveSecret(appId);
-                ApplyLogin(appId, appSecret);
-                return;
-            }
-            catch (Exception ex)
-            {
-                // Dynamic resolution failed — try fallbacks
-                System.Diagnostics.Debug.WriteLine($"Dynamic resolution failed: {ex.Message}");
-            }
+            Models.QobuzLoginResponse result = _useToken
+                ? await Api.LoginWithTokenAsync(appId, _token)
+                : await Api.LoginWithEmailAsync(appId, _email, _password);
 
-            // Try each fallback pair
-            foreach (var (fbAppId, fbAppSecret) in QobuzApiService.GetFallbackCredentials())
-            {
-                try
-                {
-                    await LoginWithCredentials(fbAppId, fbAppSecret);
-                    return;
-                }
-                catch
-                {
-                    // This pair didn't work, try next
-                }
-            }
-
-            _error = Loc["login.error.noAppCredentials"];
+            ApplyLogin(appId, appSecret, result);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.BadRequest
+                                                  or HttpStatusCode.Unauthorized
+                                                  or HttpStatusCode.Forbidden)
+        {
+            _error = Loc["login.error.invalidCredentials"];
         }
         catch (HttpRequestException)
         {
@@ -154,9 +144,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message.Contains("401") || ex.Message.Contains("Invalid")
-                ? Loc["login.error.invalidCredentials"]
-                : Loc.T("login.error.generic", ex.Message);
+            _error = Loc.T("login.error.generic", ex.Message);
         }
         finally
         {
@@ -164,30 +152,8 @@
         }
     }
 
-    private async Task<string> TryLoginAndResolveSecret(string appId)
+    private void ApplyLogin(string appId, string appSecret, Models.QobuzLoginResponse result)
     {
-        Models.QobuzLoginResponse result = _useToken
-            ? await Api.LoginWithTokenAsync(appId, _token)
-            : await Api.LoginWithEmailAsync(appId, _email, _password);
-
-        string appSecret = await Api.GetAppSecretAsync(appId, result.UserAuthToken!);
-        _loginResult = result;
-        return appSecret;
-    }
-
-    private async Task LoginWithCredentials(string appId, string appSecret)
-    {
-        Models.QobuzLoginResponse result = _useToken
-            ? await Api.LoginWithTokenAsync(appId, _token)
-            : await Api.LoginWithEmailAsync(appId, _email, _password);
-
-        _loginResult = result;
-        ApplyLogin(appId, appSecret);
-    }
-
-    private void ApplyLogin(string appId, string appSecret)
-    {
-        var result = _loginResult!;
         Api.SetCredentials(appId, appSecret, result.UserAuthToken!);
 
         Settings.Update(s => {
@@ -203,6 +169,4 @@
 
         Nav.NavigateTo("/", forceLoad: true);
     }
-
-    private Models.QobuzLoginResponse? _loginResult;
 }

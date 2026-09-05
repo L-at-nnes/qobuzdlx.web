@@ -5,6 +5,73 @@ All notable changes to QobuzDLX.Web are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
+  erreur de la résolution dynamique était avalée, y compris un refus d'authentification : chaque
+  clic sur « Se connecter » tentait donc jusqu'à cinq logins avec les mêmes identifiants, puis
+  affichait « impossible d'obtenir les identifiants de l'application » au lieu de « identifiants
+  invalides ». Le couple `app_id` / `app_secret` est désormais validé **avant** le login, qui n'est
+  plus tenté qu'une seule fois ; un 400/401/403 signale alors de mauvais identifiants.
+
+## [1.5.1] - 2026-09-28
+
+### Fixed
+- **Connexion : les couples `app_id` / `app_secret` de repli étaient inatteignables.** Les trois
+  couples codés en dur ne répondent plus (HTTP 401) et un couple vérifié est ajouté en tête de
+  liste — mais surtout, cette liste n'était en pratique jamais atteinte. La validation d'un secret
+  acceptait toute réponse autre qu'un HTTP 400, or un `app_id` refusé en amont renvoie 401 **avant**
+  que la signature soit vérifiée : la résolution dynamique depuis `bundle.js` « réussissait » donc
+  avec un secret inutilisable. Seul un HTTP 200 vaut désormais succès, et le secret extrait par
+  expression régulière directe est validé au même titre que les autres au lieu d'être accepté
+  d'office. Symptôme typique : la connexion aboutissait, mais tous les téléchargements échouaient.
+- **Séparateur décimal dans les noms de fichiers.** Depuis la 1.3.0, la culture du processus suit
+  la langue de l'interface : en français, `%SampleRate%` et `%FormatWithQuality%` écrivaient
+  `44,1kHz` au lieu de `44.1kHz`. Les gabarits sont désormais formatés en culture invariante,
+  indépendamment de la langue choisie.
+
+## [1.5.0] - 2026-09-07
+
+### Added
+- **Application Android** (`android/`). Une coquille WebView qui affiche l'interface web de votre
+  instance : aucune interface n'est dupliquée, l'application suit donc chaque évolution du site.
+  - **Écran de configuration** : saisir `192.168.1.42`, `qobuz.mondomaine.fr` ou une URL complète.
+    L'adresse est essayée en HTTPS et en HTTP, avec et sans le port 8080 — les quatre en
+    parallèle — et n'est enregistrée qu'une fois `/healthz` confirmé. En cas d'échec, le message
+    liste les adresses tentées : un port publié autre que 8080 ne peut pas être deviné et doit
+    être saisi.
+  - **Changer de serveur** par appui long sur l'icône du lanceur, sans avoir à effacer les
+    données de l'application.
+  - **Avertissement en clair** : une adresse `http://` vers un hôte qui n'est ni sur un réseau
+    privé ni dans un tunnel (Tailscale, WireGuard) déclenche une confirmation explicite, le mot
+    de passe d'accès circulant alors en clair.
+  - Rotation et bascule clair/sombre **ne rechargent plus la page** ; retour arrière, insets et
+    clavier gérés nativement ; écran d'erreur avec « Réessayer » et « Changer de serveur ».
+  - Compilation depuis Android Studio, voir [android/README.md](android/README.md).
+- **Déverrouillage persistant.** Le mot de passe d'accès n'est plus redemandé à chaque
+  rechargement : il est échangé contre un cookie de 30 jours à expiration glissante, qui survit à
+  la fermeture du navigateur **et au redémarrage du conteneur**.
+  - Changer ou retirer le mot de passe dans les Paramètres **déverrouille tous les appareils**.
+- **Reconnexion automatique.** Quand le circuit tombe (mise en veille, coupure Wi-Fi, redémarrage
+  du serveur), un bandeau aux couleurs de l'application remplace l'overlay gris illisible de
+  Blazor, et la page se recharge d'elle-même si les tentatives échouent. Aucun état n'est perdu :
+  recherche, tris et file de téléchargement sont restitués tels quels.
+- **Icône et manifeste web** : l'application peut être ajoutée à l'écran d'accueil et s'ouvre
+  alors sans barre d'adresse.
+- Sonde **`/healthz`** exposant le nom et la version de l'application.
+
+### Fixed
+- L'écran de verrouillage **répond immédiatement**. Le formulaire attendait l'établissement du
+  circuit SignalR : sur un réseau lent, le bouton restait inerte plusieurs secondes alors que la
+  page était visible. C'est désormais un formulaire HTML classique, qui fonctionne dès le
+  prérendu — et que le gestionnaire de mots de passe du téléphone sait remplir.
+- La **limite de tentatives** de déverrouillage était décorative : son compteur vivait dans le
+  circuit, donc ouvrir un nouvel onglet le remettait à zéro. Il est maintenant global à
+  l'application, avec un délai qui double à chaque série d'échecs (30 s, 1 min, 5 min, 15 min).
+- Un changement de langue n'est plus interrompu à mi-chemin lorsqu'un onglet fermé se trouve
+  parmi les abonnés.
+
 ## [1.4.0] - 2026-08-25
 
 ### Added
@@ -57,10 +124,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lieu d'attendre l'expiration du délai de grâce.
 - Un échec sur un élément n'interrompt plus la suite : le traitement se poursuit avec l'élément
   suivant, l'élément fautif étant marqué *Échec* avec son message d'erreur.
-- **Séparateur décimal dans les noms de fichiers.** Depuis la 1.3.0, la culture du processus suit
-  la langue de l'interface : en français, `%SampleRate%` et `%FormatWithQuality%` écrivaient
-  `44,1kHz` au lieu de `44.1kHz`. Les gabarits sont désormais formatés en culture invariante,
-  indépendamment de la langue choisie.
 
 ## [1.3.0] - 2026-08-23
 

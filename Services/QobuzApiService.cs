@@ -28,7 +28,6 @@ public class QobuzApiService
     public string? AppSecret => _appSecret;
     public string? UserAuthToken => _userAuthToken;
     public bool IsLoggedIn => !string.IsNullOrEmpty(_userAuthToken);
-    public static (string AppId, string AppSecret)[] GetFallbackCredentials() => FallbackCredentials;
 
     public QobuzApiService(ILogger<QobuzApiService> logger)
     {
@@ -80,7 +79,34 @@ public class QobuzApiService
         return _appId;
     }
 
-    public async Task<string> GetAppSecretAsync(string appId, string userAuthToken)
+    /// <summary>
+    /// Trouve un couple app_id / app_secret valide <b>avant</b> toute authentification : seul
+    /// <c>track/getFileUrl</c> est sondé, aucun identifiant utilisateur n'est envoyé. Le login peut
+    /// ainsi n'être tenté qu'une fois, avec un app_id déjà éprouvé — un échec 401 y désigne alors
+    /// sans ambiguïté de mauvais identifiants. Renvoie null si aucun couple ne répond.
+    /// </summary>
+    public async Task<(string AppId, string AppSecret)?> ResolveAppCredentialsAsync()
+    {
+        try
+        {
+            var appId = await GetAppIdAsync();
+            return (appId, await GetAppSecretAsync(appId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Dynamic app credentials resolution failed ({Error}), trying fallback pairs", ex.Message);
+        }
+
+        foreach (var (appId, appSecret) in FallbackCredentials)
+        {
+            if (await TestSecretAsync(appId, appSecret))
+                return (appId, appSecret);
+        }
+
+        return null;
+    }
+
+    public async Task<string> GetAppSecretAsync(string appId)
     {
         _logger.LogInformation("Fetching app_secret...");
         var bundleJs = await FetchBundleJsAsync();
@@ -297,7 +323,7 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning("Token login failed ({Status}): {Body}", response.StatusCode, json);
-            throw new Exception($"Token login failed ({(int)response.StatusCode}): {json}");
+            throw new HttpRequestException($"Token login failed ({(int)response.StatusCode}): {json}", null, response.StatusCode);
         }
 
         var user = JsonConvert.DeserializeObject<QobuzUserInfo>(json);
