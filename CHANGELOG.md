@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affichait « impossible d'obtenir les identifiants de l'application » au lieu de « identifiants
   invalides ». Le couple `app_id` / `app_secret` est désormais validé **avant** le login, qui n'est
   plus tenté qu'une seule fois ; un 400/401/403 signale alors de mauvais identifiants.
+- **Le repli de qualité ne bascule plus de FLAC vers MP3.** La chaîne 27 → 7 → 6 → 5 pouvait
+  enregistrer un flux MP3 sous l'extension `.flac` ; TagLib l'ouvrait alors comme du FLAC et la
+  piste échouait avec une erreur obscure. Une qualité FLAC ne se replie plus que sur une qualité
+  FLAC inférieure.
 
 ## [1.5.1] - 2026-09-28
 

@@ -116,6 +116,9 @@ Select your preferred audio quality from the settings page:
 | FLAC 24-bit ≤96kHz | `.flac` | 7 |
 | FLAC 24-bit 192kHz | `.flac` | 27 |
 
+If a track is not available in the chosen FLAC quality, lower FLAC qualities are tried in turn.
+MP3 is never used as a fallback for FLAC, so a `.flac` file always contains FLAC audio.
+
 ### Templates
 
 Customize your folder and file structure using template variables. Default structure:

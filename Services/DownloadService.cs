@@ -1035,36 +1035,34 @@ public class DownloadService
 
     // ─── HTTP stream download helpers ───
 
+    // From highest to lowest: 27 = FLAC 24bit 192kHz, 7 = FLAC 24bit 96kHz, 6 = FLAC 16bit 44.1kHz.
+    private static readonly (string format, string label)[] FlacQualities =
+    {
+        ("27", "FLAC 24bit/192kHz"),
+        ("7",  "FLAC 24bit/96kHz"),
+        ("6",  "FLAC 16bit/44.1kHz"),
+    };
+
+    private static readonly (string format, string label) Mp3Quality = ("5", "MP3 320");
+
     /// <summary>
     /// Returns the chain of (format_id, label) to try for downloading a track.
     /// Starts with the user's chosen quality, then falls back to lower qualities
     /// if Qobuz refuses or throttles the high-res stream.
+    /// MP3 is never a fallback for FLAC: the file keeps the extension of the requested format
+    /// (<see cref="AppSettings.AudioFormat"/>), so an MP3 stream saved as ".flac" cannot be tagged.
     /// </summary>
     private static IEnumerable<(string format, string label)> BuildQualityFallbackChain(string requested)
     {
-        // Quality order from highest to lowest:
-        //  27 = FLAC 24bit 192kHz, 7 = FLAC 24bit 96kHz, 6 = FLAC 16bit 44.1kHz, 5 = MP3 320
-        var allQualities = new (string format, string label)[]
-        {
-            ("27", "FLAC 24bit/192kHz"),
-            ("7",  "FLAC 24bit/96kHz"),
-            ("6",  "FLAC 16bit/44.1kHz"),
-            ("5",  "MP3 320"),
-        };
+        if (requested == Mp3Quality.format)
+            return new[] { Mp3Quality };
 
-        // Find requested quality, then yield it followed by lower ones
-        bool foundRequested = false;
-        foreach (var q in allQualities)
-        {
-            if (q.format == requested) foundRequested = true;
-            if (foundRequested) yield return q;
-        }
-        // If the requested quality wasn't in our list (e.g. unknown id), just try it raw
-        if (!foundRequested)
-        {
-            yield return (requested, $"format {requested}");
-            foreach (var q in allQualities) yield return q;
-        }
+        var index = Array.FindIndex(FlacQualities, q => q.format == requested);
+
+        // Unknown id: try it raw, then the whole FLAC chain
+        return index < 0
+            ? new[] { (requested, $"format {requested}") }.Concat(FlacQualities)
+            : FlacQualities.Skip(index);
     }
 
     /// <summary>
