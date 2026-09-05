@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   puis substitués à l'original (l'ancienne version reste dans `settings.json.bak`). Au démarrage,
   un fichier illisible est mis de côté sous `settings.json.corrupt-<date>` et la dernière version
   saine est restaurée, au lieu de faire planter l'application.
+- **Redirection ouverte sur le déverrouillage.** `POST /auth/unlock` renvoyait vers la destination
+  fournie par le formulaire, même avec un mauvais mot de passe : `/\evil.com` ou `/<tabulation>/evil.com`
+  passaient le filtre et étaient lus par les navigateurs comme `//evil.com`. L'antislash et les
+  caractères de contrôle sont désormais refusés (`LocalRedirect`).
 
 ## [1.5.1] - 2026-09-28
 
