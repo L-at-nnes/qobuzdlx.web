@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enregistrer un flux MP3 sous l'extension `.flac` ; TagLib l'ouvrait alors comme du FLAC et la
   piste échouait avec une erreur obscure. Une qualité FLAC ne se replie plus que sur une qualité
   FLAC inférieure.
+- **Mauvaise pochette après l'échec d'une piste.** Quand une piste de playlist ou de favoris
+  échouait, la pochette temporaire n'était pas supprimée et la piste suivante — d'un autre album —
+  l'embarquait à son tour. Le nettoyage est désormais garanti (`finally`), et le fichier temporaire
+  porte l'identifiant de l'album pour qu'un résidu ne puisse plus être réutilisé.
 
 ## [1.5.1] - 2026-09-28
 

@@ -697,44 +697,49 @@ public class DownloadService
         var downloadPath = _templates.CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate, null, album, null, null);
         Directory.CreateDirectory(downloadPath);
 
-        // Artwork
-        await DownloadArtworkAsync(downloadPath, album);
-
-        var tracks = album.Tracks?.Items ?? new List<QobuzTrack>();
-        int total = tracks.Count;
-
-        for (int i = 0; i < total; i++)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); break; }
+            // Artwork
+            await DownloadArtworkAsync(downloadPath, album);
 
-            var track = tracks[i];
-            UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total), _templates.FormatTrackTitle(track));
+            var tracks = album.Tracks?.Items ?? new List<QobuzTrack>();
+            int total = tracks.Count;
 
-            try
+            for (int i = 0; i < total; i++)
             {
-                // Get full track info
-                var trackInfo = await _api.GetTrackAsync(track.Id.ToString());
-                if (trackInfo == null) { Log(_loc.T("log.trackUnavailable", track.TrackNumber)); continue; }
-                if (!trackInfo.Streamable && s.StreamableCheck) { Log(_loc.T("log.trackNotStreamable", track.TrackNumber)); continue; }
+                ct.ThrowIfCancellationRequested();
+                if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); break; }
 
-                await DownloadTrackToFileAsync("album", album, trackInfo, downloadPath, null, ct);
+                var track = tracks[i];
+                UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total), _templates.FormatTrackTitle(track));
+
+                try
+                {
+                    // Get full track info
+                    var trackInfo = await _api.GetTrackAsync(track.Id.ToString());
+                    if (trackInfo == null) { Log(_loc.T("log.trackUnavailable", track.TrackNumber)); continue; }
+                    if (!trackInfo.Streamable && s.StreamableCheck) { Log(_loc.T("log.trackNotStreamable", track.TrackNumber)); continue; }
+
+                    await DownloadTrackToFileAsync("album", album, trackInfo, downloadPath, null, ct);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { Log(_loc.T("log.trackFailed", track.Id, ex.Message)); }
             }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.trackFailed", track.Id, ex.Message)); }
-        }
 
-        // Goodies
-        if (s.DownloadGoodies && album.Goodies != null)
+            // Goodies
+            if (s.DownloadGoodies && album.Goodies != null)
+            {
+                foreach (var goody in album.Goodies)
+                {
+                    if (goody.FileFormatId == 52 || string.IsNullOrEmpty(goody.Url)) continue;
+                    await DownloadGoodyAsync(downloadPath, album, goody, ct);
+                }
+            }
+        }
+        finally
         {
-            foreach (var goody in album.Goodies)
-            {
-                if (goody.FileFormatId == 52 || string.IsNullOrEmpty(goody.Url)) continue;
-                await DownloadGoodyAsync(downloadPath, album, goody, ct);
-            }
+            DeleteTempArtwork(album);
         }
-
-        DeleteTempArtwork();
     }
 
     // ─── Single Track ───
@@ -755,9 +760,15 @@ public class DownloadService
         var downloadPath = _templates.CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate, null, album, track, null);
         Directory.CreateDirectory(downloadPath);
 
-        await DownloadArtworkAsync(downloadPath, album);
-        await DownloadTrackToFileAsync("track", album, track, downloadPath, null, ct);
-        DeleteTempArtwork();
+        try
+        {
+            await DownloadArtworkAsync(downloadPath, album);
+            await DownloadTrackToFileAsync("track", album, track, downloadPath, null, ct);
+        }
+        finally
+        {
+            DeleteTempArtwork(album);
+        }
     }
 
     // ─── Playlist ───
@@ -789,9 +800,15 @@ public class DownloadService
                 var downloadPath = _templates.CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate, s.PlaylistTemplate, album, item, playlist);
                 Directory.CreateDirectory(downloadPath);
 
-                await DownloadArtworkAsync(downloadPath, album);
-                await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct);
-                DeleteTempArtwork();
+                try
+                {
+                    await DownloadArtworkAsync(downloadPath, album);
+                    await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct);
+                }
+                finally
+                {
+                    DeleteTempArtwork(album);
+                }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message)); }
@@ -1009,7 +1026,7 @@ public class DownloadService
         }
 
         // Tag file
-        var embeddedArtPath = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
+        var embeddedArtPath = EmbeddedArtPath(album);
         _tagging.WriteToFile(tempFile, System.IO.File.Exists(embeddedArtPath) ? embeddedArtPath : null, album, track);
 
         // Move to final location
@@ -1141,7 +1158,7 @@ public class DownloadService
             }
 
             // Embedded artwork to temp
-            var embeddedPath = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
+            var embeddedPath = EmbeddedArtPath(album);
             if (!System.IO.File.Exists(embeddedPath))
             {
                 var url = album.Image.Large.Replace("_600", $"_{s.EmbeddedArtSize}");
@@ -1171,12 +1188,16 @@ public class DownloadService
         catch (Exception ex) { Log(_loc.T("log.goodyFailed", ex.Message)); }
     }
 
-    private void DeleteTempArtwork()
+    /// <summary>Keyed by album as well as session: a leftover from one album can then never be
+    /// mistaken for the cover of the next one, whatever went wrong in between.</summary>
+    private string EmbeddedArtPath(QobuzAlbum album) =>
+        Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{album.Id}-{_settings.Settings.EmbeddedArtSize}.jpg");
+
+    private void DeleteTempArtwork(QobuzAlbum album)
     {
         try
         {
-            var s = _settings.Settings;
-            var path = Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{s.EmbeddedArtSize}.jpg");
+            var path = EmbeddedArtPath(album);
             if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
         }
         catch { }
