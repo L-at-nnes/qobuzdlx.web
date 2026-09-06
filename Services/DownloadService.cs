@@ -137,7 +137,11 @@ public class DownloadService
         lifetime.ApplicationStopping.Register(() => { try { _appCts.Cancel(); } catch { } });
 
         MigrateTempFolder();
+        PurgeStaleTempFiles();
     }
+
+    private static string TempDirectory =>
+        Path.Combine(Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config", "qbdlx-temp");
 
     /// <summary>
     /// Migrate qbdlx-temp from /downloads to /config for existing installations.
@@ -147,8 +151,7 @@ public class DownloadService
         try
         {
             var oldTempDir = Path.Combine(_settings.Settings.DownloadLocation, "qbdlx-temp");
-            var configPath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
-            var newTempDir = Path.Combine(configPath, "qbdlx-temp");
+            var newTempDir = TempDirectory;
 
             if (Directory.Exists(oldTempDir) && oldTempDir != newTempDir)
             {
@@ -162,6 +165,30 @@ public class DownloadService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to migrate temp folder, it will be recreated in /config");
+        }
+    }
+
+    /// <summary>
+    /// A previous run killed mid-download (docker kill, power loss) leaves partial audio files and
+    /// cover art behind. No download is running yet at construction time, so everything carrying our
+    /// prefixes is stale.
+    /// </summary>
+    private void PurgeStaleTempFiles()
+    {
+        try
+        {
+            if (Directory.Exists(TempDirectory))
+            {
+                foreach (var file in Directory.EnumerateFiles(TempDirectory, "qbdlx_downloading-*"))
+                    DeleteQuietly(file);
+            }
+
+            foreach (var file in Directory.EnumerateFiles(Path.GetTempPath(), "qbdlx-*.jpg"))
+                DeleteQuietly(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Failed to purge stale temporary files");
         }
     }
 
@@ -935,13 +962,57 @@ public class DownloadService
         }
 
         // Prepare temp path (reused across retry attempts)
-        var configPath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
-        var tempDir = Path.Combine(configPath, "qbdlx-temp");
-        Directory.CreateDirectory(tempDir);
-        var tempFile = Path.Combine(tempDir, $"qbdlx_downloading-{track.Id}{s.AudioFormat}");
+        Directory.CreateDirectory(TempDirectory);
+        var tempFile = Path.Combine(TempDirectory, $"qbdlx_downloading-{track.Id}{s.AudioFormat}");
 
         var titleFormatted = _templates.FormatTrackTitle(track);
         Log(_loc.T("log.downloadingTrack", track.TrackNumber.ToString().PadLeft(2, '0'), titleFormatted));
+
+        // Whatever happens below — cancellation, tagging error, failed move — the partial file must
+        // not stay behind in the config volume.
+        try
+        {
+            await DownloadWithQualityFallbackAsync(track, tempFile, ct);
+
+            // Fix MD5 for FLAC
+            if (s.FixMD5s && s.AudioFormat.Contains("flac"))
+                await FixFlacMd5Async(tempFile, ct);
+
+            // Tag file
+            var embeddedArtPath = EmbeddedArtPath(album);
+            _tagging.WriteToFile(tempFile, System.IO.File.Exists(embeddedArtPath) ? embeddedArtPath : null, album, track);
+
+            // Move to final location
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            if (s.DuplicateFileMode == "rename" && System.IO.File.Exists(filePath))
+            {
+                var name = Path.GetFileNameWithoutExtension(filePath);
+                var ext = Path.GetExtension(filePath);
+                var dirPath = Path.GetDirectoryName(filePath) ?? downloadPath;
+                int counter = 1;
+                while (System.IO.File.Exists(filePath))
+                {
+                    filePath = Path.Combine(dirPath, $"{name} ({counter}){ext}");
+                    counter++;
+                }
+            }
+
+            System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
+            Log(_loc["log.done"]);
+        }
+        finally
+        {
+            DeleteQuietly(tempFile);
+        }
+    }
+
+    /// <summary>Downloads the track into <paramref name="tempFile"/>, stepping down the quality chain
+    /// when a quality keeps failing. Throws when no quality could be downloaded.</summary>
+    private async Task DownloadWithQualityFallbackAsync(QobuzTrack track, string tempFile, CancellationToken ct)
+    {
+        var s = _settings.Settings;
 
         // Try requested quality, then fall back to lower qualities if download keeps failing.
         // For each quality we make a few silent attempts (with a fresh signed URL each time)
@@ -1010,34 +1081,6 @@ public class DownloadService
         {
             throw lastError ?? new IOException("Téléchargement impossible (toutes qualités échouées)");
         }
-
-        // Fix MD5 for FLAC
-        if (s.FixMD5s && s.AudioFormat.Contains("flac"))
-            await FixFlacMd5Async(tempFile, ct);
-
-        // Tag file
-        var embeddedArtPath = EmbeddedArtPath(album);
-        _tagging.WriteToFile(tempFile, System.IO.File.Exists(embeddedArtPath) ? embeddedArtPath : null, album, track);
-
-        // Move to final location
-        var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-
-        if (s.DuplicateFileMode == "rename" && System.IO.File.Exists(filePath))
-        {
-            var name = Path.GetFileNameWithoutExtension(filePath);
-            var ext = Path.GetExtension(filePath);
-            var dirPath = Path.GetDirectoryName(filePath) ?? downloadPath;
-            int counter = 1;
-            while (System.IO.File.Exists(filePath))
-            {
-                filePath = Path.Combine(dirPath, $"{name} ({counter}){ext}");
-                counter++;
-            }
-        }
-
-        System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
-        Log(_loc["log.done"]);
     }
 
     /// <summary>
@@ -1082,6 +1125,12 @@ public class DownloadService
             _logger.LogWarning(ex, "flac MD5 fix failed");
             Log(_loc.T("log.md5FixFailed", ex.Message));
         }
+    }
+
+    private static void DeleteQuietly(string path)
+    {
+        try { System.IO.File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best effort */ }
     }
 
     private static void KillQuietly(Process process)

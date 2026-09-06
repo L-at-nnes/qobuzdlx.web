@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   désormais lus pendant l'attente et la progression est désactivée (`-s`). Un code de sortie non nul
   apparaît dans le journal, et l'annulation termine le processus `flac` au lieu de le laisser
   tourner.
+- **Plus de fichiers partiels abandonnés dans `/config/qbdlx-temp`.** Une annulation, une erreur de
+  tag ou un déplacement raté laissait le fichier en cours de téléchargement sur le volume de
+  configuration. Il est maintenant supprimé quoi qu'il arrive, et les restes d'un arrêt brutal
+  (fichiers `qbdlx_downloading-*` et pochettes temporaires) sont purgés au démarrage.
 
 ## [1.5.1] - 2026-09-28
 
