@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fournie par le formulaire, même avec un mauvais mot de passe : `/\evil.com` ou `/<tabulation>/evil.com`
   passaient le filtre et étaient lus par les navigateurs comme `//evil.com`. L'antislash et les
   caractères de contrôle sont désormais refusés (`LocalRedirect`).
+- **Le palier de blocage du mot de passe d'accès ne redescendait jamais.** Après quelques séries
+  d'échecs — les siens ou ceux d'un tiers —, les blocages de 5 puis 15 minutes restaient la règle
+  jusqu'au prochain déverrouillage réussi. Une heure sans tentative fait désormais redescendre le
+  palier d'un cran et efface les échecs isolés. Le seau reste global : tant qu'un tiers insiste, il
+  continue de bloquer les autres.
 
 ## [1.5.1] - 2026-09-28
 

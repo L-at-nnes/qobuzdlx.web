@@ -55,6 +55,7 @@ builder.Services.AddSingleton<LocalizationService>();
 builder.Services.AddScoped<AppGuardService>();
 // Étranglement du déverrouillage : singleton, pour que le compteur ne soit pas remis à zéro
 // par l'ouverture d'un nouvel onglet.
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AppAccessGate>();
 
 // Cookie d'accès à l'application. Il remplace un état qui vivait dans le circuit Blazor et que
