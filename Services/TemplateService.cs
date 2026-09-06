@@ -108,7 +108,7 @@ public class TemplateService
         {
             int padLen = album?.TracksCount.ToString().Length ?? 2;
 
-            template = ReplaceParentalWarningTags(template, track.ParentalWarning);
+            template = ReplaceParentalWarningTags(template, "track", track.ParentalWarning);
             template = template
                 .Replace("%trackid%", track.Id.ToString())
                 .Replace("%trackcomposer%", track.Composer?.Name ?? "")
@@ -133,7 +133,7 @@ public class TemplateService
         // Album tags
         if (album != null)
         {
-            template = ReplaceParentalWarningTags(template, album.ParentalWarning);
+            template = ReplaceParentalWarningTags(template, "album", album.ParentalWarning);
             var year = "";
             if (!string.IsNullOrEmpty(album.ReleaseDateOriginal) && album.ReleaseDateOriginal.Length >= 4)
                 year = album.ReleaseDateOriginal.Trim()[..4];
@@ -302,50 +302,39 @@ public class TemplateService
         return album.Artist?.Name ?? "Unknown Artist";
     }
 
-    /// <summary>
-    /// Complete parental warning tag replacement matching original QobuzDownloaderX RenameTemplates.
-    /// </summary>
-    private static string ReplaceParentalWarningTags(string template, bool isExplicit)
+    // (tag suffix, value when explicit, value when clean). Each variant exists once per scope:
+    // %track<suffix>% follows the track's parental warning, %album<suffix>% the album's.
+    private static readonly (string Suffix, string Explicit, string Clean)[] ParentalWarningVariants =
     {
-        // ── Track PA tags ──
-        template = template.Replace("%trackpa%", isExplicit ? "Explicit" : "Clean");
-        template = template.Replace("%trackpashort%", isExplicit ? "E" : "C");
-        template = template.Replace("%trackpaifex%", isExplicit ? "Explicit" : "");
-        template = template.Replace("%trackpaifexshort%", isExplicit ? "E" : "");
-        template = template.Replace("%trackpaifcl%", isExplicit ? "" : "Clean");
-        template = template.Replace("%trackpaifclshort%", isExplicit ? "" : "C");
-        template = template.Replace("%trackpaenclosed%", isExplicit ? "(Explicit)" : "(Clean)");
-        template = template.Replace("%trackpaenclosed[]%", isExplicit ? "[Explicit]" : "[Clean]");
-        template = template.Replace("%trackpaenclosedshort%", isExplicit ? "(E)" : "(C)");
-        template = template.Replace("%trackpaenclosedshort[]%", isExplicit ? "[E]" : "[C]");
-        template = template.Replace("%trackpaifexenclosed%", isExplicit ? "(Explicit)" : "");
-        template = template.Replace("%trackpaifexenclosed[]%", isExplicit ? "[Explicit]" : "");
-        template = template.Replace("%trackpaifexenclosedshort%", isExplicit ? "(E)" : "");
-        template = template.Replace("%trackpaifexenclosedshort[]%", isExplicit ? "[E]" : "");
-        template = template.Replace("%trackpaifclenclosed%", isExplicit ? "" : "(Clean)");
-        template = template.Replace("%trackpaifclenclosed[]%", isExplicit ? "" : "[Clean]");
-        template = template.Replace("%trackpaifclenclosedshort%", isExplicit ? "" : "(C)");
-        template = template.Replace("%trackpaifclenclosedshort[]%", isExplicit ? "" : "[C]");
+        ("pa",                    "Explicit",   "Clean"),
+        ("pashort",               "E",          "C"),
+        ("paifex",                "Explicit",   ""),
+        ("paifexshort",           "E",          ""),
+        ("paifcl",                "",           "Clean"),
+        ("paifclshort",           "",           "C"),
+        ("paenclosed",            "(Explicit)", "(Clean)"),
+        ("paenclosed[]",          "[Explicit]", "[Clean]"),
+        ("paenclosedshort",       "(E)",        "(C)"),
+        ("paenclosedshort[]",     "[E]",        "[C]"),
+        ("paifexenclosed",        "(Explicit)", ""),
+        ("paifexenclosed[]",      "[Explicit]", ""),
+        ("paifexenclosedshort",   "(E)",        ""),
+        ("paifexenclosedshort[]", "[E]",        ""),
+        ("paifclenclosed",        "",           "(Clean)"),
+        ("paifclenclosed[]",      "",           "[Clean]"),
+        ("paifclenclosedshort",   "",           "(C)"),
+        ("paifclenclosedshort[]", "",           "[C]"),
+    };
 
-        // ── Album PA tags ──
-        template = template.Replace("%albumpa%", isExplicit ? "Explicit" : "Clean");
-        template = template.Replace("%albumpashort%", isExplicit ? "E" : "C");
-        template = template.Replace("%albumpaifex%", isExplicit ? "Explicit" : "");
-        template = template.Replace("%albumpaifexshort%", isExplicit ? "E" : "");
-        template = template.Replace("%albumpaifcl%", isExplicit ? "" : "Clean");
-        template = template.Replace("%albumpaifclshort%", isExplicit ? "" : "C");
-        template = template.Replace("%albumpaenclosed%", isExplicit ? "(Explicit)" : "(Clean)");
-        template = template.Replace("%albumpaenclosed[]%", isExplicit ? "[Explicit]" : "[Clean]");
-        template = template.Replace("%albumpaenclosedshort%", isExplicit ? "(E)" : "(C)");
-        template = template.Replace("%albumpaenclosedshort[]%", isExplicit ? "[E]" : "[C]");
-        template = template.Replace("%albumpaifexenclosed%", isExplicit ? "(Explicit)" : "");
-        template = template.Replace("%albumpaifexenclosed[]%", isExplicit ? "[Explicit]" : "");
-        template = template.Replace("%albumpaifexenclosedshort%", isExplicit ? "(E)" : "");
-        template = template.Replace("%albumpaifexenclosedshort[]%", isExplicit ? "[E]" : "");
-        template = template.Replace("%albumpaifclenclosed%", isExplicit ? "" : "(Clean)");
-        template = template.Replace("%albumpaifclenclosed[]%", isExplicit ? "" : "[Clean]");
-        template = template.Replace("%albumpaifclenclosedshort%", isExplicit ? "" : "(C)");
-        template = template.Replace("%albumpaifclenclosedshort[]%", isExplicit ? "" : "[C]");
+    /// <summary>
+    /// Parental warning tag replacement matching original QobuzDownloaderX RenameTemplates.
+    /// <paramref name="scope"/> is "track" or "album": the two scopes must be resolved separately,
+    /// each with its own flag, otherwise %AlbumPA% would reflect the track's warning.
+    /// </summary>
+    private static string ReplaceParentalWarningTags(string template, string scope, bool isExplicit)
+    {
+        foreach (var (suffix, explicitValue, cleanValue) in ParentalWarningVariants)
+            template = template.Replace($"%{scope}{suffix}%", isExplicit ? explicitValue : cleanValue);
 
         return template;
     }

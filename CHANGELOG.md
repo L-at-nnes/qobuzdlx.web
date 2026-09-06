@@ -61,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   désormais vérifié au démarrage (un Qobuz injoignable ne déconnecte pas), et une réponse 401
   pendant une recherche ramène à l'écran de connexion avec un message explicite. Un jeton refusé à
   la connexion ne laisse plus l'interface se comporter comme si l'on était connecté.
+- **`%AlbumPA%` et ses variantes reflétaient l'avertissement parental de la piste.** Dès qu'une
+  piste était fournie (nom de fichier), les balises `%Album…%` étaient résolues avec le drapeau de
+  la piste avant que celui de l'album ne soit consulté. Chaque portée utilise maintenant son propre
+  drapeau.
 
 ## [1.5.1] - 2026-09-28
 
