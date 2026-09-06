@@ -92,7 +92,7 @@ public class DownloadService
     private readonly CancellationTokenSource _appCts = new();
     private readonly CancellationToken _appCt;
     private CancellationTokenSource? _itemCts;
-    private bool _skipCurrent;
+    private volatile bool _skipCurrent;
 
     // Réveil du worker. Borné à 1 : enfiler cinquante éléments d'un coup ne provoque pas cinquante
     // réveils, et le worker draine de toute façon jusqu'à ne plus rien trouver.
@@ -762,11 +762,12 @@ public class DownloadService
 
             var tracks = album.Tracks?.Items ?? new List<QobuzTrack>();
             int total = tracks.Count;
+            var skipped = false;
 
             for (int i = 0; i < total; i++)
             {
                 ct.ThrowIfCancellationRequested();
-                if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); break; }
+                if (_skipCurrent) { _skipCurrent = false; skipped = true; Log(_loc["log.albumSkipped"]); break; }
 
                 var track = tracks[i];
                 UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total), _templates.FormatTrackTitle(track));
@@ -784,8 +785,8 @@ public class DownloadService
                 catch (Exception ex) { Log(_loc.T("log.trackFailed", track.Id, ex.Message)); }
             }
 
-            // Goodies
-            if (s.DownloadGoodies && album.Goodies != null)
+            // Goodies — an album the user chose to skip is skipped entirely
+            if (!skipped && s.DownloadGoodies && album.Goodies != null)
             {
                 foreach (var goody in album.Goodies)
                 {

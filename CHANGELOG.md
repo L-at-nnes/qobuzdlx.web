@@ -80,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **La barre de progression d'un artiste, d'un label ou des favoris ne repart plus de zéro à chaque
   album.** Chaque album écrasait le pourcentage global avec son propre avancement ; il se loge
   désormais dans la part de la barre qui lui revient.
+- **« Passer » ne télécharge plus les fichiers bonus de l'album sauté.** Le bouton interrompait les
+  pistes mais l'album continuait avec ses livrets.
 
 ## [1.5.1] - 2026-09-28
 
