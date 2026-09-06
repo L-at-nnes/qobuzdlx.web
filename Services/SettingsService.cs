@@ -66,6 +66,18 @@ public class SettingsService
         }
     }
 
+    /// <summary>Oublie la session Qobuz persistée (déconnexion, ou session expirée).</summary>
+    public void ClearQobuzSession() => Update(s =>
+    {
+        s.UserAuthToken = "";
+        s.UserId = "";
+        s.UserDisplayName = "";
+        s.UserLabel = "";
+        s.Email = "";
+        s.AppId = "";
+        s.AppSecret = "";
+    });
+
     /// <summary>
     /// Ne lève jamais : un réglage illisible ne doit pas empêcher l'application de démarrer. Le
     /// fichier fautif est mis de côté (<c>.corrupt-*</c>) plutôt qu'écrasé par la prochaine

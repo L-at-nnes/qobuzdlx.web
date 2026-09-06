@@ -168,15 +168,7 @@ else
 
     private void Logout()
     {
-        Settings.Update(s => {
-            s.UserAuthToken = "";
-            s.UserId = "";
-            s.UserDisplayName = "";
-            s.UserLabel = "";
-            s.Email = "";
-            s.AppId = "";
-            s.AppSecret = "";
-        });
+        Settings.ClearQobuzSession();
         Api.SetCredentials("", "", "");
         NavigationManager.NavigateTo("/login", forceLoad: true);
     }

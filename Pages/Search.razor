@@ -1,5 +1,6 @@
 @page "/"
 @page "/search"
+@using System.Net
 @inject QobuzApiService Api
 @inject DownloadService Download
 @inject SettingsService Settings
@@ -302,6 +303,14 @@ else if (HasNoResults)
                     State.Artists = artistResult?.Artists?.Items ?? new();
                     break;
             }
+        }
+        catch (QobuzApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            // Jeton révoqué ou expiré : inutile de laisser l'interface croire à une session valide.
+            Logger.LogInformation("Qobuz rejected the session during a search, signing out");
+            Settings.ClearQobuzSession();
+            Api.SetCredentials("", "", "");
+            Nav.NavigateTo("/login?expired=1", forceLoad: true);
         }
         catch (Exception ex)
         {

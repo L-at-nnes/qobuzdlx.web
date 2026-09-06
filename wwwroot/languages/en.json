@@ -34,6 +34,7 @@
   "login.error.noPassword": "No password provided",
   "login.error.noAppCredentials": "Login failed: no valid app credentials found. Try providing a custom App ID and Secret.",
   "login.error.network": "Cannot reach the Qobuz servers. Check your connection.",
+  "login.error.sessionExpired": "Your Qobuz session has expired. Please sign in again.",
   "login.error.invalidCredentials": "Invalid credentials. Check your email/password or token.",
   "login.error.generic": "Login failed: {0}",
 

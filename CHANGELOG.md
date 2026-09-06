@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   les résultats sans un mot, et une recherche sans résultat n'affichait rien non plus. Un message
   distingue désormais l'échec de l'absence de résultat. Lancer une recherche avec la touche Entrée
   pendant qu'une autre est en cours n'en démarre plus une seconde en parallèle.
+- **Une session Qobuz expirée est détectée.** Le jeton enregistré n'était jamais revalidé : après
+  un redémarrage, l'interface s'affichait comme connectée et chaque recherche échouait. Le jeton est
+  désormais vérifié au démarrage (un Qobuz injoignable ne déconnecte pas), et une réponse 401
+  pendant une recherche ramène à l'écran de connexion avec un message explicite. Un jeton refusé à
+  la connexion ne laisse plus l'interface se comporter comme si l'on était connecté.
 
 ## [1.5.1] - 2026-09-28
 

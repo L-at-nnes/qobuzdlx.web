@@ -34,6 +34,7 @@
   "login.error.noPassword": "Aucun mot de passe fourni",
   "login.error.noAppCredentials": "Échec de connexion : aucun identifiant d'application valide trouvé. Essayez de fournir un App ID et Secret personnalisés.",
   "login.error.network": "Impossible de joindre les serveurs Qobuz. Vérifiez votre connexion.",
+  "login.error.sessionExpired": "Votre session Qobuz a expiré. Reconnectez-vous.",
   "login.error.invalidCredentials": "Identifiants invalides. Vérifiez votre e-mail/mot de passe ou jeton.",
   "login.error.generic": "Échec de connexion : {0}",
 

@@ -304,11 +304,8 @@ public class QobuzApiService
         return result;
     }
 
-    public async Task<QobuzLoginResponse> LoginWithTokenAsync(string appId, string token)
+    public async Task<QobuzLoginResponse> LoginWithTokenAsync(string appId, string token, CancellationToken ct = default)
     {
-        _appId = appId;
-        _userAuthToken = token;
-
         // Ensure X-App-Id header is set (may have been cleared by logout)
         _http.DefaultRequestHeaders.Remove("X-App-Id");
         _http.DefaultRequestHeaders.Add("X-App-Id", appId);
@@ -317,14 +314,19 @@ public class QobuzApiService
         var url = $"{BaseUrl}user/get?app_id={appId}";
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Add("X-User-Auth-Token", token);
-        var response = await _http.SendAsync(request);
-        var json = await response.Content.ReadAsStringAsync();
+        var response = await _http.SendAsync(request, ct);
+        var json = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning("Token login failed ({Status}): {Body}", response.StatusCode, json);
             throw new HttpRequestException($"Token login failed ({(int)response.StatusCode}): {json}", null, response.StatusCode);
         }
+
+        // Les identifiants ne sont retenus qu'une fois le jeton validé : un jeton refusé ne doit pas
+        // laisser IsLoggedIn à vrai.
+        _appId = appId;
+        _userAuthToken = token;
 
         var user = JsonConvert.DeserializeObject<QobuzUserInfo>(json);
         return new QobuzLoginResponse
@@ -389,7 +391,7 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("Stream URL error {Code}: {Body}", (int)response.StatusCode, json);
-            throw new Exception($"Qobuz API error {(int)response.StatusCode}: {json}");
+            throw new QobuzApiException(response.StatusCode, $"Qobuz API error {(int)response.StatusCode}: {json}");
         }
 
         return JsonConvert.DeserializeObject<QobuzStreamUrl>(json);
@@ -501,7 +503,7 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("API error {Code}: {Body}", (int)response.StatusCode, json);
-            throw new Exception($"Qobuz API error {(int)response.StatusCode}: {json}");
+            throw new QobuzApiException(response.StatusCode, $"Qobuz API error {(int)response.StatusCode}: {json}");
         }
 
         return JsonConvert.DeserializeObject<T>(json);

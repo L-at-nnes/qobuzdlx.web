@@ -1,5 +1,6 @@
 @page "/login"
 @using System.Net
+@using Microsoft.AspNetCore.WebUtilities
 @inject QobuzApiService Api
 @inject SettingsService Settings
 @inject NavigationManager Nav
@@ -84,11 +85,51 @@
         _customAppSecret = s.AppSecret;
         _useToken = s.UseTokenLogin;
 
-        // Auto-login if token and secret are persisted
-        if (!string.IsNullOrEmpty(s.UserAuthToken) && !string.IsNullOrEmpty(s.AppId) && !string.IsNullOrEmpty(s.AppSecret))
+        // Posé par la déconnexion automatique (Search, ou ci-dessous) : l'adresse survit au rechargement.
+        var query = QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+        if (query.ContainsKey("expired"))
+            _error = Loc["login.error.sessionExpired"];
+    }
+
+    // Auto-login if token and secret are persisted
+    protected override async Task OnInitializedAsync()
+    {
+        var s = Settings.Settings;
+        if (string.IsNullOrEmpty(s.UserAuthToken) || string.IsNullOrEmpty(s.AppId) || string.IsNullOrEmpty(s.AppSecret))
+            return;
+
+        if (await PersistedSessionIsValidAsync(s))
         {
             Api.SetCredentials(s.AppId, s.AppSecret, s.UserAuthToken);
             Nav.NavigateTo("/", forceLoad: false);
+        }
+        else
+        {
+            Settings.ClearQobuzSession();
+            Nav.NavigateTo("/login?expired=1", forceLoad: true);
+        }
+    }
+
+    /// <summary>
+    /// Un jeton refusé par Qobuz est périmé. Toute autre défaillance (Qobuz injoignable, délai
+    /// dépassé) ne dit rien de sa validité : on le conserve plutôt que de déconnecter l'utilisateur
+    /// à chaque coupure réseau.
+    /// </summary>
+    private async Task<bool> PersistedSessionIsValidAsync(Models.AppSettings s)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await Api.LoginWithTokenAsync(s.AppId, s.UserAuthToken, timeout.Token);
+            return true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            return true;
         }
     }
 
