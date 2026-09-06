@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   jusqu'au prochain déverrouillage réussi. Une heure sans tentative fait désormais redescendre le
   palier d'un cran et efface les échecs isolés. Le seau reste global : tant qu'un tiers insiste, il
   continue de bloquer les autres.
+- **La langue du premier lancement n'est plus figée par une requête qui n'est pas un navigateur.**
+  La détection par `Accept-Language` s'exécutait sur toute requête : la sonde `/healthz` de
+  l'application Android (qui n'envoie pas l'en-tête) ou un outil de supervision enregistrait donc
+  le français pour tout le monde. Elle ne se déclenche plus que sur une navigation vers une page,
+  et uniquement si l'en-tête est présent.
 
 ## [1.5.1] - 2026-09-28
 

@@ -139,9 +139,13 @@ app.UseAuthentication();
 
 // Premier lancement uniquement : tant qu'aucune langue n'a été choisie, on suit l'en-tête
 // Accept-Language du navigateur. L'appel ne fait plus rien dès que le choix est persisté.
+// Seules les navigations vers une page comptent : /healthz, les POST et les appels de l'application
+// Android ne disent rien de la langue de l'utilisateur.
 app.Use(async (context, next) =>
 {
-    localization.DetectFromBrowser(context.Request.Headers["Accept-Language"].ToString());
+    if (context.Request.Headers.Accept.ToString().Contains("text/html", StringComparison.OrdinalIgnoreCase))
+        localization.DetectFromBrowser(context.Request.Headers.AcceptLanguage.ToString());
+
     await next();
 });
 

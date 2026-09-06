@@ -95,10 +95,12 @@ public class LocalizationService
     /// Premier lancement : aucune langue enregistrée, on suit l'en-tête Accept-Language du
     /// navigateur. Anglais si le navigateur est anglophone, français dans tous les autres cas.
     /// Le choix est persisté immédiatement pour que la détection ne rejoue pas.
+    /// Sans en-tête, rien n'est décidé : la requête ne vient pas d'un navigateur (sonde de l'application
+    /// Android, supervision) et ne doit pas figer la langue de tous les utilisateurs.
     /// </summary>
     public void DetectFromBrowser(string? acceptLanguage)
     {
-        if (IsChosen) return;
+        if (IsChosen || string.IsNullOrWhiteSpace(acceptLanguage)) return;
 
         var first = (acceptLanguage ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
