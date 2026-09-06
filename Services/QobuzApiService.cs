@@ -41,11 +41,6 @@ public class QobuzApiService
         _appId = appId;
         _appSecret = appSecret;
         _userAuthToken = userAuthToken;
-
-        // Match original DLL: set X-App-Id as default header (like QopenAPI Service.Login)
-        _http.DefaultRequestHeaders.Remove("X-App-Id");
-        if (!string.IsNullOrEmpty(appId))
-            _http.DefaultRequestHeaders.Add("X-App-Id", appId);
     }
 
     // ─── App ID / Secret Retrieval ───
@@ -269,7 +264,8 @@ public class QobuzApiService
 
             var url = $"{BaseUrl}track/getFileUrl?request_ts={timestamp}&request_sig={sig}&track_id=197432204&format_id=5&intent=stream&app_id={appId}";
 
-            var resp = await _http.GetAsync(url);
+            using var request = CreateApiRequest(url, appId);
+            using var resp = await _http.SendAsync(request);
 
             // A valid secret will NOT return 400 (Invalid Request Signature)
             // It may return 401/403 (auth issues) or 200 but NOT 400
@@ -288,13 +284,11 @@ public class QobuzApiService
     {
         _appId = appId;
 
-        // Ensure X-App-Id header is set (may have been cleared by logout)
-        _http.DefaultRequestHeaders.Remove("X-App-Id");
-        _http.DefaultRequestHeaders.Add("X-App-Id", appId);
-
         var url = $"{BaseUrl}user/login?app_id={appId}&email={Uri.EscapeDataString(email)}&password={Uri.EscapeDataString(password)}";
-        var response = await _http.GetStringAsync(url);
-        var result = JsonConvert.DeserializeObject<QobuzLoginResponse>(response)
+        using var request = CreateApiRequest(url, appId);
+        using var response = await _http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var result = JsonConvert.DeserializeObject<QobuzLoginResponse>(await response.Content.ReadAsStringAsync())
             ?? throw new Exception("Login failed: empty response");
 
         _userAuthToken = result.UserAuthToken
@@ -306,15 +300,10 @@ public class QobuzApiService
 
     public async Task<QobuzLoginResponse> LoginWithTokenAsync(string appId, string token, CancellationToken ct = default)
     {
-        // Ensure X-App-Id header is set (may have been cleared by logout)
-        _http.DefaultRequestHeaders.Remove("X-App-Id");
-        _http.DefaultRequestHeaders.Add("X-App-Id", appId);
-
         // Validate token by fetching user info
         var url = $"{BaseUrl}user/get?app_id={appId}";
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Add("X-User-Auth-Token", token);
-        var response = await _http.SendAsync(request, ct);
+        using var request = CreateApiRequest(url, appId, token);
+        using var response = await _http.SendAsync(request, ct);
         var json = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -384,8 +373,8 @@ public class QobuzApiService
         // Match original app: app_id and user_auth_token in query params (like Form1.cs)
         var url = $"{BaseUrl}track/getFileUrl?request_ts={timestamp}&request_sig={sig}&track_id={trackId}&format_id={formatId}&intent=stream&app_id={_appId}&user_auth_token={_userAuthToken}";
 
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
-        var response = await _http.SendAsync(request);
+        using var request = CreateApiRequest(url, _appId);
+        using var response = await _http.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
@@ -491,13 +480,25 @@ public class QobuzApiService
 
     // ─── Helpers ───
 
-    private async Task<T?> AuthGetAsync<T>(string url) where T : class
+    /// <summary>
+    /// Les en-têtes d'identification sont posés requête par requête et non dans
+    /// <c>DefaultRequestHeaders</c> : ce dictionnaire n'est pas thread-safe une fois qu'une requête
+    /// est partie, or une connexion ou une déconnexion peut survenir pendant un téléchargement.
+    /// </summary>
+    private static HttpRequestMessage CreateApiRequest(string url, string? appId, string? userAuthToken = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (!string.IsNullOrEmpty(_userAuthToken))
-            request.Headers.Add("X-User-Auth-Token", _userAuthToken);
+        if (!string.IsNullOrEmpty(appId))
+            request.Headers.Add("X-App-Id", appId);
+        if (!string.IsNullOrEmpty(userAuthToken))
+            request.Headers.Add("X-User-Auth-Token", userAuthToken);
+        return request;
+    }
 
-        var response = await _http.SendAsync(request);
+    private async Task<T?> AuthGetAsync<T>(string url) where T : class
+    {
+        using var request = CreateApiRequest(url, _appId, _userAuthToken);
+        using var response = await _http.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)

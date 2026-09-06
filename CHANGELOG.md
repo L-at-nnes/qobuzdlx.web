@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **octets** (ext4) — et un titre japonais ou cyrillique en pèse deux à trois par caractère. Chaque
   composant est désormais tronqué à 240 octets UTF-8 (avec « … »), sans jamais couper un caractère
   en deux. Les fichiers bonus sont concernés de la même façon.
+- **Les en-têtes d'identification Qobuz ne sont plus modifiés sur un client HTTP partagé.**
+  `X-App-Id` était ajouté et retiré dans `DefaultRequestHeaders` à chaque connexion ou
+  déconnexion, une opération qui n'est pas thread-safe si une requête est en cours — un
+  téléchargement, par exemple. Les en-têtes sont désormais posés requête par requête.
 
 ## [1.5.1] - 2026-09-28
 
