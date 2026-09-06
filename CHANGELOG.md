@@ -77,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Extension des fichiers bonus.** Elle était lue dans l'URL entière : une URL signée donnait
   `.pdf?Expires=…`, un nom invalide sous Windows et sur les partages SMB. Seul le chemin est
   désormais pris en compte.
+- **La barre de progression d'un artiste, d'un label ou des favoris ne repart plus de zéro à chaque
+  album.** Chaque album écrasait le pourcentage global avec son propre avancement ; il se loge
+  désormais dans la part de la barre qui lui revient.
 
 ## [1.5.1] - 2026-09-28
 

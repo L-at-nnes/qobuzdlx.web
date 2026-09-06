@@ -548,9 +548,39 @@ public class DownloadService
         RaiseProgress(force: true);
     }
 
+    /// <summary>
+    /// Part de la barre globale occupée par ce qui est en cours de traitement. Un artiste ou un label
+    /// enchaîne des albums qui rapportent chacun leur avancement de 0 à 100 % : sans portée, la barre
+    /// repartirait de zéro à chaque album au lieu de refléter l'ensemble.
+    /// </summary>
+    private readonly record struct ProgressScope(double Start, double Span)
+    {
+        public static ProgressScope Full => new(0, 100);
+
+        public ProgressScope Slice(int index, int total) => new(Start + Span * index / total, Span / total);
+
+        public int Map(int percent) => (int)(Start + Span * percent / 100);
+    }
+
+    /// <summary>Rétablit la portée précédente à la sortie du <c>using</c>.</summary>
+    private readonly struct ScopeLease(DownloadService owner, ProgressScope previous) : IDisposable
+    {
+        public void Dispose() => owner._scope = previous;
+    }
+
+    private ProgressScope _scope = ProgressScope.Full;
+
+    /// <summary>Restreint la progression au <paramref name="index"/>-ième élément sur <paramref name="total"/>.</summary>
+    private ScopeLease EnterScope(int index, int total)
+    {
+        var lease = new ScopeLease(this, _scope);
+        _scope = _scope.Slice(index, total);
+        return lease;
+    }
+
     private void UpdateProgress(int percent, string status, string currentItem = "")
     {
-        Progress.Percent = percent;
+        Progress.Percent = _scope.Map(percent);
         Progress.Status = status;
         if (!string.IsNullOrEmpty(currentItem)) Progress.CurrentItem = currentItem;
         RaiseProgress(force: true);
@@ -631,6 +661,7 @@ public class DownloadService
 
         _sessionId = Guid.NewGuid().ToString("N")[..8];
         _skipCurrent = false;
+        _scope = ProgressScope.Full;
 
         Progress.IsRunning = true;
         Progress.IsComplete = false;
@@ -856,7 +887,7 @@ public class DownloadService
             if (_skipCurrent) { _skipCurrent = false; Log(_loc["log.albumSkipped"]); continue; }
 
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
-            try { await DownloadAlbumAsync(albums[i].Id, ct); }
+            try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
         }
@@ -878,7 +909,7 @@ public class DownloadService
             if (_skipCurrent) { _skipCurrent = false; continue; }
 
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
-            try { await DownloadAlbumAsync(albums[i].Id, ct); }
+            try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
         }
@@ -898,7 +929,7 @@ public class DownloadService
         {
             ct.ThrowIfCancellationRequested();
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.favAlbum", i + 1, total));
-            try { await DownloadAlbumAsync(albums[i].Id, ct); }
+            try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { Log(_loc.T("log.favAlbumFailed", albums[i].Id, ex.Message)); }
         }
@@ -928,12 +959,13 @@ public class DownloadService
         var favs = await _api.GetFavoritesAsync(s.UserId, "artists");
         if (favs?.Artists?.Items == null) return;
 
-        foreach (var artist in favs.Artists.Items)
+        var artists = favs.Artists.Items;
+        for (int i = 0; i < artists.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
-            try { await DownloadArtistAsync(artist.Id.ToString(), ct); }
+            try { using (EnterScope(i, artists.Count)) await DownloadArtistAsync(artists[i].Id.ToString(), ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.favArtistFailed", artist.Id, ex.Message)); }
+            catch (Exception ex) { Log(_loc.T("log.favArtistFailed", artists[i].Id, ex.Message)); }
         }
     }
 
