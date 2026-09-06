@@ -162,6 +162,7 @@
   "log.goodyExists": "Goody already exists",
   "log.goodyFound": "Goody found, downloading...",
   "log.goodyFailed": "Goody failed: {0}",
+  "log.md5FixFailed": "MD5 fix failed (flac): {0}",
 
   "settings.title": "Settings",
   "settings.folder.title": "Download folder",

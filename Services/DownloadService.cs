@@ -1013,17 +1013,7 @@ public class DownloadService
 
         // Fix MD5 for FLAC
         if (s.FixMD5s && s.AudioFormat.Contains("flac"))
-        {
-            try
-            {
-                var proc = Process.Start(new ProcessStartInfo("flac", $"-f8 \"{tempFile}\"")
-                {
-                    CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-                });
-                if (proc != null) await proc.WaitForExitAsync(ct);
-            }
-            catch (Exception ex) { _logger.LogWarning("flac MD5 fix failed: {Error}", ex.Message); }
-        }
+            await FixFlacMd5Async(tempFile, ct);
 
         // Tag file
         var embeddedArtPath = EmbeddedArtPath(album);
@@ -1048,6 +1038,56 @@ public class DownloadService
 
         System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
         Log(_loc["log.done"]);
+    }
+
+    /// <summary>
+    /// Re-encodes the file with the flac CLI so that its STREAMINFO MD5 is valid. A failure is not
+    /// fatal — the track stays playable — so it is reported in the log and the download goes on.
+    /// </summary>
+    private async Task FixFlacMd5Async(string path, CancellationToken ct)
+    {
+        var startInfo = new ProcessStartInfo("flac")
+        {
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        // -s: without it flac streams its progress to stderr, a few hundred kilobytes per file.
+        foreach (var argument in new[] { "-s", "-f", "-8", path })
+            startInfo.ArgumentList.Add(argument);
+
+        try
+        {
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("flac could not be started");
+
+            // Both pipes are drained while waiting: once a pipe buffer is full flac blocks on its
+            // write, and WaitForExitAsync would then never return.
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+
+            using (ct.Register(() => KillQuietly(process)))
+                await process.WaitForExitAsync(ct);
+
+            await stdout;
+            if (process.ExitCode != 0)
+            {
+                var error = (await stderr).Trim();
+                Log(_loc.T("log.md5FixFailed", error.Length > 0 ? error : $"exit code {process.ExitCode}"));
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "flac MD5 fix failed");
+            Log(_loc.T("log.md5FixFailed", ex.Message));
+        }
+    }
+
+    private static void KillQuietly(Process process)
+    {
+        try { process.Kill(entireProcessTree: true); }
+        catch (InvalidOperationException) { /* already exited */ }
     }
 
     // ─── HTTP stream download helpers ───

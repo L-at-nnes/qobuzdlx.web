@@ -162,6 +162,7 @@
   "log.goodyExists": "Le bonus existe déjà",
   "log.goodyFound": "Bonus trouvé, téléchargement...",
   "log.goodyFailed": "Échec du bonus : {0}",
+  "log.md5FixFailed": "Correction du MD5 impossible (flac) : {0}",
 
   "settings.title": "Paramètres",
   "settings.folder.title": "Dossier de téléchargement",

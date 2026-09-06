@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   l'application Android (qui n'envoie pas l'en-tête) ou un outil de supervision enregistrait donc
   le français pour tout le monde. Elle ne se déclenche plus que sur une navigation vers une page,
   et uniquement si l'en-tête est présent.
+- **« Fix MD5s » ne peut plus bloquer un téléchargement.** `flac` était lancé avec ses sorties
+  redirigées mais jamais lues ; sa progression, écrite sur la sortie d'erreur, pouvait remplir le
+  tampon du tube et suspendre le processus — donc toute la file — indéfiniment. Les deux flux sont
+  désormais lus pendant l'attente et la progression est désactivée (`-s`). Un code de sortie non nul
+  apparaît dans le journal, et l'annulation termine le processus `flac` au lieu de le laisser
+  tourner.
 
 ## [1.5.1] - 2026-09-28
 
