@@ -17,6 +17,10 @@ public class TemplateService
     // fr-FR quand l'utilisateur est en français, ce qui écrirait « 44,1kHz » au lieu de « 44.1kHz ».
     private static string Rate(double khz) => khz.ToString(CultureInfo.InvariantCulture);
 
+    // 255 bytes is the limit of a path component on ext4 and most NAS filesystems. The margin leaves
+    // room for the audio extension (".flac") and the " (99)" suffix of the "rename" duplicate mode.
+    private const int MaxSegmentBytes = 240;
+
     private static readonly string[] VariousArtistsNames = {
         "Various Artists, Array", "Various Artists", "Various Aritsts",
         "Various Artist", "Various Interpreters", "Various Interpreter", "Various Interprets"
@@ -197,7 +201,8 @@ public class TemplateService
         template = SpacesRegex.Replace(template, " ").Trim();
         template = template.Replace("...", "\u2026");
 
-        return template;
+        // The template may contain "/" (folder separators): the limit applies to each component.
+        return string.Join('/', template.Split('/').Select(segment => TruncateToBytes(segment)));
     }
 
     /// <summary>
@@ -373,11 +378,33 @@ public class TemplateService
         return result.Trim(' ', '.', '-');
     }
 
-    public static string TruncateLongName(string name, int reserveLen, int maxLen = 255)
+    /// <summary>
+    /// Truncates to at most <paramref name="maxBytes"/> bytes of UTF-8 and marks the cut with an
+    /// ellipsis. The limit is in bytes, not characters, because that is what filesystems count:
+    /// 255 per path component on ext4, and a title in Japanese or Cyrillic takes 2 to 3 bytes per
+    /// character. Cuts fall between text elements, never inside a surrogate pair or a base letter
+    /// and its combining marks.
+    /// </summary>
+    public static string TruncateToBytes(string name, int maxBytes = MaxSegmentBytes)
     {
-        if (string.IsNullOrEmpty(name)) return name;
-        if (name.Length + reserveLen >= maxLen)
-            name = name[..(maxLen - 1 - reserveLen)] + "\u2026";
-        return name;
+        if (Encoding.UTF8.GetByteCount(name) <= maxBytes) return name;
+
+        const string ellipsis = "\u2026";
+        var budget = maxBytes - Encoding.UTF8.GetByteCount(ellipsis);
+
+        var kept = new StringBuilder();
+        var used = 0;
+        var elements = StringInfo.GetTextElementEnumerator(name);
+        while (elements.MoveNext())
+        {
+            var element = (string)elements.Current;
+            var size = Encoding.UTF8.GetByteCount(element);
+            if (used + size > budget) break;
+
+            kept.Append(element);
+            used += size;
+        }
+
+        return kept.Append(ellipsis).ToString();
     }
 }

@@ -1260,7 +1260,9 @@ public class DownloadService
 
     private async Task DownloadGoodyAsync(string downloadPath, QobuzAlbum album, QobuzGoody goody, CancellationToken ct)
     {
-        var fileName = TemplateService.MakeSafeFilename(goody.Description ?? album.Title);
+        // 200 bytes: room for the " (id)" suffix and the extension below the 255-byte limit.
+        var fileName = TemplateService.TruncateToBytes(
+            TemplateService.MakeSafeFilename(goody.Description ?? album.Title), maxBytes: 200);
         var ext = Path.GetExtension(goody.Url ?? ".pdf");
         var filePath = Path.Combine(downloadPath, $"{fileName} ({goody.Id}){ext}");
 

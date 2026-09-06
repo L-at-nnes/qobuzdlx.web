@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   piste était fournie (nom de fichier), les balises `%Album…%` étaient résolues avec le drapeau de
   la piste avant que celui de l'album ne soit consulté. Chaque portée utilise maintenant son propre
   drapeau.
+- **Les titres très longs ne font plus échouer les pistes.** Les noms de fichiers et de dossiers
+  n'étaient jamais raccourcis, alors que les systèmes de fichiers limitent chaque composant à 255
+  **octets** (ext4) — et un titre japonais ou cyrillique en pèse deux à trois par caractère. Chaque
+  composant est désormais tronqué à 240 octets UTF-8 (avec « … »), sans jamais couper un caractère
+  en deux. Les fichiers bonus sont concernés de la même façon.
 
 ## [1.5.1] - 2026-09-28
 
