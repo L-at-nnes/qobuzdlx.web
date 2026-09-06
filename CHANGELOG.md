@@ -74,6 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `X-App-Id` était ajouté et retiré dans `DefaultRequestHeaders` à chaque connexion ou
   déconnexion, une opération qui n'est pas thread-safe si une requête est en cours — un
   téléchargement, par exemple. Les en-têtes sont désormais posés requête par requête.
+- **Extension des fichiers bonus.** Elle était lue dans l'URL entière : une URL signée donnait
+  `.pdf?Expires=…`, un nom invalide sous Windows et sur les partages SMB. Seul le chemin est
+  désormais pris en compte.
 
 ## [1.5.1] - 2026-09-28
 

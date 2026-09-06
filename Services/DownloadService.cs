@@ -1263,7 +1263,7 @@ public class DownloadService
         // 200 bytes: room for the " (id)" suffix and the extension below the 255-byte limit.
         var fileName = TemplateService.TruncateToBytes(
             TemplateService.MakeSafeFilename(goody.Description ?? album.Title), maxBytes: 200);
-        var ext = Path.GetExtension(goody.Url ?? ".pdf");
+        var ext = GoodyExtension(goody.Url);
         var filePath = Path.Combine(downloadPath, $"{fileName} ({goody.Id}){ext}");
 
         if (System.IO.File.Exists(filePath)) { Log(_loc["log.goodyExists"]); return; }
@@ -1283,6 +1283,11 @@ public class DownloadService
     /// mistaken for the cover of the next one, whatever went wrong in between.</summary>
     private string EmbeddedArtPath(QobuzAlbum album) =>
         Path.Combine(Path.GetTempPath(), $"qbdlx-{_sessionId}-{album.Id}-{_settings.Settings.EmbeddedArtSize}.jpg");
+
+    /// <summary>Read from the URL path: a signed URL ends with a query string that must not leak into
+    /// the file name (".pdf?Expires=..." is not a valid name on Windows or SMB shares).</summary>
+    private static string GoodyExtension(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) ? Path.GetExtension(uri.AbsolutePath) : "";
 
     private void DeleteTempArtwork(QobuzAlbum album)
     {
