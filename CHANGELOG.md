@@ -82,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   désormais dans la part de la barre qui lui revient.
 - **« Passer » ne télécharge plus les fichiers bonus de l'album sauté.** Le bouton interrompait les
   pistes mais l'album continuait avec ses livrets.
+- **Numérotation des pistes d'une playlist.** Avec l'option « position dans la playlist », le
+  numéro était complété selon la taille de l'album d'origine : `7` et `35` voisinaient avec `120`
+  et le tri alphabétique des fichiers n'était plus celui de la playlist. Le complément suit
+  désormais la taille de la playlist.
 
 ## [1.5.1] - 2026-09-28
 

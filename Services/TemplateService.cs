@@ -110,7 +110,12 @@ public class TemplateService
         // Track tags
         if (track != null)
         {
-            int padLen = album?.TracksCount.ToString().Length ?? 2;
+            // With playlist positions the number is a rank in the playlist, not in the album it comes
+            // from: padding to the album's size would sort "7" before "35" but after "120".
+            var numberedTracks = playlist != null && s.UseItemPosInPlaylist && playlist.TracksCount > 0
+                ? playlist.TracksCount
+                : album?.TracksCount;
+            int padLen = numberedTracks?.ToString().Length ?? 2;
 
             template = ReplaceParentalWarningTags(template, "track", track.ParentalWarning);
             template = template
