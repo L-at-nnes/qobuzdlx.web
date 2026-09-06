@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag ou un déplacement raté laissait le fichier en cours de téléchargement sur le volume de
   configuration. Il est maintenant supprimé quoi qu'il arrive, et les restes d'un arrêt brutal
   (fichiers `qbdlx_downloading-*` et pochettes temporaires) sont purgés au démarrage.
+- **La recherche n'échoue plus en silence.** Une erreur de l'API (session expirée, réseau) vidait
+  les résultats sans un mot, et une recherche sans résultat n'affichait rien non plus. Un message
+  distingue désormais l'échec de l'absence de résultat. Lancer une recherche avec la touche Entrée
+  pendant qu'une autre est en cours n'en démarre plus une seconde en parallèle.
 
 ## [1.5.1] - 2026-09-28
 

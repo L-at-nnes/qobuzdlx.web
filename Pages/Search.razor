@@ -5,6 +5,7 @@
 @inject SettingsService Settings
 @inject SearchStateService State
 @inject NavigationManager Nav
+@inject ILogger<Search> Logger
 @inherits LocalizedComponentBase
 
 <h3 style="margin-bottom:16px;">@Loc["search.title"]</h3>
@@ -21,6 +22,15 @@
 @if (_searching)
 {
     <div class="card" style="text-align:center;color:var(--text-secondary);">@Loc["search.searching"]</div>
+}
+
+@if (_searchFailed)
+{
+    <div class="card" style="background:rgba(231,76,60,0.15);border:1px solid #c0392b;color:#e74c3c;">@Loc["search.error"]</div>
+}
+else if (HasNoResults)
+{
+    <div class="card" style="text-align:center;color:var(--text-secondary);">@Loc["search.noResults"]</div>
 }
 
 @if (State.Albums != null && State.Albums.Count > 0)
@@ -221,10 +231,20 @@
 
 @code {
     private bool _searching;
+    private bool _searchFailed;
     private bool _loadingArtistAlbums;
     private HashSet<string> _selectedAlbums = new();
     private HashSet<int> _selectedTracks = new();
     private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
+
+    // La recherche a abouti mais n'a rien trouvé : distinct d'un échec, où les listes sont nulles.
+    private bool HasNoResults => !_searching && State.LastSearchType switch
+    {
+        "albums" => State.Albums is { Count: 0 },
+        "tracks" => State.Tracks is { Count: 0 },
+        "artists" => State.Artists is { Count: 0 },
+        _ => false
+    };
 
     private string? _toast;
     private bool _toastIsError;
@@ -254,8 +274,10 @@
 
     private async Task DoSearch(string type)
     {
-        if (string.IsNullOrWhiteSpace(State.Query)) return;
+        // _searching protège aussi la touche Entrée, que le bouton désactivé ne couvre pas.
+        if (string.IsNullOrWhiteSpace(State.Query) || _searching) return;
         _searching = true;
+        _searchFailed = false;
         State.LastSearchType = type;
         State.Albums = null;
         State.Tracks = null;
@@ -281,8 +303,10 @@
                     break;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Search failed for type {Type}", type);
+            _searchFailed = true;
             State.Albums = null;
             State.Tracks = null;
             State.Artists = null;

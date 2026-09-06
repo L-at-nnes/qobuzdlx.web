@@ -43,6 +43,8 @@
   "search.tracks": "Pistes",
   "search.artists": "Artistes",
   "search.searching": "Recherche en cours...",
+  "search.noResults": "Aucun résultat.",
+  "search.error": "La recherche a échoué. Vérifiez votre connexion et votre session Qobuz, puis réessayez.",
   "search.results.one": "{0} résultat",
   "search.results.other": "{0} résultats",
   "search.selectAll": "Tout sélectionner",
