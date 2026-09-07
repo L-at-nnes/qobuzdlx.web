@@ -88,6 +88,14 @@ public class AppGuardService
         return CryptographicOperations.FixedTimeEquals(parsed.Hash, computed);
     }
 
+    /// <summary>
+    /// Vrai si l'empreinte n'est pas au format courant, ou si son coût est inférieur au coût actuel.
+    /// À consulter après une vérification réussie, seul moment où le mot de passe en clair est connu.
+    /// </summary>
+    public static bool NeedsRehash(string storedHash) =>
+        !storedHash.StartsWith(FormatTag + "$", StringComparison.Ordinal)
+        || ParsePbkdf2(storedHash) is not { Iterations: >= Iterations };
+
     private readonly record struct Pbkdf2Hash(int Iterations, byte[] Salt, byte[] Hash);
 
     private static bool IsLegacySha256(string storedHash) =>

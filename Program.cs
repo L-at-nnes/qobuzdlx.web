@@ -204,6 +204,16 @@ app.MapPost("/auth/unlock", async (HttpContext ctx, SettingsService settings, Ap
 
     gate.RegisterSuccess();
 
+    // Le mot de passe en clair n'est connu qu'ici : on migre une empreinte ancienne ou moins
+    // coûteuse que l'actuelle vers le format courant. L'empreinte du cookie suit le nouveau hash ;
+    // ceux des autres appareils, calés sur l'ancien, seront refusés une fois et leur demanderont
+    // de se déverrouiller à nouveau.
+    if (AppGuardService.NeedsRehash(hash))
+    {
+        hash = AppGuardService.HashPassword(password);
+        settings.Update(s => s.AppAccessPasswordHash = hash);
+    }
+
     var identity = new ClaimsIdentity(
         new[]
         {

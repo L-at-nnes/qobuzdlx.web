@@ -140,6 +140,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itérations, SHA-256 non salé) restent acceptés. Une empreinte dont le hash ou le sel est vide
   ou de taille inattendue est refusée au lieu de valider n'importe quel mot de passe, et la
   comparaison SHA-256 d'origine se fait désormais en temps constant.
+- **Les anciennes empreintes sont migrées au déverrouillage.** Le code promettait de migrer le
+  SHA-256 non salé « à la prochaine sauvegarde » sans jamais le faire. Le premier déverrouillage
+  réussi après la mise à jour réécrit désormais l'empreinte au format courant (SHA-256 non salé,
+  PBKDF2 à 100 000 itérations). Les autres appareils déjà déverrouillés devront alors se
+  déverrouiller une fois de plus : leur cookie porte l'empreinte de l'ancien hash.
 
 ## [1.5.1] - 2026-09-28
 
