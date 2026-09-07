@@ -109,6 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remplace sans changer le résultat (vérifié en FLAC et en MP3).
 
 ### Changed
+- **L'écran de verrouillage n'a plus de sélecteur de langue.** La langue est un réglage global :
+  tout visiteur non authentifié pouvait la changer pour tous les appareils connectés et provoquer
+  des réécritures de `settings.json`. L'écran suit la langue du navigateur détectée au premier
+  lancement ; le sélecteur reste disponible une fois connecté.
 - La version affichée dans la barre latérale et renvoyée par `/healthz` provient d'un seul endroit
   (`AppInfo.Version`, lue dans le csproj). Elle était calculée deux fois, avec un repli « 1.5.1 »
   écrit en dur qui serait devenu faux à la première montée de version.
