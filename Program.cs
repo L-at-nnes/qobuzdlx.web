@@ -131,6 +131,21 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Posés sur toutes les réponses, fichiers statiques compris. frame-ancestors (et X-Frame-Options
+// pour les navigateurs qui l'ignorent) interdit d'encadrer l'interface dans la page d'un tiers
+// pour piéger un clic ; l'application elle-même n'a besoin d'aucun cadre. Pas de CSP complète :
+// Blazor Server s'appuie sur des scripts et styles en ligne, et les vignettes viennent de
+// serveurs d'images Qobuz qu'on ne maîtrise pas.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers.XContentTypeOptions = "nosniff";
+    headers.XFrameOptions = "DENY";
+    headers.ContentSecurityPolicy = "frame-ancestors 'none'";
+    headers["Referrer-Policy"] = "same-origin";
+    await next();
+});
+
 // .webmanifest est absent de la table MIME par défaut : sans ce mapping le fichier partirait en
 // application/octet-stream et Chrome ignorerait le manifeste, donc l'installation sur l'écran
 // d'accueil, sans rien signaler.

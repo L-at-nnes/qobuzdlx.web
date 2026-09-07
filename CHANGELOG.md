@@ -128,6 +128,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pouvait aussi partir sur une requête en clair vers le même hôte. Le déduire de `X-Forwarded-Proto`
   aurait obligé à faire confiance à n'importe quel client ; l'opérateur le déclare donc lui-même.
   Désactivé par défaut : un cookie `Secure` n'est pas accepté en HTTP simple.
+- **En-têtes de sécurité sur toutes les réponses.** `X-Frame-Options: DENY` et
+  `Content-Security-Policy: frame-ancestors 'none'` empêchent d'encadrer l'interface dans la page
+  d'un tiers (détournement de clic) ; `X-Content-Type-Options: nosniff` et
+  `Referrer-Policy: same-origin` complètent. Une CSP complète n'est pas posée : Blazor Server
+  repose sur des scripts et styles en ligne, et les vignettes viennent de serveurs d'images Qobuz.
 
 ## [1.5.1] - 2026-09-28
 
