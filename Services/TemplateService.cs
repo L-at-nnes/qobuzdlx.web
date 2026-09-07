@@ -82,16 +82,23 @@ public class TemplateService
     }
 
     /// <summary>
-    /// Remove path traversal sequences from a single path segment.
+    /// Makes a folder name safe. It may hold several components (a template can contain "/"):
+    /// each one loses the dots and spaces at its ends, so "." and ".." vanish and the path cannot
+    /// climb out of the download folder, while a ".." inside a name ("Vol..2") is left alone.
     /// Returns empty string if input was empty (intentionally blank template).
     /// Returns "_" only if input had content but became empty after sanitization.
     /// </summary>
     private static string SanitizePathSegment(string segment)
     {
         if (string.IsNullOrWhiteSpace(segment)) return "";
-        segment = segment.Replace("..", "").Replace("\0", "");
-        segment = segment.Trim('.', ' ');
-        return string.IsNullOrWhiteSpace(segment) ? "_" : segment;
+
+        var components = segment.Replace("\0", "")
+            .Split('/')
+            .Select(component => component.Trim('.', ' '))
+            .Where(component => component.Length > 0)
+            .ToArray();
+
+        return components.Length == 0 ? "_" : string.Join('/', components);
     }
 
     public string ApplyTemplate(string template, QobuzAlbum? album, QobuzTrack? track, QobuzPlaylist? playlist)

@@ -92,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Garde du dossier de téléchargement.** Le contrôle « le chemin reste dans le dossier de
   destination » comparait des préfixes de chaîne : `/downloads-evil` passait pour être dans
   `/downloads`. Il compare désormais des composants de chemin.
+- **Un `..` à l'intérieur d'un nom n'est plus supprimé.** « Vol..2 » devenait « Vol2 ». Seuls les
+  composants `.` et `..` d'un chemin sont écartés ; les points et espaces en bout de chaque
+  composant sont retirés, comme l'exigent Windows et les partages SMB.
 
 ## [1.5.1] - 2026-09-28
 
