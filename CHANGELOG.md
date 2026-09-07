@@ -95,6 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Un `..` à l'intérieur d'un nom n'est plus supprimé.** « Vol..2 » devenait « Vol2 ». Seuls les
   composants `.` et `..` d'un chemin sont écartés ; les points et espaces en bout de chaque
   composant sont retirés, comme l'exigent Windows et les partages SMB.
+- **Le tag « Qobuz URL » ne retire plus que `/fr-fr/`.** Les liens d'une autre langue (`/us-en/`,
+  `/de-de/`…) gardaient leur segment de langue dans le tag. Il est retiré quelle que soit la
+  langue, et la logique n'est plus dupliquée entre FLAC et MP3.
 
 ## [1.5.1] - 2026-09-28
 

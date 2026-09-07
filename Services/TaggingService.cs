@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using QobuzDLX.Web.Models;
 using TagLib;
 using Id3v2Tag = TagLib.Id3v2.Tag;
@@ -7,6 +8,11 @@ namespace QobuzDLX.Web.Services;
 
 public class TaggingService
 {
+    // Store URLs carry a locale segment (/fr-fr/, /us-en/, /de-de/...) that has nothing to do with
+    // the release: the link must be the same whatever the language it was read in.
+    private static readonly Regex LocaleSegmentRegex =
+        new("(?<=qobuz[.]com)/[a-z]{2}-[a-z]{2}(?=/)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private readonly SettingsService _settings;
     private readonly TemplateService _templates;
     private readonly ILogger<TaggingService> _logger;
@@ -68,7 +74,7 @@ public class TaggingService
 
         if (s.UrlTag)
         {
-            var url = (!string.IsNullOrWhiteSpace(track.Url) ? track.Url : album.Url)?.Replace("/fr-fr/", "/");
+            var url = ResolveQobuzUrl(album, track);
             if (!string.IsNullOrWhiteSpace(url))
                 tags.SetField("Qobuz URL", new[] { url });
         }
@@ -111,7 +117,7 @@ public class TaggingService
 
         if (s.UrlTag)
         {
-            var url = (!string.IsNullOrWhiteSpace(track.Url) ? track.Url : album.Url)?.Replace("/fr-fr/", "/");
+            var url = ResolveQobuzUrl(album, track);
             if (!string.IsNullOrWhiteSpace(url))
             {
                 var data = new ByteVector {
@@ -133,6 +139,12 @@ public class TaggingService
                     mp3Tag.SetTextFrame("TDRL", date);
             }
         }
+    }
+
+    private static string? ResolveQobuzUrl(QobuzAlbum album, QobuzTrack track)
+    {
+        var url = !string.IsNullOrWhiteSpace(track.Url) ? track.Url : album.Url;
+        return url == null ? null : LocaleSegmentRegex.Replace(url, "");
     }
 
     private void SetCommonTags(TagLib.File file, QobuzAlbum album, QobuzTrack track, AppSettings s)
