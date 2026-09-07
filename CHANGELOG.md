@@ -133,6 +133,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   d'un tiers (détournement de clic) ; `X-Content-Type-Options: nosniff` et
   `Referrer-Policy: same-origin` complètent. Une CSP complète n'est pas posée : Blazor Server
   repose sur des scripts et styles en ligne, et les vignettes viennent de serveurs d'images Qobuz.
+- **Empreinte du mot de passe d'accès renforcée et versionnée.** PBKDF2 passe de 100 000 à
+  600 000 itérations (recommandation OWASP pour HMAC-SHA256). L'empreinte porte désormais son
+  format et son nombre d'itérations (`pbkdf2-sha256$600000$sel$hash`) : relever le coût plus tard
+  ne rendra pas les empreintes existantes illisibles. Les anciens formats (PBKDF2 à 100 000
+  itérations, SHA-256 non salé) restent acceptés. Une empreinte dont le hash ou le sel est vide
+  ou de taille inattendue est refusée au lieu de valider n'importe quel mot de passe, et la
+  comparaison SHA-256 d'origine se fait désormais en temps constant.
 
 ## [1.5.1] - 2026-09-28
 
