@@ -72,11 +72,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // niveau, et None imposerait le drapeau Secure — impossible à garantir en HTTP sur une
         // adresse privée (VPN, réseau local).
         options.Cookie.SameSite = SameSiteMode.Lax;
-        // Derrière un reverse proxy qui termine TLS, Kestrel ne voit que du HTTP : le drapeau
-        // Secure ne sera donc pas posé. Le récupérer imposerait UseForwardedHeaders sans liste
-        // de proxys connus (leur adresse est dynamique en Docker), c'est-à-dire faire confiance
-        // au X-Forwarded-Proto de quiconque peut joindre Kestrel. Le jeu n'en vaut pas la chandelle.
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        // Derrière un reverse proxy qui termine TLS, Kestrel ne voit que du HTTP : SameAsRequest ne
+        // pose alors pas le drapeau Secure. Le déduire de X-Forwarded-Proto imposerait de faire
+        // confiance à quiconque peut joindre Kestrel (l'adresse du proxy est dynamique en Docker).
+        // C'est donc à l'opérateur, qui sait que l'accès se fait en HTTPS, de le déclarer :
+        // COOKIE_SECURE=true. Le cookie n'est alors plus accepté par les navigateurs sur du HTTP
+        // simple, d'où une option et non un défaut.
+        options.Cookie.SecurePolicy = builder.Configuration.GetValue<bool>("COOKIE_SECURE")
+            ? CookieSecurePolicy.Always
+            : CookieSecurePolicy.SameAsRequest;
 
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
         options.SlidingExpiration = true;

@@ -123,6 +123,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   téléchargements. Un bandeau reste affiché dans l'interface jusqu'à la définition d'un mot de
   passe, un avertissement est écrit dans les journaux au démarrage, et le README ouvre désormais
   par une section « Security ».
+- **Option `COOKIE_SECURE=true` pour le cookie d'accès.** Derrière un reverse proxy HTTPS, le
+  serveur ne voit que du HTTP et ne posait donc jamais le drapeau `Secure`, de sorte que le cookie
+  pouvait aussi partir sur une requête en clair vers le même hôte. Le déduire de `X-Forwarded-Proto`
+  aurait obligé à faire confiance à n'importe quel client ; l'opérateur le déclare donc lui-même.
+  Désactivé par défaut : un cookie `Secure` n'est pas accepté en HTTP simple.
 
 ## [1.5.1] - 2026-09-28
 

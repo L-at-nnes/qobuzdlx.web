@@ -104,6 +104,15 @@ chown -R 1000:1000 /path/to/downloads /path/to/config
   warning banner stays visible until you do, and the server logs a warning at startup.
 - **Put it behind a reverse proxy with HTTPS** if it is reachable from outside your network. The
   password and the unlock cookie otherwise travel in clear text.
+- **Behind an HTTPS reverse proxy, set `COOKIE_SECURE=true`.** The container only sees plain HTTP,
+  so it cannot tell on its own that the unlock cookie should carry the `Secure` flag. Do not set it
+  if you also reach the app over plain `http://` (directly on your LAN, or from the Android app):
+  browsers refuse `Secure` cookies over HTTP and the unlock would never stick.
+
+  ```yaml
+  environment:
+    - COOKIE_SECURE=true
+  ```
 - `settings.json` holds your Qobuz session token and app secret in clear text: keep `/config`
   readable by the container user only.
 
