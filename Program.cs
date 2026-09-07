@@ -155,7 +155,7 @@ app.Use(async (context, next) =>
 app.MapGet("/healthz", () => Results.Json(new
 {
     app = "QobuzDLX.Web",
-    version = AppVersion()
+    version = AppInfo.Version
 }));
 
 // Déverrouillage par formulaire HTML classique, et non par un gestionnaire Blazor : poser un
@@ -210,9 +210,3 @@ app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
-
-// Même source que la barre latérale (MainLayout.razor) : la version du csproj, sans la révision.
-static string AppVersion() =>
-    System.Reflection.Assembly.GetExecutingAssembly().GetName().Version is { } v
-        ? $"{v.Major}.{v.Minor}.{v.Build}"
-        : "1.5.1";

@@ -108,6 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   TagLibSharp 2.3 et produisait deux avertissements à la compilation ; `AttachmentFrame` le
   remplace sans changer le résultat (vérifié en FLAC et en MP3).
 
+### Changed
+- La version affichée dans la barre latérale et renvoyée par `/healthz` provient d'un seul endroit
+  (`AppInfo.Version`, lue dans le csproj). Elle était calculée deux fois, avec un repli « 1.5.1 »
+  écrit en dur qui serait devenu faux à la première montée de version.
+
 ## [1.5.1] - 2026-09-28
 
 ### Fixed
