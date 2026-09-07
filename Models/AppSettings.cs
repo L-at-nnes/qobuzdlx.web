@@ -7,14 +7,12 @@ public class AppSettings
 
     // Auth
     public string Email { get; set; } = "";
-    public string Password { get; set; } = "";
     public string UserAuthToken { get; set; } = "";
     public string AppId { get; set; } = "";
     public string AppSecret { get; set; } = "";
     public string UserId { get; set; } = "";
     public string UserDisplayName { get; set; } = "";
     public string UserLabel { get; set; } = "";
-    public string UserAvatar { get; set; } = "";
     public bool UseTokenLogin { get; set; }
 
     // Download
@@ -80,5 +78,4 @@ public class AppSettings
     // du navigateur au premier rendu. Nom volontairement différent de l'ancien "Language" (vestige
     // inutilisé du portage desktop, sérialisé à "en") pour ne pas hériter de sa valeur.
     public string UiLanguage { get; set; } = "";
-    public string Theme { get; set; } = "dark";
 }

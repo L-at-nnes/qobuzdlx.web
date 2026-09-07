@@ -148,6 +148,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Règles minimales pour le mot de passe d'accès.** N'importe quelle saisie non vide était
   acceptée, sans confirmation : une faute de frappe verrouillait l'instance derrière un mot de
   passe inconnu. Un nouveau mot de passe doit faire au moins 8 caractères et être saisi deux fois.
+- **Réglages morts supprimés, dont un champ `Password`.** `AppSettings` déclarait un mot de passe
+  en clair que rien n'utilisait, ainsi que `UserAvatar` et `Theme`. Un piège pour qui aurait un
+  jour branché dessus ; ils disparaissent du fichier à la prochaine sauvegarde, sans effet sur les
+  installations existantes.
 
 ## [1.5.1] - 2026-09-28
 
