@@ -8,6 +8,11 @@ namespace QobuzDLX.Web.Services;
 /// </summary>
 public class AppGuardService
 {
+    /// <summary>Longueur minimale d'un nouveau mot de passe d'accès. Le blocage progressif de
+    /// <see cref="AppAccessGate"/> et le coût de PBKDF2 limitent les essais ; une longueur
+    /// raisonnable fait le reste.</summary>
+    public const int MinPasswordLength = 8;
+
     private const int SaltSize = 16;
     private const int HashSize = 32;
 

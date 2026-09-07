@@ -257,6 +257,10 @@
   "settings.access.enable": "Activer",
   "settings.access.change": "Modifier",
   "settings.access.remove": "Supprimer",
+  "settings.access.confirmPassword": "Confirmer le mot de passe",
+  "settings.access.confirmPlaceholder": "Saisir à nouveau...",
+  "settings.access.tooShort": "Le mot de passe doit contenir au moins {0} caractères.",
+  "settings.access.mismatch": "Les deux saisies ne correspondent pas.",
   "settings.access.saved": "Mot de passe enregistré.",
   "settings.access.removed": "Mot de passe supprimé — application ouverte."
 }

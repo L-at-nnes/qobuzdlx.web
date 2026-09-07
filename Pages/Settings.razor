@@ -292,6 +292,10 @@
                 <label>@Loc["settings.access.newPassword"]</label>
                 <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.choosePlaceholder"]' />
             </div>
+            <div class="form-group">
+                <label>@Loc["settings.access.confirmPassword"]</label>
+                <input type="password" @bind="_confirmAccessPassword" placeholder='@Loc["settings.access.confirmPlaceholder"]' />
+            </div>
             <button class="btn btn-primary" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.enable"]</button>
         </div>
     }
@@ -306,9 +310,18 @@
                 <label>@Loc["settings.access.newPassword"]</label>
                 <input type="password" @bind="_newAccessPassword" placeholder='@Loc["settings.access.changePlaceholder"]' />
             </div>
+            <div class="form-group">
+                <label>@Loc["settings.access.confirmPassword"]</label>
+                <input type="password" @bind="_confirmAccessPassword" placeholder='@Loc["settings.access.confirmPlaceholder"]' />
+            </div>
             <button class="btn btn-primary" @onclick="SetAccessPassword" disabled="@string.IsNullOrWhiteSpace(_newAccessPassword)">@Loc["settings.access.change"]</button>
             <button class="btn btn-danger" @onclick="RemoveAccessPassword">@Loc["settings.access.remove"]</button>
         </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_accessPasswordError))
+    {
+        <div style="color:#e74c3c;font-size:0.85em;margin-top:8px;">@_accessPasswordError</div>
     }
 
     @if (_accessPasswordSaved)
@@ -327,6 +340,8 @@
     private bool _showCopied;
     private string _copiedToken = "";
     private string _newAccessPassword = "";
+    private string _confirmAccessPassword = "";
+    private string _accessPasswordError = "";
     private bool _accessPasswordSaved;
     private string _accessPasswordMessage = "";
 
@@ -342,8 +357,17 @@
     private async Task SetAccessPassword()
     {
         if (string.IsNullOrWhiteSpace(_newAccessPassword)) return;
+
+        _accessPasswordError = "";
+        if (_newAccessPassword.Length < AppGuardService.MinPasswordLength)
+            _accessPasswordError = Loc.T("settings.access.tooShort", AppGuardService.MinPasswordLength);
+        else if (_newAccessPassword != _confirmAccessPassword)
+            _accessPasswordError = Loc["settings.access.mismatch"];
+        if (_accessPasswordError.Length > 0) return;
+
         SettingsSvc.Update(s => s.AppAccessPasswordHash = AppGuardService.HashPassword(_newAccessPassword));
         _newAccessPassword = "";
+        _confirmAccessPassword = "";
         _accessPasswordMessage = Loc["settings.access.saved"];
         _accessPasswordSaved = true;
         StateHasChanged();
@@ -356,6 +380,8 @@
     {
         SettingsSvc.Update(s => s.AppAccessPasswordHash = "");
         _newAccessPassword = "";
+        _confirmAccessPassword = "";
+        _accessPasswordError = "";
         _accessPasswordMessage = Loc["settings.access.removed"];
         _accessPasswordSaved = true;
         StateHasChanged();

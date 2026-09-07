@@ -257,6 +257,10 @@
   "settings.access.enable": "Enable",
   "settings.access.change": "Change",
   "settings.access.remove": "Remove",
+  "settings.access.confirmPassword": "Confirm password",
+  "settings.access.confirmPlaceholder": "Type it again...",
+  "settings.access.tooShort": "The password must be at least {0} characters long.",
+  "settings.access.mismatch": "The two entries do not match.",
   "settings.access.saved": "Password saved.",
   "settings.access.removed": "Password removed — app open."
 }

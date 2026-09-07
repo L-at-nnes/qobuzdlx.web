@@ -145,6 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   réussi après la mise à jour réécrit désormais l'empreinte au format courant (SHA-256 non salé,
   PBKDF2 à 100 000 itérations). Les autres appareils déjà déverrouillés devront alors se
   déverrouiller une fois de plus : leur cookie porte l'empreinte de l'ancien hash.
+- **Règles minimales pour le mot de passe d'accès.** N'importe quelle saisie non vide était
+  acceptée, sans confirmation : une faute de frappe verrouillait l'instance derrière un mot de
+  passe inconnu. Un nouveau mot de passe doit faire au moins 8 caractères et être saisi deux fois.
 
 ## [1.5.1] - 2026-09-28
 
