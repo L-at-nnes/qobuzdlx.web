@@ -1112,7 +1112,7 @@ public class DownloadService
 
         if (!downloaded)
         {
-            throw lastError ?? new IOException("Téléchargement impossible (toutes qualités échouées)");
+            throw lastError ?? new IOException(_loc["error.downloadAllQualitiesFailed"]);
         }
     }
 
@@ -1253,7 +1253,7 @@ public class DownloadService
 
         if (totalBytes > 0 && bytesRead < totalBytes)
         {
-            throw new IOException($"Téléchargement incomplet : {bytesRead}/{totalBytes} octets");
+            throw new IOException(_loc.T("error.incompleteDownload", bytesRead, totalBytes));
         }
     }
 

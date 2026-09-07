@@ -98,6 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Le tag « Qobuz URL » ne retire plus que `/fr-fr/`.** Les liens d'une autre langue (`/us-en/`,
   `/de-de/`…) gardaient leur segment de langue dans le tag. Il est retiré quelle que soit la
   langue, et la logique n'est plus dupliquée entre FLAC et MP3.
+- **Textes encore en dur, hors du catalogue de traduction.** Deux messages d'erreur de
+  téléchargement étaient toujours en français, et la page « introuvable » toujours en anglais,
+  quelle que soit la langue choisie.
 
 ## [1.5.1] - 2026-09-28
 

@@ -15,6 +15,13 @@
   "lock.passwordPlaceholder": "mot de passe",
   "lock.unlock": "DÉVERROUILLER",
 
+  "notFound.title": "Page introuvable",
+  "notFound.message": "Cette page n'existe pas.",
+  "reconnect.trying": "Reconnexion au serveur…",
+  "reconnect.failed": "Connexion perdue. Rechargement…",
+  "reconnect.rejected": "La session a expiré. Rechargement…",
+  "reconnect.reload": "Recharger",
+
   "login.subtitle": "Qobuz Downloader - Édition Web",
   "login.token": "Jeton d'authentification",
   "login.tokenPlaceholder": "jeton",
@@ -165,6 +172,8 @@
   "log.goodyExists": "Le bonus existe déjà",
   "log.goodyFound": "Bonus trouvé, téléchargement...",
   "log.goodyFailed": "Échec du bonus : {0}",
+  "error.downloadAllQualitiesFailed": "Téléchargement impossible (toutes les qualités ont échoué)",
+  "error.incompleteDownload": "Téléchargement incomplet : {0}/{1} octets",
   "log.md5FixFailed": "Correction du MD5 impossible (flac) : {0}",
 
   "settings.title": "Paramètres",

@@ -1,12 +1,14 @@
+@inject LocalizationService Loc
+
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
-        <PageTitle>Not found</PageTitle>
+        <PageTitle>@Loc["notFound.title"]</PageTitle>
         <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Page not found.</p>
+            <p role="alert">@Loc["notFound.message"]</p>
         </LayoutView>
     </NotFound>
 </Router>

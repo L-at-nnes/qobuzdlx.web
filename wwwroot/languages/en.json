@@ -15,6 +15,13 @@
   "lock.passwordPlaceholder": "password",
   "lock.unlock": "UNLOCK",
 
+  "notFound.title": "Page not found",
+  "notFound.message": "This page does not exist.",
+  "reconnect.trying": "Reconnecting to the server…",
+  "reconnect.failed": "Connection lost. Reloading…",
+  "reconnect.rejected": "Session expired. Reloading…",
+  "reconnect.reload": "Reload",
+
   "login.subtitle": "Qobuz Downloader - Web Edition",
   "login.token": "Authentication token",
   "login.tokenPlaceholder": "token",
@@ -165,6 +172,8 @@
   "log.goodyExists": "Goody already exists",
   "log.goodyFound": "Goody found, downloading...",
   "log.goodyFailed": "Goody failed: {0}",
+  "error.downloadAllQualitiesFailed": "Download failed (every quality failed)",
+  "error.incompleteDownload": "Incomplete download: {0}/{1} bytes",
   "log.md5FixFailed": "MD5 fix failed (flac): {0}",
 
   "settings.title": "Settings",
