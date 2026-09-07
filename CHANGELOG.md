@@ -117,6 +117,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`AppInfo.Version`, lue dans le csproj). Elle était calculée deux fois, avec un repli « 1.5.1 »
   écrit en dur qui serait devenu faux à la première montée de version.
 
+### Security
+- **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne
+  qui joint le port utilise le compte Qobuz de l'instance, lit les réglages et lance des
+  téléchargements. Un bandeau reste affiché dans l'interface jusqu'à la définition d'un mot de
+  passe, un avertissement est écrit dans les journaux au démarrage, et le README ouvre désormais
+  par une section « Security ».
+
 ## [1.5.1] - 2026-09-28
 
 ### Fixed

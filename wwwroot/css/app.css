@@ -206,6 +206,23 @@ html, body {
     padding: 24px;
 }
 
+/* Avertissement : aucun mot de passe d'accès n'est défini */
+.security-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border: 1px solid #c0392b;
+    border-left-width: 4px;
+    border-radius: 6px;
+    background: rgba(231, 76, 60, 0.12);
+    font-size: 0.85em;
+}
+
+.security-banner a { color: var(--accent-hover); white-space: nowrap; }
+
 /* Cards */
 .card {
     background: var(--bg-secondary);
@@ -998,3 +1015,58 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
         transform: none;
     }
 }
+
+/* ── Voile de reconnexion ──────────────────────────────────────────────────────
+   Blazor pose lui-même les classes components-reconnect-{show,failed,rejected} sur
+   #components-reconnect-modal ; on ne fait que les habiller. Le lien avec le thème compte
+   ici plus qu'ailleurs : c'est l'écran que l'application mobile montre le plus souvent,
+   à chaque retour au premier plan. */
+#components-reconnect-modal { display: none; }
+
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 26, 46, 0.94);
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.reconnect-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 320px;
+    text-align: center;
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+/* Un seul des trois messages est visible, selon l'état posé par Blazor. */
+#components-reconnect-modal [data-state] { display: none; margin-bottom: 14px; }
+#components-reconnect-modal.components-reconnect-show [data-state="show"] { display: block; }
+#components-reconnect-modal.components-reconnect-failed [data-state="failed"] { display: block; }
+#components-reconnect-modal.components-reconnect-rejected [data-state="rejected"] { display: block; }
+
+/* Le rechargement est automatique ; le bouton n'est là que si le script a été empêché
+   d'agir (hors ligne, ou garde-fou anti-boucle déclenché). */
+#components-reconnect-modal .reconnect-reload { display: none; }
+#components-reconnect-modal.components-reconnect-failed .reconnect-reload,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-reload { display: inline-block; }
+
+.reconnect-spinner {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 14px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: reconnect-spin 0.9s linear infinite;
+}
+
+@keyframes reconnect-spin { to { transform: rotate(360deg); } }

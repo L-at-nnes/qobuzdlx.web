@@ -100,6 +100,13 @@ else
                 <div class="sidebar-version">v@(AppInfo.Version)</div>
             </nav>
             <div class="main-content">
+                @if (!needsPassword)
+                {
+                    <div class="security-banner" role="alert">
+                        <span>@Loc["security.noPassword"]</span>
+                        <NavLink href="/settings">@Loc["security.noPasswordAction"]</NavLink>
+                    </div>
+                }
                 @Body
             </div>
         }

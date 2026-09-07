@@ -15,6 +15,8 @@
   "lock.passwordPlaceholder": "password",
   "lock.unlock": "UNLOCK",
 
+  "security.noPassword": "No access password: anyone who can reach this server uses your Qobuz account.",
+  "security.noPasswordAction": "Set a password",
   "notFound.title": "Page not found",
   "notFound.message": "This page does not exist.",
   "reconnect.trying": "Reconnecting to the server…",

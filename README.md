@@ -94,6 +94,21 @@ chown -R 1000:1000 /path/to/downloads /path/to/config
 
 ---
 
+## Security
+
+> **QobuzDLX.Web has no access control until you set a password.** By default anyone who can reach
+> the port uses *your* Qobuz account, can read the settings and can start downloads. Do not expose
+> it to the internet in that state.
+
+- **Set an access password** in *Settings* as soon as the app is reachable by anyone but you. A
+  warning banner stays visible until you do, and the server logs a warning at startup.
+- **Put it behind a reverse proxy with HTTPS** if it is reachable from outside your network. The
+  password and the unlock cookie otherwise travel in clear text.
+- `settings.json` holds your Qobuz session token and app secret in clear text: keep `/config`
+  readable by the container user only.
+
+---
+
 ## Configuration
 
 ### Login
