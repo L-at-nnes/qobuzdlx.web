@@ -152,6 +152,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   en clair que rien n'utilisait, ainsi que `UserAvatar` et `Theme`. Un piège pour qui aurait un
   jour branché dessus ; ils disparaissent du fichier à la prochaine sauvegarde, sans effet sur les
   installations existantes.
+- **Les erreurs de l'API Qobuz n'exposent plus le corps brut de la réponse.** Il était recopié tel
+  quel dans le message d'erreur, donc affiché dans la file de téléchargement et le journal : page
+  HTML d'un proxy, ou JSON contenant des champs qui n'avaient rien à faire à l'écran. L'interface
+  ne reçoit plus que le code HTTP et le champ `message` de Qobuz (limité à 200 caractères) ; le
+  corps complet reste dans les journaux du serveur.
 
 ## [1.5.1] - 2026-09-28
 

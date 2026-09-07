@@ -1,7 +1,9 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using QobuzDLX.Web.Models;
 
 namespace QobuzDLX.Web.Services;
@@ -309,7 +311,7 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning("Token login failed ({Status}): {Body}", response.StatusCode, json);
-            throw new HttpRequestException($"Token login failed ({(int)response.StatusCode}): {json}", null, response.StatusCode);
+            throw new HttpRequestException(DescribeApiError(response.StatusCode, json), null, response.StatusCode);
         }
 
         // Les identifiants ne sont retenus qu'une fois le jeton validé : un jeton refusé ne doit pas
@@ -380,7 +382,7 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("Stream URL error {Code}: {Body}", (int)response.StatusCode, json);
-            throw new QobuzApiException(response.StatusCode, $"Qobuz API error {(int)response.StatusCode}: {json}");
+            throw new QobuzApiException(response.StatusCode, DescribeApiError(response.StatusCode, json));
         }
 
         return JsonConvert.DeserializeObject<QobuzStreamUrl>(json);
@@ -504,10 +506,41 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("API error {Code}: {Body}", (int)response.StatusCode, json);
-            throw new QobuzApiException(response.StatusCode, $"Qobuz API error {(int)response.StatusCode}: {json}");
+            throw new QobuzApiException(response.StatusCode, DescribeApiError(response.StatusCode, json));
         }
 
         return JsonConvert.DeserializeObject<T>(json);
+    }
+
+    private const int MaxErrorDetailLength = 200;
+
+    /// <summary>
+    /// Message d'erreur affiché à l'utilisateur (file de téléchargement, journal) : le code HTTP et,
+    /// quand la réponse est du JSON Qobuz, son champ « message ». Le corps brut — qui peut être une
+    /// page HTML de proxy ou contenir des identifiants renvoyés en écho — reste dans les journaux du
+    /// serveur, où il est écrit avant l'appel.
+    /// </summary>
+    private static string DescribeApiError(HttpStatusCode status, string body)
+    {
+        var description = $"Qobuz API error {(int)status}";
+
+        try
+        {
+            if (JToken.Parse(body) is JObject json && json["message"] is { Type: JTokenType.String } message)
+            {
+                var detail = message.Value<string>()!.Trim();
+                if (detail.Length > MaxErrorDetailLength)
+                    detail = detail[..MaxErrorDetailLength] + "\u2026";
+                if (detail.Length > 0)
+                    description += $": {detail}";
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON (HTML error page from a proxy, empty body): the status code is all we keep.
+        }
+
+        return description;
     }
 
     private static string ComputeMD5(string input)
