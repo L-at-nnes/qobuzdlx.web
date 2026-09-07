@@ -120,6 +120,7 @@ public class TemplateService
             template = ReplaceParentalWarningTags(template, "track", track.ParentalWarning);
             template = template
                 .Replace("%trackid%", track.Id.ToString())
+                .Replace("%discnumber%", track.MediaNumber.ToString())
                 .Replace("%trackcomposer%", track.Composer?.Name ?? "")
                 .Replace("%tracknumber%", track.TrackNumber.ToString().PadLeft(padLen, '0'))
                 .Replace("%isrc%", track.ISRC ?? "")
@@ -197,7 +198,7 @@ public class TemplateService
             }
         }
 
-        // CD / Disc tags (also handle here as fallback)
+        // Disc number without a track (album and playlist folders): nothing to resolve it against
         template = template.Replace("%discnumber%", "");
 
         // Sanitize

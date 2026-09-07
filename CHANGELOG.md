@@ -86,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numéro était complété selon la taille de l'album d'origine : `7` et `35` voisinaient avec `120`
   et le tri alphabétique des fichiers n'était plus celui de la playlist. Le complément suit
   désormais la taille de la playlist.
+- **`%DiscNumber%` fonctionne dans le modèle de piste.** La balise était listée parmi les
+  variables disponibles mais n'était résolue que par le modèle du sous-dossier de disque ; partout
+  ailleurs elle donnait une chaîne vide.
 
 ## [1.5.1] - 2026-09-28
 

@@ -152,7 +152,7 @@ Available templates:
 `%PlaylistID%`, `%PlaylistTitle%`
 
 **Disc-specific:**
-`%DiscNumber%`
+`%DiscNumber%` *(multi-disc folder and track templates; empty in album and playlist folder templates)*
 
 **Parental advisory:**
 `%TrackPA%`, `%TrackPAShort%`, `%TrackPAifEx%`, `%TrackPAEnclosed%`, `%AlbumPA%`, `%AlbumPAShort%`, `%AlbumPAifEx%`, `%AlbumPAEnclosed%` *(and more variants)*
