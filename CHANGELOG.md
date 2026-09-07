@@ -101,6 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Textes encore en dur, hors du catalogue de traduction.** Deux messages d'erreur de
   téléchargement étaient toujours en français, et la page « introuvable » toujours en anglais,
   quelle que soit la langue choisie.
+- **Les tirets en bout de nom ne sont plus supprimés.** Le nettoyage des noms de fichiers retirait
+  tout tiret initial ou final : « -OSC- » devenait « OSC ». Seuls les tirets séparateurs, collés à
+  un espace (le « - » laissé par `Titre:` ou par un champ vide), sont écartés.
 
 ## [1.5.1] - 2026-09-28
 

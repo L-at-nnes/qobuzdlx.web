@@ -11,6 +11,10 @@ public class TemplateService
 
     private static readonly Regex PercentRegex = new(@"%(.*?)%", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SpacesRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    // A dash glued to the edge of a name by a separator: "Song:" becomes "Song -", an empty field in
+    // "%TrackNumber% - %TrackTitle%" leaves "- Title". A dash with no blank next to it ("-OSC-") is
+    // part of the name and stays.
+    private static readonly Regex EdgeSeparatorRegex = new(@"^(?:-\s+)+|(?:\s+-)+$", RegexOptions.Compiled);
     private static readonly Regex RepeatedParenthesesRegex = new(@"\(([^()]+)\)\s*(\(\1\))+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // Les noms de fichiers ne suivent pas la langue de l'interface : la culture du processus est
@@ -397,8 +401,8 @@ public class TemplateService
         // Collapse whitespace left by removed characters and trim leftover separator artifacts
         // (e.g. a trailing " -" from a title ending in ':'). The main template path also collapses
         // spaces, but the standalone goodies call does not \u2014 so normalize here too.
-        var result = SpacesRegex.Replace(sb.ToString(), " ");
-        return result.Trim(' ', '.', '-');
+        var result = SpacesRegex.Replace(sb.ToString(), " ").Trim(' ', '.');
+        return EdgeSeparatorRegex.Replace(result, "").Trim(' ', '.');
     }
 
     /// <summary>
