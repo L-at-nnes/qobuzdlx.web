@@ -89,6 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`%DiscNumber%` fonctionne dans le modèle de piste.** La balise était listée parmi les
   variables disponibles mais n'était résolue que par le modèle du sous-dossier de disque ; partout
   ailleurs elle donnait une chaîne vide.
+- **Garde du dossier de téléchargement.** Le contrôle « le chemin reste dans le dossier de
+  destination » comparait des préfixes de chaîne : `/downloads-evil` passait pour être dans
+  `/downloads`. Il compare désormais des composants de chemin.
 
 ## [1.5.1] - 2026-09-28
 

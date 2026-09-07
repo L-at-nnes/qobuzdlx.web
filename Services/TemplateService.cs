@@ -63,12 +63,22 @@ public class TemplateService
         }
 
         // Ensure final path stays within downloadLocation
-        var fullBase = Path.GetFullPath(downloadLocation);
-        var fullPath = Path.GetFullPath(downloadPath);
-        if (!fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
+        if (!IsInside(Path.GetFullPath(downloadLocation), Path.GetFullPath(downloadPath)))
             downloadPath = downloadLocation;
 
         return downloadPath;
+    }
+
+    /// <summary>
+    /// Compares path components, not characters: a plain prefix test would accept
+    /// "/downloads-evil" as being inside "/downloads".
+    /// </summary>
+    private static bool IsInside(string basePath, string path)
+    {
+        var relative = Path.GetRelativePath(basePath, path);
+        return relative != ".."
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar)
+            && !Path.IsPathRooted(relative);
     }
 
     /// <summary>
