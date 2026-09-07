@@ -104,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Les tirets en bout de nom ne sont plus supprimés.** Le nettoyage des noms de fichiers retirait
   tout tiret initial ou final : « -OSC- » devenait « OSC ». Seuls les tirets séparateurs, collés à
   un espace (le « - » laissé par `Titre:` ou par un champ vide), sont écartés.
+- **Pochette embarquée via l'API TagLib courante.** `AttachedPictureFrame` est obsolète dans
+  TagLibSharp 2.3 et produisait deux avertissements à la compilation ; `AttachmentFrame` le
+  remplace sans changer le résultat (vérifié en FLAC et en MP3).
 
 ## [1.5.1] - 2026-09-28
 

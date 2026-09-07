@@ -207,7 +207,7 @@ public class TaggingService
 
         try
         {
-            var pic = new AttachedPictureFrame
+            var pic = new AttachmentFrame
             {
                 TextEncoding = StringType.Latin1,
                 MimeType = System.Net.Mime.MediaTypeNames.Image.Jpeg,
