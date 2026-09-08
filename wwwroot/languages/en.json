@@ -176,6 +176,7 @@
   "log.goodyFailed": "Goody failed: {0}",
   "error.downloadAllQualitiesFailed": "Download failed (every quality failed)",
   "error.sessionExpired": "Qobuz session expired: sign in again, then retry this item (↻).",
+  "error.corruptedDownload": "Corrupted FLAC file (flac -t): {0}",
   "error.previewOnly": "30-second preview only: your subscription does not cover this track in full, or it is restricted.",
   "error.incompleteDownload": "Incomplete download: {0}/{1} bytes",
   "log.md5FixFailed": "MD5 fix failed (flac): {0}",
@@ -238,6 +239,7 @@
 
   "settings.advanced.title": "Advanced options",
   "settings.advanced.streamable": "Availability check",
+  "settings.advanced.verifyIntegrity": "Verify FLAC file integrity (flac -t)",
   "settings.advanced.fixMd5": "Auto-fix missing MD5s",
   "settings.advanced.goodies": "Download goodies",
   "settings.advanced.speed": "Show speed",

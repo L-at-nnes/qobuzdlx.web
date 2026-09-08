@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   est oubliée, l'élément en cours s'arrête avec un message clair, les éléments en attente échouent
   aussitôt sans appeler Qobuz, et toutes les pages ouvertes sont renvoyées à l'écran de connexion,
   qui explique la situation. Après reconnexion, ↻ relance les éléments concernés.
+- **Vérification d'intégrité des fichiers FLAC** (réglage « Vérifier l'intégrité des fichiers FLAC »,
+  activé par défaut). Un téléchargement qui atteint la taille annoncée peut contenir des trames
+  abîmées, qu'on ne découvre qu'à l'écoute. Chaque fichier est décodé avec `flac -t` ; en cas
+  d'échec il est retéléchargé avec une nouvelle URL signée, puis avec une qualité inférieure, comme
+  pour toute coupure du CDN. Sans `flac` installé, la vérification est ignorée et le fichier accepté.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

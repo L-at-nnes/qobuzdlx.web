@@ -69,6 +69,7 @@ public class AppSettings
     // Advanced
     public bool StreamableCheck { get; set; } = true;
     public bool FixMD5s { get; set; }
+    public bool VerifyIntegrity { get; set; } = true;
     public bool DownloadGoodies { get; set; } = true;
     public bool DownloadSpeed { get; set; }
     public bool UseItemPosInPlaylist { get; set; }

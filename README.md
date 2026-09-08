@@ -208,6 +208,7 @@ Additional tagging options:
 |---------|---------|-------------|
 | Streamable check | Enabled | Skip non-streamable tracks |
 | Fix MD5s | Disabled | Repair FLAC MD5 checksums (requires `flac` CLI) |
+| Verify integrity | Enabled | Decode every downloaded FLAC with `flac -t`; a damaged file is downloaded again (requires `flac` CLI, about a second per track, skipped when `flac` is missing) |
 | Download goodies | Enabled | Download booklets and bonus materials |
 | Print speed | Disabled | Show download speed in logs |
 | Duplicate handling | Skip | `skip`, `rename`, or `overwrite` existing files |

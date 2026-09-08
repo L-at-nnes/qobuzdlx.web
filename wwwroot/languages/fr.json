@@ -176,6 +176,7 @@
   "log.goodyFailed": "Échec du bonus : {0}",
   "error.downloadAllQualitiesFailed": "Téléchargement impossible (toutes les qualités ont échoué)",
   "error.sessionExpired": "Session Qobuz expirée : reconnectez-vous, puis relancez cet élément (↻).",
+  "error.corruptedDownload": "Fichier FLAC corrompu (flac -t) : {0}",
   "error.previewOnly": "Aperçu de 30 s uniquement : l'abonnement ne permet pas d'écouter cette piste en entier, ou elle est restreinte.",
   "error.incompleteDownload": "Téléchargement incomplet : {0}/{1} octets",
   "log.md5FixFailed": "Correction du MD5 impossible (flac) : {0}",
@@ -238,6 +239,7 @@
 
   "settings.advanced.title": "Options avancées",
   "settings.advanced.streamable": "Vérification de disponibilité",
+  "settings.advanced.verifyIntegrity": "Vérifier l'intégrité des fichiers FLAC (flac -t)",
   "settings.advanced.fixMd5": "Corriger auto. les MD5 manquants",
   "settings.advanced.goodies": "Télécharger les bonus",
   "settings.advanced.speed": "Afficher la vitesse",
