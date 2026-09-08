@@ -136,6 +136,9 @@ public class QobuzStreamUrl
     [JsonProperty("mime_type")] public string? MimeType { get; set; }
     [JsonProperty("sampling_rate")] public double SamplingRate { get; set; }
     [JsonProperty("bit_depth")] public int BitDepth { get; set; }
+
+    /// <summary>Vrai quand l'URL ne donne que l'extrait de 30 s et non la piste entière.</summary>
+    [JsonProperty("sample")] public bool Sample { get; set; }
 }
 
 public class QobuzUserInfo

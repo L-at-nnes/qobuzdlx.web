@@ -299,7 +299,9 @@ QobuzDLX.Web/
 
 ## Requirements
 
-- A valid **Qobuz account** (subscription required for Hi-Res streaming)
+- A valid **Qobuz account** (subscription required for Hi-Res streaming). Without an active
+  subscription, or for restricted tracks, Qobuz only provides a 30-second preview: it is detected
+  and the track is skipped with an explanatory message instead of being saved as a full track.
 - Docker (recommended) or .NET 8 runtime
 
 ---

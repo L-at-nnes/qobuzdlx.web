@@ -1090,6 +1090,10 @@ public class DownloadService
                         break;
                     }
 
+                    // Sans ce garde, l'extrait de 30 s serait téléchargé, tagué et rangé comme une piste entière.
+                    if (stream.Sample)
+                        throw new PreviewOnlyException(_loc["error.previewOnly"]);
+
                     await DownloadStreamToFileAsync(stream.Url, tempFile, ct);
                     downloaded = true;
                     lastError = null;
@@ -1097,6 +1101,7 @@ public class DownloadService
                     break;
                 }
                 catch (OperationCanceledException) { throw; }
+                catch (PreviewOnlyException) { throw; }
                 catch (Exception ex)
                 {
                     qualityError = ex;

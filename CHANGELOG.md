@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Les extraits de 30 secondes ne sont plus enregistrés comme des pistes entières.** Sans
+  abonnement actif, ou pour une piste restreinte, Qobuz ne fournit que l'extrait : il était
+  téléchargé, tagué et rangé à côté des vraies pistes. Il est désormais détecté (champ `sample` de
+  la réponse `track/getFileUrl`) et la piste est écartée avec un message explicite, sans nouvelle
+  tentative ni descente en qualité, puisque l'extrait est le même partout.
+
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
   erreur de la résolution dynamique était avalée, y compris un refus d'authentification : chaque
