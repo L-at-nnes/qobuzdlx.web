@@ -116,6 +116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - La version affichée dans la barre latérale et renvoyée par `/healthz` provient d'un seul endroit
   (`AppInfo.Version`, lue dans le csproj). Elle était calculée deux fois, avec un repli « 1.5.1 »
   écrit en dur qui serait devenu faux à la première montée de version.
+- **Les téléchargements réutilisent leurs connexions.** Un nouveau `HttpClient` était créé pour
+  chaque piste, pochette et fichier bonus : une connexion neuve (et un socket laissé en
+  `TIME_WAIT`) à chaque fichier, soit des centaines sur une discographie. Trois clients partagés,
+  un par type de transfert, portent désormais leurs délais d'attente (30 min, 2 min, 5 min).
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne

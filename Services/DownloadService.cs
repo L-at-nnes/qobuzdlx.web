@@ -105,6 +105,13 @@ public class DownloadService
     private const int LogMaxLines = 1200;
     private const int LogTrimLines = 400;
 
+    // Shared clients: one HttpClient per file opens a new connection (and leaves a socket in
+    // TIME_WAIT) for every track, cover and booklet. The timeout belongs to the client, hence one
+    // per kind of transfer.
+    private static readonly HttpClient StreamHttp = new() { Timeout = TimeSpan.FromMinutes(30) };
+    private static readonly HttpClient ArtworkHttp = new() { Timeout = TimeSpan.FromMinutes(2) };
+    private static readonly HttpClient GoodyHttp = new() { Timeout = TimeSpan.FromMinutes(5) };
+
     public DownloadProgress Progress { get; } = new();
 
     /// <summary>Haute fréquence (pourcentage, vitesse) : étranglé à 200 ms, sauf appel forcé.</summary>
@@ -1216,8 +1223,7 @@ public class DownloadService
             try { System.IO.File.Delete(tempFile); } catch { }
         }
 
-        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await StreamHttp.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
         long totalBytes = response.Content.Headers.ContentLength ?? -1;
@@ -1262,8 +1268,6 @@ public class DownloadService
     private async Task DownloadArtworkAsync(string downloadPath, QobuzAlbum album)
     {
         var s = _settings.Settings;
-        using var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-
         try
         {
             // Cover.jpg to disk
@@ -1273,7 +1277,7 @@ public class DownloadService
                 if (!System.IO.File.Exists(coverPath))
                 {
                     var url = album.Image.Large.Replace("_600", $"_{s.SavedArtSize}");
-                    var data = await httpClient.GetByteArrayAsync(url);
+                    var data = await ArtworkHttp.GetByteArrayAsync(url);
                     Directory.CreateDirectory(downloadPath);
                     await System.IO.File.WriteAllBytesAsync(coverPath, data);
                 }
@@ -1284,7 +1288,7 @@ public class DownloadService
             if (!System.IO.File.Exists(embeddedPath))
             {
                 var url = album.Image.Large.Replace("_600", $"_{s.EmbeddedArtSize}");
-                var data = await httpClient.GetByteArrayAsync(url);
+                var data = await ArtworkHttp.GetByteArrayAsync(url);
                 await System.IO.File.WriteAllBytesAsync(embeddedPath, data);
             }
         }
@@ -1304,8 +1308,7 @@ public class DownloadService
         try
         {
             Log(_loc["log.goodyFound"]);
-            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            var data = await http.GetByteArrayAsync(goody.Url, ct);
+            var data = await GoodyHttp.GetByteArrayAsync(goody.Url, ct);
             await System.IO.File.WriteAllBytesAsync(filePath, data, ct);
             Log(_loc["log.done"]);
         }
