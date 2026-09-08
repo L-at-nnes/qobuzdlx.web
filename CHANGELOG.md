@@ -125,6 +125,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discographie. Ces quatre statuts sont maintenant rejoués jusqu'à trois fois, en respectant
   `Retry-After` (30 s au plus) ou, à défaut, avec 1 s puis 2 s d'attente. Les autres statuts (401,
   404, 500…) et les connexions ne sont jamais rejoués.
+- **Une playlist ou une liste de favoris ne redemande plus le même album à chaque piste.** Chaque
+  piste déclenchait le chargement complet de son album (plusieurs appels pour une longue liste de
+  pistes), même quand dix pistes venaient du même disque. Les albums déjà chargés pendant
+  l'élément en cours sont conservés (50 au plus) et oubliés à la fin de l'élément.
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne

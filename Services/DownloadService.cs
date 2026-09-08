@@ -738,6 +738,7 @@ public class DownloadService
         {
             _itemCts = null;
             cts.Dispose();
+            _albumCache.Clear();
             Progress.CurrentQueueItemId = null;
             Progress.CurrentAlbum = null;
             Progress.Speed = "";
@@ -808,6 +809,25 @@ public class DownloadService
         }
     }
 
+    // ─── Album cache ───
+
+    // Albums fetched during the current queue item. A playlist or a favourites list often draws
+    // several tracks from the same album, and every fetch is at least one API call (more for a long
+    // tracklist). Only the worker thread touches it, and it is emptied after each item. A full
+    // cache is simply cleared: the point is to catch neighbours, not to remember everything.
+    private const int AlbumCacheMax = 50;
+    private readonly Dictionary<string, QobuzAlbum> _albumCache = new();
+
+    private async Task<QobuzAlbum> GetAlbumCachedAsync(string albumId)
+    {
+        if (_albumCache.TryGetValue(albumId, out var cached)) return cached;
+
+        var album = await _api.GetAlbumFullAsync(albumId);
+        if (_albumCache.Count >= AlbumCacheMax) _albumCache.Clear();
+        _albumCache[albumId] = album;
+        return album;
+    }
+
     // ─── Single Track ───
 
     private async Task DownloadSingleTrackAsync(string trackId, CancellationToken ct)
@@ -817,7 +837,7 @@ public class DownloadService
 
         QobuzAlbum? album = null;
         if (track.Album != null)
-            album = await _api.GetAlbumFullAsync(track.Album.Id);
+            album = await GetAlbumCachedAsync(track.Album.Id);
 
         if (album == null) { Log(_loc["log.albumInfoUnavailable"]); return; }
         Progress.CurrentAlbum = album;
@@ -859,7 +879,7 @@ public class DownloadService
                 var trackInfo = await _api.GetTrackAsync(item.Id.ToString());
                 if (trackInfo == null) continue;
 
-                QobuzAlbum? album = trackInfo.Album != null ? await _api.GetAlbumFullAsync(trackInfo.Album.Id) : null;
+                QobuzAlbum? album = trackInfo.Album != null ? await GetAlbumCachedAsync(trackInfo.Album.Id) : null;
                 if (album == null) continue;
                 Progress.CurrentAlbum = album;
 
