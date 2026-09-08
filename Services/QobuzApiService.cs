@@ -375,8 +375,7 @@ public class QobuzApiService
         // Match original app: app_id and user_auth_token in query params (like Form1.cs)
         var url = $"{BaseUrl}track/getFileUrl?request_ts={timestamp}&request_sig={sig}&track_id={trackId}&format_id={formatId}&intent=stream&app_id={_appId}&user_auth_token={_userAuthToken}";
 
-        using var request = CreateApiRequest(url, _appId);
-        using var response = await _http.SendAsync(request);
+        using var response = await SendWithRetryAsync(url, _appId);
         var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
@@ -499,8 +498,7 @@ public class QobuzApiService
 
     private async Task<T?> AuthGetAsync<T>(string url) where T : class
     {
-        using var request = CreateApiRequest(url, _appId, _userAuthToken);
-        using var response = await _http.SendAsync(request);
+        using var response = await SendWithRetryAsync(url, _appId, _userAuthToken);
         var json = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
@@ -511,6 +509,41 @@ public class QobuzApiService
 
         return JsonConvert.DeserializeObject<T>(json);
     }
+
+    private const int MaxAttempts = 3;
+    private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Qobuz answers 429 when it is asked too much, and its edge briefly answers 502/503/504 now and
+    /// then. Waiting a moment fixes both, whereas failing at once drops a track from a long
+    /// discography. Only these statuses are retried: anything else (401, 404, 500...) will answer
+    /// the same way again. Used for reads only; logins are never replayed.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendWithRetryAsync(string url, string? appId, string? userAuthToken = null)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            using var request = CreateApiRequest(url, appId, userAuthToken);
+            var response = await _http.SendAsync(request);
+            if (attempt == MaxAttempts || !IsTransient(response.StatusCode))
+                return response;
+
+            // Retry-After when Qobuz gives one (in seconds), otherwise 1 s then 2 s.
+            var delay = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(1 << (attempt - 1));
+            if (delay > MaxRetryDelay) delay = MaxRetryDelay;
+
+            _logger.LogWarning("Qobuz answered {Status}, retrying in {Delay:F0} s (attempt {Attempt}/{Max})",
+                (int)response.StatusCode, delay.TotalSeconds, attempt, MaxAttempts);
+            response.Dispose();
+            await Task.Delay(delay);
+        }
+    }
+
+    private static bool IsTransient(HttpStatusCode status) =>
+        status is HttpStatusCode.TooManyRequests
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout;
 
     private const int MaxErrorDetailLength = 200;
 

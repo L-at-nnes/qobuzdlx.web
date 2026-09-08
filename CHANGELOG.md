@@ -120,6 +120,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   chaque piste, pochette et fichier bonus : une connexion neuve (et un socket laissé en
   `TIME_WAIT`) à chaque fichier, soit des centaines sur une discographie. Trois clients partagés,
   un par type de transfert, portent désormais leurs délais d'attente (30 min, 2 min, 5 min).
+- **Les erreurs passagères de l'API Qobuz sont retentées.** Une réponse 429 (trop de requêtes) ou
+  502/503/504 faisait échouer l'appel sur-le-champ, donc une piste perdue au milieu d'une
+  discographie. Ces quatre statuts sont maintenant rejoués jusqu'à trois fois, en respectant
+  `Retry-After` (30 s au plus) ou, à défaut, avec 1 s puis 2 s d'attente. Les autres statuts (401,
+  404, 500…) et les connexions ne sont jamais rejoués.
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne
