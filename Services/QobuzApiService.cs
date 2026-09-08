@@ -22,6 +22,10 @@ public class QobuzApiService
         ("950096963", "979549437fcc4a3faad4867b5cd25dcb"),  // tokens before 2024-08-12
     };
 
+    // Catalogue calls answer in well under a second; the largest transfer is bundle.js (a few MB).
+    // The 100 s default would freeze a page for nearly two minutes when Qobuz stops answering.
+    private static readonly TimeSpan ApiTimeout = TimeSpan.FromSeconds(30);
+
     private string? _appId;
     private string? _appSecret;
     private string? _userAuthToken;
@@ -34,7 +38,7 @@ public class QobuzApiService
     public QobuzApiService(ILogger<QobuzApiService> logger)
     {
         _logger = logger;
-        _http = new HttpClient();
+        _http = new HttpClient { Timeout = ApiTimeout };
         _http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
     }
 

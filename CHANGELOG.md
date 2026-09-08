@@ -129,6 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   piste déclenchait le chargement complet de son album (plusieurs appels pour une longue liste de
   pistes), même quand dix pistes venaient du même disque. Les albums déjà chargés pendant
   l'élément en cours sont conservés (50 au plus) et oubliés à la fin de l'élément.
+- **Délai d'attente explicite pour l'API Qobuz.** Le client utilisait le délai par défaut de
+  .NET (100 s) : si Qobuz cessait de répondre, une recherche ou une connexion restait figée près de
+  deux minutes. Il est fixé à 30 s.
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne
