@@ -132,6 +132,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Délai d'attente explicite pour l'API Qobuz.** Le client utilisait le délai par défaut de
   .NET (100 s) : si Qobuz cessait de répondre, une recherche ou une connexion restait figée près de
   deux minutes. Il est fixé à 30 s.
+- **La page Téléchargement ne peut plus planter à la fin d'un élément.** Elle testait si un album
+  était en cours puis le relisait pour l'afficher ; si le worker le remettait à zéro entre les deux
+  lectures, le rendu levait une `NullReferenceException` et coupait le circuit. L'album est lu une
+  seule fois par rendu.
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne

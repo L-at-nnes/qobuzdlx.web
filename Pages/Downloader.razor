@@ -8,7 +8,9 @@
 @inherits LocalizedComponentBase
 
 @* Instantanés pris UNE fois par rendu : les collections vives du service sont mutées par le worker
-   sur un autre thread, les énumérer directement lèverait « Collection was modified ». *@
+   sur un autre thread, les énumérer directement lèverait « Collection was modified ». Il en va de
+   même pour l'album en cours : le worker le remet à null en fin d'élément, et le lire une fois pour
+   le tester puis une seconde fois pour l'afficher ferait lever une NullReferenceException. *@
 @{
     var queue = Download.QueueSnapshot();
     var log = Download.LogSnapshot();
@@ -16,6 +18,7 @@
     var lastPending = queue.LastOrDefault(i => i.Status == QueueItemStatus.Pending);
     var pendingCount = queue.Count(i => i.Status == QueueItemStatus.Pending);
     var finishedCount = queue.Count(i => i.IsFinished);
+    var album = Download.Progress.CurrentAlbum;
 }
 
 <h3 style="margin-bottom:16px;">@Loc["download.title"]</h3>
@@ -124,9 +127,8 @@
 </div>
 
 <!-- Album Info + Progress -->
-@if (Download.Progress.CurrentAlbum != null)
+@if (album != null)
 {
-    var album = Download.Progress.CurrentAlbum;
     <div class="card">
         <div class="album-info">
             @if (!string.IsNullOrEmpty(album.Image?.Large))
