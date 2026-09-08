@@ -136,6 +136,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   était en cours puis le relisait pour l'afficher ; si le worker le remettait à zéro entre les deux
   lectures, le rendu levait une `NullReferenceException` et coupait le circuit. L'album est lu une
   seule fois par rendu.
+- **Plus de suppression préalable du dossier temporaire au démarrage.** Pour migrer l'ancien
+  `qbdlx-temp` (à côté de la musique) vers `/config`, le code supprimait d'abord le dossier de
+  destination, puis tentait un déplacement qui peut échouer entre deux volumes Docker. Ces dossiers
+  ne contiennent que des restes de téléchargements : ils sont désormais nettoyés sur place — seuls
+  les fichiers `qbdlx_downloading-*` sont supprimés, et l'ancien dossier disparaît quand il est vide.
 
 ### Security
 - **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne

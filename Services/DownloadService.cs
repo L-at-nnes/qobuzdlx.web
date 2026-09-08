@@ -143,7 +143,6 @@ public class DownloadService
         // continue dans le vide.
         lifetime.ApplicationStopping.Register(() => { try { _appCts.Cancel(); } catch { } });
 
-        MigrateTempFolder();
         PurgeStaleTempFiles();
     }
 
@@ -151,44 +150,31 @@ public class DownloadService
         Path.Combine(Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config", "qbdlx-temp");
 
     /// <summary>
-    /// Migrate qbdlx-temp from /downloads to /config for existing installations.
-    /// </summary>
-    private void MigrateTempFolder()
-    {
-        try
-        {
-            var oldTempDir = Path.Combine(_settings.Settings.DownloadLocation, "qbdlx-temp");
-            var newTempDir = TempDirectory;
-
-            if (Directory.Exists(oldTempDir) && oldTempDir != newTempDir)
-            {
-                if (Directory.Exists(newTempDir))
-                    Directory.Delete(newTempDir, true);
-
-                Directory.Move(oldTempDir, newTempDir);
-                _logger.LogInformation("Migrated temp folder from {Old} to {New}", oldTempDir, newTempDir);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to migrate temp folder, it will be recreated in /config");
-        }
-    }
-
-    /// <summary>
     /// A previous run killed mid-download (docker kill, power loss) leaves partial audio files and
     /// cover art behind. No download is running yet at construction time, so everything carrying our
     /// prefixes is stale.
+    /// Older versions kept the partial files in qbdlx-temp next to the music, not in /config. They
+    /// were once moved over, but only ever contained leftovers, and moving a directory can fail
+    /// between two Docker volumes, after the destination had already been deleted. They are now
+    /// simply cleaned: only files carrying our prefix are removed, and the folder goes once empty.
     /// </summary>
     private void PurgeStaleTempFiles()
     {
         try
         {
-            if (Directory.Exists(TempDirectory))
+            var legacyDir = Path.Combine(_settings.Settings.DownloadLocation, "qbdlx-temp");
+
+            foreach (var dir in new[] { TempDirectory, legacyDir })
             {
-                foreach (var file in Directory.EnumerateFiles(TempDirectory, "qbdlx_downloading-*"))
+                if (!Directory.Exists(dir)) continue;
+
+                foreach (var file in Directory.EnumerateFiles(dir, "qbdlx_downloading-*"))
                     DeleteQuietly(file);
             }
+
+            if (legacyDir != TempDirectory && Directory.Exists(legacyDir)
+                && !Directory.EnumerateFileSystemEntries(legacyDir).Any())
+                Directory.Delete(legacyDir);
 
             foreach (var file in Directory.EnumerateFiles(Path.GetTempPath(), "qbdlx-*.jpg"))
                 DeleteQuietly(file);
