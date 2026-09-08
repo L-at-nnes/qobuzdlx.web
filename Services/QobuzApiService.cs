@@ -35,6 +35,13 @@ public class QobuzApiService
     public string? UserAuthToken => _userAuthToken;
     public bool IsLoggedIn => !string.IsNullOrEmpty(_userAuthToken);
 
+    /// <summary>
+    /// Levé quand Qobuz répond 401 à un appel authentifié, c'est-à-dire quand le jeton enregistré est
+    /// expiré ou révoqué. Permet à ceux qui n'ont pas lancé l'appel (la file de téléchargement) de
+    /// réagir sans que chaque appelant sache reconnaître cette réponse.
+    /// </summary>
+    public event Action? SessionRejected;
+
     public QobuzApiService(ILogger<QobuzApiService> logger)
     {
         _logger = logger;
@@ -508,6 +515,8 @@ public class QobuzApiService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("API error {Code}: {Body}", (int)response.StatusCode, json);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                SessionRejected?.Invoke();
             throw new QobuzApiException(response.StatusCode, DescribeApiError(response.StatusCode, json));
         }
 

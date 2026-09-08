@@ -175,6 +175,7 @@
   "log.goodyFound": "Bonus trouvé, téléchargement...",
   "log.goodyFailed": "Échec du bonus : {0}",
   "error.downloadAllQualitiesFailed": "Téléchargement impossible (toutes les qualités ont échoué)",
+  "error.sessionExpired": "Session Qobuz expirée : reconnectez-vous, puis relancez cet élément (↻).",
   "error.previewOnly": "Aperçu de 30 s uniquement : l'abonnement ne permet pas d'écouter cette piste en entier, ou elle est restreinte.",
   "error.incompleteDownload": "Téléchargement incomplet : {0}/{1} octets",
   "log.md5FixFailed": "Correction du MD5 impossible (flac) : {0}",

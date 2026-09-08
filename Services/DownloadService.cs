@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.RegularExpressions;
 using QobuzDLX.Web.Models;
 
@@ -93,6 +94,7 @@ public class DownloadService
     private readonly CancellationToken _appCt;
     private CancellationTokenSource? _itemCts;
     private volatile bool _skipCurrent;
+    private volatile bool _sessionExpired;
 
     // Réveil du worker. Borné à 1 : enfiler cinquante éléments d'un coup ne provoque pas cinquante
     // réveils, et le worker draine de toute façon jusqu'à ne plus rien trouver.
@@ -122,6 +124,10 @@ public class DownloadService
     /// OnProgressChanged redessinerait tous les circuits ouverts à chaque bloc reçu.</summary>
     public event Action? OnQueueChanged;
 
+    /// <summary>Qobuz a refusé le jeton de session : la session est oubliée et les pages doivent
+    /// ramener l'utilisateur à l'écran de connexion.</summary>
+    public event Action? OnSessionExpired;
+
     private static readonly Regex QobuzStoreLinkRegex = new(
         @"https://(?:.*?).qobuz.com/(?<region>.*?)/(?<type>.*?)/(?<name>.*?)/(?<id>.*?)$", RegexOptions.Compiled);
     private static readonly Regex QobuzLinkIdGrabRegex = new(
@@ -137,6 +143,8 @@ public class DownloadService
         _tagging = tagging;
         _loc = loc;
         _logger = logger;
+
+        _api.SessionRejected += OnSessionRejected;
 
         _appCt = _appCts.Token;
         // Sans cela, `docker stop` attendrait le délai de grâce complet pendant qu'un téléchargement
@@ -183,6 +191,23 @@ public class DownloadService
         {
             _logger.LogWarning(ex, "Failed to purge stale temporary files");
         }
+    }
+
+    // ─── Session expirée ───
+
+    /// <summary>
+    /// Un jeton refusé l'est pour tous les appels qui suivent : on l'oublie pour que la file cesse de
+    /// le présenter, on interrompt l'élément en cours (qui échouerait piste après piste en journalisant
+    /// la même erreur) et on prévient les pages. Les éléments en attente échouent aussitôt avec le même
+    /// message ; une fois reconnecté, ↻ les relance.
+    /// </summary>
+    private void OnSessionRejected()
+    {
+        _sessionExpired = true;
+        _settings.ClearQobuzSession();
+        _api.SetCredentials("", "", "");
+        CancelCurrent();
+        RaiseSafely(OnSessionExpired, nameof(OnSessionExpired));
     }
 
     // ─── Lecture pour l'interface ───
@@ -654,6 +679,7 @@ public class DownloadService
 
         _sessionId = Guid.NewGuid().ToString("N")[..8];
         _skipCurrent = false;
+        _sessionExpired = false;
         _scope = ProgressScope.Full;
 
         Progress.IsRunning = true;
@@ -671,6 +697,9 @@ public class DownloadService
 
         try
         {
+            if (!_api.IsLoggedIn)
+                throw new QobuzApiException(HttpStatusCode.Unauthorized, _loc["error.sessionExpired"]);
+
             Log(_loc["log.checkingLink"]);
 
             switch (item.Kind)
@@ -706,6 +735,13 @@ public class DownloadService
 
             Log(_loc["log.complete"]);
             SetStatus(item, QueueItemStatus.Completed);
+        }
+        catch (Exception) when (_sessionExpired)
+        {
+            // Avant les autres : l'interruption provoquée par OnSessionRejected arrive ici en
+            // OperationCanceledException ou en erreur d'API, selon l'endroit où l'élément se trouvait.
+            Log(_loc.T("log.error", _loc["error.sessionExpired"]));
+            SetStatus(item, QueueItemStatus.Failed, _loc["error.sessionExpired"]);
         }
         catch (OperationCanceledException)
         {

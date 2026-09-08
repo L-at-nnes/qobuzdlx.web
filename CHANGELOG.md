@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   téléchargé, tagué et rangé à côté des vraies pistes. Il est désormais détecté (champ `sample` de
   la réponse `track/getFileUrl`) et la piste est écartée avec un message explicite, sans nouvelle
   tentative ni descente en qualité, puisque l'extrait est le même partout.
+- **Une session Qobuz qui expire pendant un téléchargement est gérée.** Un jeton refusé faisait
+  échouer l'élément en cours piste après piste, en journalisant la même erreur, tandis que
+  l'interface continuait de se présenter comme connectée. Sur la première réponse 401, la session
+  est oubliée, l'élément en cours s'arrête avec un message clair, les éléments en attente échouent
+  aussitôt sans appeler Qobuz, et toutes les pages ouvertes sont renvoyées à l'écran de connexion,
+  qui explique la situation. Après reconnexion, ↻ relance les éléments concernés.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

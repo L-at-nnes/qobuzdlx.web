@@ -144,11 +144,17 @@ else
         // file change, quelques fois par minute. L'autre événement redessinerait la barre latérale
         // de tous les circuits ouverts à chaque bloc de 80 Ko reçu.
         Download.OnQueueChanged += OnQueueChanged;
+        Download.OnSessionExpired += OnSessionExpired;
     }
 
     private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
 
     private void OnQueueChanged() => InvokeAsync(StateHasChanged);
+
+    // La session a été oubliée côté serveur : sans ce renvoi, l'interface continuerait de s'afficher
+    // comme connectée jusqu'à la prochaine action.
+    private void OnSessionExpired() =>
+        InvokeAsync(() => NavigationManager.NavigateTo("/login?expired=1", forceLoad: true));
 
     // Un seul point de branchement pour refermer le tiroir après une navigation, plutôt qu'un
     // @onclick sur chacun des liens.
@@ -168,6 +174,7 @@ else
         Loc.OnLanguageChanged -= OnLanguageChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
         Download.OnQueueChanged -= OnQueueChanged;
+        Download.OnSessionExpired -= OnSessionExpired;
     }
 
     private void Logout()
