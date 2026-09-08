@@ -14,7 +14,8 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 - **Multiple download types** — Albums, tracks, playlists, artists, labels, favorites
 - **Bilingual UI** — French and English, one-click switch, browser language detected on first run
 - **Search** — Search Qobuz by albums, tracks, or artists directly from the UI, with sorting by
-  title, artist, release date, quality or track count
+  title, artist, release date, quality or track count, and a "Show more" button to go past the
+  first 50 results
 - **Batch downloads** — Paste multiple URLs and download them all at once
 - **4 quality levels** — MP3 320, FLAC 16-bit, FLAC 24-bit (up to 96kHz), FLAC 24-bit (up to 192kHz)
 - **Full metadata tagging** — ID3v2.4 (MP3) and Vorbis Comments (FLAC) with 25+ configurable tags

@@ -53,6 +53,7 @@
   "search.tracks": "Pistes",
   "search.artists": "Artistes",
   "search.searching": "Recherche en cours...",
+  "search.loadMore": "Voir plus ({0} sur {1})",
   "search.noResults": "Aucun résultat.",
   "search.error": "La recherche a échoué. Vérifiez votre connexion et votre session Qobuz, puis réessayez.",
   "search.results.one": "{0} résultat",

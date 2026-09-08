@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   les échecs » ne retraite que ces pistes, avec les dossiers, modèles et playlists de l'élément
   d'origine (les fichiers bonus ne sont pas retéléchargés) ; le bilan déjà acquis est conservé. Le
   bouton ↻ relance toujours l'élément entier, en repartant d'un bilan vierge.
+- **Recherche : bouton « Voir plus ».** Les résultats s'arrêtaient aux 50 premiers, sans moyen
+  d'aller plus loin. Un bouton charge la page suivante à la suite (albums, pistes et artistes),
+  affiche « n sur total » et disparaît quand tout est chargé. Il prolonge la dernière recherche
+  exécutée, pas ce qui a été retapé dans le champ depuis, et un échec garde les résultats déjà
+  affichés.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

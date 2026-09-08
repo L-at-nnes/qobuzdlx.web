@@ -76,6 +76,10 @@ else if (HasNoResults)
                 </div>
             }
         </div>
+        @if (State.HasMoreAlbums)
+        {
+            <button class="btn btn-secondary load-more" @onclick="LoadMore" disabled="@_loadingMore">@Loc.T("search.loadMore", State.Albums!.Count, State.AlbumsTotal)</button>
+        }
     </div>
 }
 
@@ -117,6 +121,10 @@ else if (HasNoResults)
                 </div>
             }
         </div>
+        @if (State.HasMoreTracks)
+        {
+            <button class="btn btn-secondary load-more" @onclick="LoadMore" disabled="@_loadingMore">@Loc.T("search.loadMore", State.Tracks!.Count, State.TracksTotal)</button>
+        }
     </div>
 }
 
@@ -211,6 +219,10 @@ else if (HasNoResults)
                 </div>
             }
         </div>
+        @if (State.HasMoreArtists)
+        {
+            <button class="btn btn-secondary load-more" @onclick="LoadMore" disabled="@_loadingMore">@Loc.T("search.loadMore", State.Artists!.Count, State.ArtistsTotal)</button>
+        }
     </div>
 }
 
@@ -231,7 +243,11 @@ else if (HasNoResults)
 }
 
 @code {
+    // Taille d'une page de résultats Qobuz.
+    private const int PageSize = 50;
+
     private bool _searching;
+    private bool _loadingMore;
     private bool _searchFailed;
     private bool _loadingArtistAlbums;
     private HashSet<string> _selectedAlbums = new();
@@ -279,6 +295,7 @@ else if (HasNoResults)
         if (string.IsNullOrWhiteSpace(State.Query) || _searching) return;
         _searching = true;
         _searchFailed = false;
+        State.LastQuery = State.Query;
         State.LastSearchType = type;
         State.Albums = null;
         State.Tracks = null;
@@ -288,21 +305,74 @@ else if (HasNoResults)
 
         try
         {
-            switch (type)
+            var succeeded = await TryApiAsync(() => FetchPageAsync(type, offset: 0), type);
+            if (!succeeded)
             {
-                case "albums":
-                    var albumResult = await Api.SearchAlbumsAsync(State.Query, 50);
-                    State.Albums = albumResult?.Albums?.Items ?? new();
-                    break;
-                case "tracks":
-                    var trackResult = await Api.SearchTracksAsync(State.Query, 50);
-                    State.Tracks = trackResult?.Tracks?.Items ?? new();
-                    break;
-                case "artists":
-                    var artistResult = await Api.SearchArtistsAsync(State.Query, 50);
-                    State.Artists = artistResult?.Artists?.Items ?? new();
-                    break;
+                _searchFailed = true;
+                State.Albums = null;
+                State.Tracks = null;
+                State.Artists = null;
             }
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    // « Voir plus » : la page suivante de la recherche affichée, ajoutée à la suite. Un échec garde
+    // ce qui est déjà à l'écran et ne fait qu'avertir.
+    private async Task LoadMore()
+    {
+        if (_searching || _loadingMore) return;
+        _loadingMore = true;
+
+        try
+        {
+            var type = State.LastSearchType;
+            var offset = type switch
+            {
+                "albums" => State.Albums?.Count ?? 0,
+                "tracks" => State.Tracks?.Count ?? 0,
+                _ => State.Artists?.Count ?? 0
+            };
+
+            if (!await TryApiAsync(() => FetchPageAsync(type, offset), type))
+                ShowToast(Loc["search.error"], isError: true);
+        }
+        finally
+        {
+            _loadingMore = false;
+        }
+    }
+
+    private async Task FetchPageAsync(string type, int offset)
+    {
+        switch (type)
+        {
+            case "albums":
+                var albumResult = await Api.SearchAlbumsAsync(State.LastQuery, PageSize, offset);
+                State.AppendAlbums(albumResult?.Albums?.Items ?? new(), albumResult?.Albums?.Total ?? 0);
+                break;
+            case "tracks":
+                var trackResult = await Api.SearchTracksAsync(State.LastQuery, PageSize, offset);
+                State.AppendTracks(trackResult?.Tracks?.Items ?? new(), trackResult?.Tracks?.Total ?? 0);
+                break;
+            case "artists":
+                var artistResult = await Api.SearchArtistsAsync(State.LastQuery, PageSize, offset);
+                State.AppendArtists(artistResult?.Artists?.Items ?? new(), artistResult?.Artists?.Total ?? 0);
+                break;
+        }
+    }
+
+    /// <summary>Exécute un appel de recherche. Faux s'il a échoué ; une session refusée renvoie en plus
+    /// l'utilisateur à l'écran de connexion.</summary>
+    private async Task<bool> TryApiAsync(Func<Task> call, string what)
+    {
+        try
+        {
+            await call();
+            return true;
         }
         catch (QobuzApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -311,18 +381,12 @@ else if (HasNoResults)
             Settings.ClearQobuzSession();
             Api.SetCredentials("", "", "");
             Nav.NavigateTo("/login?expired=1", forceLoad: true);
+            return false;
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Search failed for type {Type}", type);
-            _searchFailed = true;
-            State.Albums = null;
-            State.Tracks = null;
-            State.Artists = null;
-        }
-        finally
-        {
-            _searching = false;
+            Logger.LogWarning(ex, "Search failed ({What})", what);
+            return false;
         }
     }
 
