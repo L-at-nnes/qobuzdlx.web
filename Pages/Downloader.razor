@@ -96,6 +96,26 @@
                         {
                             <div class="err">@it.Error</div>
                         }
+                        @if (it.Downloaded + it.Skipped + it.Failures.Count > 0)
+                        {
+                            <div class="sub">@Loc.T("queue.summary", it.Downloaded, it.Skipped, it.Failures.Count)</div>
+                        }
+                        @if (it.Failures.Count > 0)
+                        {
+                            <details class="queue-failures">
+                                <summary>@Loc.P("queue.failures", it.Failures.Count)</summary>
+                                <ul>
+                                    @foreach (var failure in it.Failures.Take(MaxFailuresShown))
+                                    {
+                                        <li><strong>@failure.Title</strong> — @failure.Error</li>
+                                    }
+                                    @if (it.Failures.Count > MaxFailuresShown)
+                                    {
+                                        <li>@Loc.T("queue.failuresMore", it.Failures.Count - MaxFailuresShown)</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
                     </div>
 
                     <span class="queue-status @RowClass(it)">@(Loc[$"queue.status.{StatusKey(it.Status)}"])</span>
@@ -116,6 +136,10 @@
                         }
                         else
                         {
+                            @if (it.Failures.Count > 0)
+                            {
+                                <button class="btn btn-secondary btn-sm" @onclick="() => Download.RetryFailures(it.Id)" title='@Loc["queue.retryFailuresHint"]'>@Loc["queue.retryFailures"]</button>
+                            }
                             <button class="queue-btn" @onclick="() => Download.Retry(it.Id)" title='@Loc["queue.action.retry"]'>&#8635;</button>
                             <button class="queue-btn danger" @onclick="() => Download.Remove(it.Id)" title='@Loc["queue.action.remove"]'>&#10005;</button>
                         }
@@ -189,6 +213,9 @@
 </div>
 
 @code {
+    // Au-delà, la liste des échecs d'un artiste de plusieurs centaines de pistes noierait la page.
+    private const int MaxFailuresShown = 50;
+
     private string _inputUrl = "";
     private string _batchUrls = "";
     private bool _showBatch;

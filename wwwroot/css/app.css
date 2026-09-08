@@ -206,6 +206,12 @@ html, body {
     padding: 24px;
 }
 
+/* Détail des pistes en échec d'un élément de la file */
+.queue-failures { margin-top: 4px; font-size: 0.8em; color: var(--text-secondary); }
+.queue-failures summary { cursor: pointer; color: #e74c3c; }
+.queue-failures ul { margin: 4px 0 0 18px; }
+.queue-failures li { overflow-wrap: anywhere; }
+
 /* Avertissement : aucun mot de passe d'accès n'est défini */
 .security-banner {
     display: flex;

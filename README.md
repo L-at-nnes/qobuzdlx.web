@@ -23,6 +23,8 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 - **Goodies** — Downloads bonus materials (booklets, etc.) when available
 - **FLAC MD5 fix** — Optional automatic MD5 checksum repair
 - **Real-time progress** — Live progress bar, download speed, and log output
+- **Download report** — Each queue entry shows how many tracks were downloaded, skipped or failed,
+  lists the failures with their reason, and can retry just those tracks
 - **Persistent settings** — All configuration saved to JSON, survives restarts
 - **Docker-ready** — Multi-stage Alpine image, lightweight and portable
 

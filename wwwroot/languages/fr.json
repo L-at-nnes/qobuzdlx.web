@@ -112,6 +112,13 @@
   "download.status.downloading": "Téléchargement - {0}% [{1}]",
 
   "queue.title": "File d'attente",
+  "queue.summary": "Téléchargées : {0} · Ignorées : {1} · Échecs : {2}",
+  "queue.failures.one": "{0} piste en échec",
+  "queue.failures.other": "{0} pistes en échec",
+  "queue.failuresMore": "… et {0} autres",
+  "queue.retryFailures": "Relancer les échecs",
+  "queue.retryFailuresHint": "Ne relance que les pistes en échec, sans retoucher aux autres",
+  "log.itemSummary": "Bilan — téléchargées : {0}, ignorées : {1}, échecs : {2}",
   "queue.empty": "La file est vide.",
   "queue.count.one": "{0} élément",
   "queue.count.other": "{0} éléments",

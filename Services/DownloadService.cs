@@ -35,9 +35,30 @@ public class QueueItem
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
 
+    /// <summary>Pistes écrites, pistes ignorées (déjà présentes, indisponibles) et pistes en échec
+    /// pendant le traitement. Mutés par le worker sous le verrou du service ; <see cref="Failures"/>
+    /// est remplacé et non modifié, pour qu'un instantané puisse l'énumérer sans verrou.</summary>
+    public int Downloaded { get; set; }
+    public int Skipped { get; set; }
+    public IReadOnlyList<FailedTrack> Failures { get; set; } = Array.Empty<FailedTrack>();
+
+    /// <summary>Renseigné par « relancer les échecs » : seules ces pistes sont traitées.</summary>
+    public IReadOnlySet<int>? OnlyTrackIds { get; set; }
+
     public bool IsFinished =>
         Status is QueueItemStatus.Completed or QueueItemStatus.Failed or QueueItemStatus.Cancelled;
+
+    /// <summary>Remet à zéro le bilan, avant un nouveau traitement complet de l'élément.</summary>
+    public void ResetOutcome()
+    {
+        Downloaded = 0;
+        Skipped = 0;
+        Failures = Array.Empty<FailedTrack>();
+        OnlyTrackIds = null;
+    }
 }
+
+public record FailedTrack(int TrackId, string Title, string Error);
 
 public class DownloadProgress
 {
@@ -95,6 +116,11 @@ public class DownloadService
     private CancellationTokenSource? _itemCts;
     private volatile bool _skipCurrent;
     private volatile bool _sessionExpired;
+
+    // Élément en cours et, pour « relancer les échecs », les seules pistes à traiter. Propres au
+    // worker : posés au début de RunItemAsync, retirés à sa fin.
+    private QueueItem? _currentItem;
+    private IReadOnlySet<int>? _retryFilter;
 
     // Réveil du worker. Borné à 1 : enfiler cinquante éléments d'un coup ne provoque pas cinquante
     // réveils, et le worker draine de toute façon jusqu'à ne plus rien trouver.
@@ -192,6 +218,27 @@ public class DownloadService
             _logger.LogWarning(ex, "Failed to purge stale temporary files");
         }
     }
+
+    // ─── Bilan de l'élément ───
+
+    /// <summary>Résultat d'une piste menée à terme : écrite, ou déjà présente et laissée en l'état.</summary>
+    private readonly record struct TrackResult(string FilePath, bool AlreadyExisted);
+
+    private bool IsExcludedByRetry(int trackId) => _retryFilter != null && !_retryFilter.Contains(trackId);
+
+    private void Record(Action<QueueItem> update)
+    {
+        if (_currentItem is not { } item) return;
+        lock (_gate) update(item);
+    }
+
+    private void RecordResult(TrackResult result) =>
+        Record(item => { if (result.AlreadyExisted) item.Skipped++; else item.Downloaded++; });
+
+    private void RecordSkipped() => Record(item => item.Skipped++);
+
+    private void RecordFailure(int trackId, string title, string error) =>
+        Record(item => item.Failures = item.Failures.Append(new FailedTrack(trackId, title, error)).ToArray());
 
     // ─── Session expirée ───
 
@@ -325,6 +372,7 @@ public class DownloadService
             {
                 // Déjà traité : le remettre en attente en fin de file plutôt que d'en créer un
                 // doublon, sinon l'unicité par URL ne tiendrait plus.
+                existing.ResetOutcome();
                 existing.Status = QueueItemStatus.Pending;
                 existing.Error = null;
                 existing.StartedAt = null;
@@ -468,6 +516,38 @@ public class DownloadService
             var item = _queue.FirstOrDefault(i => i.Id == itemId);
             if (item is { IsFinished: true })
             {
+                item.ResetOutcome();
+                item.Status = QueueItemStatus.Pending;
+                item.Error = null;
+                item.StartedAt = null;
+                item.FinishedAt = null;
+                item.EnqueuedAt = DateTime.UtcNow;
+                _queue.Remove(item);
+                _queue.Add(item);
+                ReindexLocked();
+                _worker ??= Task.Run(WorkerLoopAsync);
+                changed = true;
+            }
+        }
+        if (changed) { Signal(); RaiseQueueChanged(); }
+    }
+
+    /// <summary>
+    /// Relance uniquement les pistes en échec d'un élément terminé. Passe par le même traitement que
+    /// l'élément d'origine, filtré sur ces pistes : les dossiers, modèles de nommage et playlists
+    /// restent ceux de l'élément, quel qu'en soit le type, et le mode « renommer » ne produit pas de
+    /// doublons des pistes déjà réussies. Le bilan déjà acquis est conservé.
+    /// </summary>
+    public void RetryFailures(string itemId)
+    {
+        bool changed = false;
+        lock (_gate)
+        {
+            var item = _queue.FirstOrDefault(i => i.Id == itemId);
+            if (item is { IsFinished: true } && item.Failures.Count > 0)
+            {
+                item.OnlyTrackIds = item.Failures.Select(f => f.TrackId).ToHashSet();
+                item.Failures = Array.Empty<FailedTrack>();
                 item.Status = QueueItemStatus.Pending;
                 item.Error = null;
                 item.StartedAt = null;
@@ -681,6 +761,8 @@ public class DownloadService
         _skipCurrent = false;
         _sessionExpired = false;
         _scope = ProgressScope.Full;
+        _currentItem = item;
+        _retryFilter = item.OnlyTrackIds;
 
         Progress.IsRunning = true;
         Progress.IsComplete = false;
@@ -733,6 +815,9 @@ public class DownloadService
                     throw new NotSupportedException(_loc.T("log.unsupportedLinkType", item.Kind));
             }
 
+            if (item.Downloaded + item.Skipped + item.Failures.Count > 0)
+                Log(_loc.T("log.itemSummary", item.Downloaded, item.Skipped, item.Failures.Count));
+
             Log(_loc["log.complete"]);
             SetStatus(item, QueueItemStatus.Completed);
         }
@@ -760,6 +845,8 @@ public class DownloadService
         {
             _itemCts = null;
             cts.Dispose();
+            _currentItem = null;
+            _retryFilter = null;
             _albumCache.Clear();
             Progress.CurrentQueueItemId = null;
             Progress.CurrentAlbum = null;
@@ -800,23 +887,29 @@ public class DownloadService
                 if (_skipCurrent) { _skipCurrent = false; skipped = true; Log(_loc["log.albumSkipped"]); break; }
 
                 var track = tracks[i];
+                if (IsExcludedByRetry(track.Id)) continue;
                 UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total), _templates.FormatTrackTitle(track));
 
                 try
                 {
                     // Get full track info
                     var trackInfo = await _api.GetTrackAsync(track.Id.ToString());
-                    if (trackInfo == null) { Log(_loc.T("log.trackUnavailable", track.TrackNumber)); continue; }
-                    if (!trackInfo.Streamable && s.StreamableCheck) { Log(_loc.T("log.trackNotStreamable", track.TrackNumber)); continue; }
+                    if (trackInfo == null) { Log(_loc.T("log.trackUnavailable", track.TrackNumber)); RecordSkipped(); continue; }
+                    if (!trackInfo.Streamable && s.StreamableCheck) { Log(_loc.T("log.trackNotStreamable", track.TrackNumber)); RecordSkipped(); continue; }
 
-                    await DownloadTrackToFileAsync("album", album, trackInfo, downloadPath, null, ct);
+                    RecordResult(await DownloadTrackToFileAsync("album", album, trackInfo, downloadPath, null, ct));
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { Log(_loc.T("log.trackFailed", track.Id, ex.Message)); }
+                catch (Exception ex)
+                {
+                    Log(_loc.T("log.trackFailed", track.Id, ex.Message));
+                    RecordFailure(track.Id, _templates.FormatTrackTitle(track), ex.Message);
+                }
             }
 
-            // Goodies — an album the user chose to skip is skipped entirely
-            if (!skipped && s.DownloadGoodies && album.Goodies != null)
+            // Goodies — an album the user chose to skip is skipped entirely, and a retry of failed
+            // tracks has no business with the booklets
+            if (!skipped && _retryFilter == null && s.DownloadGoodies && album.Goodies != null)
             {
                 foreach (var goody in album.Goodies)
                 {
@@ -855,13 +948,23 @@ public class DownloadService
     private async Task DownloadSingleTrackAsync(string trackId, CancellationToken ct)
     {
         var track = await _api.GetTrackAsync(trackId);
-        if (track == null) { Log(_loc["log.trackNotFound"]); return; }
+        if (track == null)
+        {
+            Log(_loc["log.trackNotFound"]);
+            RecordFailure(int.TryParse(trackId, out var id) ? id : 0, trackId, _loc["log.trackNotFound"]);
+            return;
+        }
 
         QobuzAlbum? album = null;
         if (track.Album != null)
             album = await GetAlbumCachedAsync(track.Album.Id);
 
-        if (album == null) { Log(_loc["log.albumInfoUnavailable"]); return; }
+        if (album == null)
+        {
+            Log(_loc["log.albumInfoUnavailable"]);
+            RecordFailure(track.Id, _templates.FormatTrackTitle(track), _loc["log.albumInfoUnavailable"]);
+            return;
+        }
         Progress.CurrentAlbum = album;
 
         var s = _settings.Settings;
@@ -871,7 +974,7 @@ public class DownloadService
         try
         {
             await DownloadArtworkAsync(downloadPath, album);
-            await DownloadTrackToFileAsync("track", album, track, downloadPath, null, ct);
+            RecordResult(await DownloadTrackToFileAsync("track", album, track, downloadPath, null, ct));
         }
         finally
         {
@@ -892,6 +995,7 @@ public class DownloadService
         {
             ct.ThrowIfCancellationRequested();
             var item = tracks[i];
+            if (IsExcludedByRetry(item.Id)) continue;
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.track", i + 1, total));
 
             try
@@ -899,10 +1003,10 @@ public class DownloadService
                 if (s.UseItemPosInPlaylist) item.TrackNumber = item.Position;
 
                 var trackInfo = await _api.GetTrackAsync(item.Id.ToString());
-                if (trackInfo == null) continue;
+                if (trackInfo == null) { RecordSkipped(); continue; }
 
                 QobuzAlbum? album = trackInfo.Album != null ? await GetAlbumCachedAsync(trackInfo.Album.Id) : null;
-                if (album == null) continue;
+                if (album == null) { RecordSkipped(); continue; }
                 Progress.CurrentAlbum = album;
 
                 var downloadPath = _templates.CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate, s.PlaylistTemplate, album, item, playlist);
@@ -911,7 +1015,7 @@ public class DownloadService
                 try
                 {
                     await DownloadArtworkAsync(downloadPath, album);
-                    await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct);
+                    RecordResult(await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct));
                 }
                 finally
                 {
@@ -919,7 +1023,11 @@ public class DownloadService
                 }
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message)); }
+            catch (Exception ex)
+            {
+                Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message));
+                RecordFailure(item.Id, _templates.FormatTrackTitle(item), ex.Message);
+            }
         }
     }
 
@@ -996,10 +1104,15 @@ public class DownloadService
         for (int i = 0; i < total; i++)
         {
             ct.ThrowIfCancellationRequested();
+            if (IsExcludedByRetry(tracks[i].Id)) continue;
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.favTrack", i + 1, total));
             try { await DownloadSingleTrackAsync(tracks[i].Id.ToString(), ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.favTrackFailed", tracks[i].Id, ex.Message)); }
+            catch (Exception ex)
+            {
+                Log(_loc.T("log.favTrackFailed", tracks[i].Id, ex.Message));
+                RecordFailure(tracks[i].Id, _templates.FormatTrackTitle(tracks[i]), ex.Message);
+            }
         }
     }
 
@@ -1021,7 +1134,7 @@ public class DownloadService
 
     // ─── Core: download a single track to file ───
 
-    private async Task DownloadTrackToFileAsync(string downloadType, QobuzAlbum album, QobuzTrack track, string downloadPath, QobuzPlaylist? playlist, CancellationToken ct)
+    private async Task<TrackResult> DownloadTrackToFileAsync(string downloadType, QobuzAlbum album, QobuzTrack track, string downloadPath, QobuzPlaylist? playlist, CancellationToken ct)
     {
         var s = _settings.Settings;
 
@@ -1040,7 +1153,7 @@ public class DownloadService
         if (s.DuplicateFileMode == "skip" && System.IO.File.Exists(filePath))
         {
             Log(_loc.T("log.fileExists", track.TrackNumber));
-            return;
+            return new TrackResult(filePath, AlreadyExisted: true);
         }
 
         // Prepare temp path (reused across retry attempts)
@@ -1083,6 +1196,7 @@ public class DownloadService
 
             System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
             Log(_loc["log.done"]);
+            return new TrackResult(filePath, AlreadyExisted: false);
         }
         finally
         {

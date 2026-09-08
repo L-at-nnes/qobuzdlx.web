@@ -112,6 +112,13 @@
   "download.status.downloading": "Downloading - {0}% [{1}]",
 
   "queue.title": "Download queue",
+  "queue.summary": "Downloaded: {0} · Skipped: {1} · Failed: {2}",
+  "queue.failures.one": "{0} failed track",
+  "queue.failures.other": "{0} failed tracks",
+  "queue.failuresMore": "… and {0} more",
+  "queue.retryFailures": "Retry failed",
+  "queue.retryFailuresHint": "Retries only the failed tracks and leaves the others alone",
+  "log.itemSummary": "Summary — downloaded: {0}, skipped: {1}, failed: {2}",
   "queue.empty": "The queue is empty.",
   "queue.count.one": "{0} item",
   "queue.count.other": "{0} items",

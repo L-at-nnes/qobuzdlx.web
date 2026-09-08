@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   abîmées, qu'on ne découvre qu'à l'écoute. Chaque fichier est décodé avec `flac -t` ; en cas
   d'échec il est retéléchargé avec une nouvelle URL signée, puis avec une qualité inférieure, comme
   pour toute coupure du CDN. Sans `flac` installé, la vérification est ignorée et le fichier accepté.
+- **Bilan de chaque élément de la file et « Relancer les échecs ».** Un album, une playlist ou une
+  discographie s'affichait « Terminé » même quand des pistes avaient échoué ; il fallait fouiller le
+  journal. Chaque ligne indique désormais les pistes téléchargées, ignorées (déjà présentes,
+  indisponibles) et en échec, et déplie la liste des échecs avec leur raison. Le bouton « Relancer
+  les échecs » ne retraite que ces pistes, avec les dossiers, modèles et playlists de l'élément
+  d'origine (les fichiers bonus ne sont pas retéléchargés) ; le bilan déjà acquis est conservé. Le
+  bouton ↻ relance toujours l'élément entier, en repartant d'un bilan vierge.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
