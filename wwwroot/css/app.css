@@ -206,6 +206,15 @@ html, body {
     padding: 24px;
 }
 
+/* Aperçu des modèles de nommage */
+.template-preview { margin-top: 16px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85em; }
+.template-preview-title { font-weight: 600; margin-bottom: 8px; }
+.template-preview-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; }
+.template-preview-row span { flex: 0 0 150px; color: var(--text-secondary); }
+.template-preview-row code { flex: 1 1 260px; overflow-wrap: anywhere; color: var(--text-primary); }
+.template-preview-note { margin-top: 8px; font-size: 0.9em; color: var(--text-secondary); }
+.template-issue { margin-top: 8px; font-size: 0.85em; color: #e8a33d; }
+
 .title-tag-row { margin: 4px 0 12px 28px; }
 .title-tag-row .form-group { flex: 0 1 220px; }
 .title-tag-example { flex: 1 1 100%; font-size: 0.8em; color: var(--text-secondary); white-space: pre; }

@@ -1138,16 +1138,8 @@ public class DownloadService
     {
         var s = _settings.Settings;
 
-        // Build file path
-        var trackTemplate = _templates.ApplyTemplate(s.TrackTemplate, album, track, playlist);
-        var filePath = Path.Combine(downloadPath, trackTemplate.TrimEnd() + s.AudioFormat);
-
-        // Handle multi-disc
-        if (track.PlaylistTrackId == null && downloadType != "track" && album.MediaCount > 1 && !string.IsNullOrEmpty(s.CdTemplate))
-        {
-            var cdDir = Regex.Replace(s.CdTemplate, "%DiscNumber%", track.MediaNumber.ToString(), RegexOptions.IgnoreCase);
-            filePath = Path.Combine(downloadPath, cdDir, trackTemplate.TrimEnd() + s.AudioFormat);
-        }
+        // Build file path (also drives the preview in Settings)
+        var filePath = _templates.TrackFilePath(downloadPath, downloadType, album, track, playlist);
 
         // Skip existing
         if (s.DuplicateFileMode == "skip" && System.IO.File.Exists(filePath))

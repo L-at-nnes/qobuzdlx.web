@@ -371,6 +371,156 @@ public class TemplateService
         return template;
     }
 
+    /// <summary>
+    /// Full path of the file a track is written to. Shared by the download and by the preview in
+    /// Settings, so that what the preview shows is what the download does.
+    /// </summary>
+    public string TrackFilePath(string downloadPath, string downloadType, QobuzAlbum album, QobuzTrack track, QobuzPlaylist? playlist)
+    {
+        var s = _settings.Settings;
+
+        // The template is user input and may hold "/" (sub-folders), ".." or a leading "/": every
+        // component is cleaned like the folder names, so the file cannot leave the download folder.
+        var fileName = SanitizePathSegment(ApplyTemplate(s.TrackTemplate, album, track, playlist));
+        if (fileName.Length == 0) fileName = track.Id.ToString();   // blank template: still a usable name
+        fileName += s.AudioFormat;
+
+        // Multi-disc releases get one folder per disc, except for a lone track or a playlist entry
+        if (track.PlaylistTrackId == null && downloadType != "track" && album.MediaCount > 1 && !string.IsNullOrEmpty(s.CdTemplate))
+        {
+            var discFolder = SanitizePathSegment(Regex.Replace(s.CdTemplate, "%DiscNumber%", track.MediaNumber.ToString(), RegexOptions.IgnoreCase));
+            if (discFolder.Length > 0)
+                return Path.Combine(downloadPath, discFolder, fileName);
+        }
+
+        return Path.Combine(downloadPath, fileName);
+    }
+
+    // ─── Preview and validation of the naming templates ───
+
+    // Invented release, big enough to exercise every template: two discs, a track version, hi-res.
+    private static readonly QobuzAlbum SampleAlbum = new()
+    {
+        Id = "0123456789012",
+        Title = "Blue Hour",
+        Artist = new QobuzPerformer { Id = 1, Name = "Nina Alvarez" },
+        Artists = new List<QobuzArtistRole> { new() { Id = 1, Name = "Nina Alvarez", Roles = new List<string> { "main-artist" } } },
+        Genre = new QobuzGenre { Id = 1, Name = "Jazz" },
+        Label = new QobuzLabel { Id = 1, Name = "Northern Lights" },
+        ReleaseDateOriginal = "2013-05-17",
+        UPC = "0123456789012",
+        Copyright = "(P) 2013 Northern Lights",
+        ProductType = "album",
+        TracksCount = 14,
+        MediaCount = 2,
+        MaximumBitDepth = 24,
+        MaximumSamplingRate = 96
+    };
+
+    private static readonly QobuzAlbum SampleCompilation = new()
+    {
+        Id = "0123456789999",
+        Title = "Summer Mix",
+        Artist = new QobuzPerformer { Id = 2, Name = "Various Artists" },
+        Genre = new QobuzGenre { Id = 1, Name = "Jazz" },
+        Label = new QobuzLabel { Id = 1, Name = "Northern Lights" },
+        ReleaseDateOriginal = "2020-06-01",
+        ProductType = "album",
+        TracksCount = 20,
+        MediaCount = 1,
+        MaximumBitDepth = 16,
+        MaximumSamplingRate = 44.1
+    };
+
+    private static readonly QobuzPlaylist SamplePlaylist = new() { Id = 99, Name = "Morning Playlist", TracksCount = 30 };
+
+    private static QobuzTrack NewSampleTrack(int trackNumber = 5, int discNumber = 2, int? playlistTrackId = null) => new()
+    {
+        Id = 4242,
+        Title = "Midnight Garden",
+        Version = "Live",
+        TrackNumber = trackNumber,
+        MediaNumber = discNumber,
+        Position = 3,
+        PlaylistTrackId = playlistTrackId,
+        Performer = new QobuzPerformer { Id = 1, Name = "Nina Alvarez" },
+        Composer = new QobuzComposer { Id = 2, Name = "R. Castillo" },
+        ISRC = "XX0000000001",
+        MaximumBitDepth = 24,
+        MaximumSamplingRate = 96
+    };
+
+    /// <summary>The path a track of an album, of a compilation and of a playlist would get today.</summary>
+    public TemplatePreview Preview()
+    {
+        var s = _settings.Settings;
+
+        string PathOf(string downloadType, QobuzAlbum album, QobuzTrack track, QobuzPlaylist? playlist)
+        {
+            // Same calls, in the same order, as the download itself
+            var folder = CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate,
+                playlist == null ? null : s.PlaylistTemplate, album, playlist == null ? null : track, playlist);
+            return TrackFilePath(folder, downloadType, album, track, playlist).Replace('\\', '/');
+        }
+
+        return new TemplatePreview(
+            PathOf("album", SampleAlbum, NewSampleTrack(), null),
+            PathOf("album", SampleCompilation, NewSampleTrack(trackNumber: 7, discNumber: 1), null),
+            PathOf("playlist", SampleAlbum, NewSampleTrack(playlistTrackId: 1), SamplePlaylist));
+    }
+
+    // Characters that MakeSafeFilename rewrites: a backslash is not a separator, only "/" is
+    private static readonly char[] ReplacedCharacters = { '\\', ':', '*', '?', '"', '<', '>', '|' };
+
+    private static readonly Regex DriveLetterRegex = new(@"^[A-Za-z]:", RegexOptions.Compiled);
+
+    // A %tag% still standing once the template has been applied to the sample: unknown, misspelt,
+    // or not available in that kind of template (%TrackNumber% in an album folder, say)
+    private static readonly Regex UnresolvedTagRegex = new(@"%[^%\s/]+%", RegexOptions.Compiled);
+
+    /// <summary>Problems with the templates as currently set, each pointing at a field. Empty when all is well.</summary>
+    public IReadOnlyList<TemplateIssue> Validate()
+    {
+        var s = _settings.Settings;
+        var issues = new List<TemplateIssue>();
+        var album = SampleAlbum;
+        var track = NewSampleTrack();
+
+        void Check(string field, string template, bool required, Func<string> resolve)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                // A folder template left blank is a choice (no such folder); a file name cannot be
+                if (required) issues.Add(new TemplateIssue(field, "empty"));
+                return;
+            }
+
+            var trimmed = template.Trim();
+            if (trimmed.StartsWith('/') || trimmed.StartsWith('\\') || DriveLetterRegex.IsMatch(trimmed))
+                issues.Add(new TemplateIssue(field, "rooted"));
+
+            if (trimmed.Split('/', '\\').Any(part => part.Trim() == ".."))
+                issues.Add(new TemplateIssue(field, "parent"));
+
+            var replaced = PercentRegex.Replace(template, "").Where(ReplacedCharacters.Contains).Distinct().ToArray();
+            if (replaced.Length > 0)
+                issues.Add(new TemplateIssue(field, "illegalChars", string.Join(" ", replaced)));
+
+            var unresolved = UnresolvedTagRegex.Matches(resolve()).Select(m => m.Value).Distinct().ToList();
+            if (unresolved.Count > 0)
+                issues.Add(new TemplateIssue(field, "unknownTag", string.Join(" ", unresolved)));
+        }
+
+        Check(nameof(AppSettings.ArtistTemplate), s.ArtistTemplate, false, () => ApplyTemplate(s.ArtistTemplate, album, null, null));
+        Check(nameof(AppSettings.AlbumTemplate), s.AlbumTemplate, false, () => ApplyTemplate(s.AlbumTemplate, album, null, null));
+        Check(nameof(AppSettings.TrackTemplate), s.TrackTemplate, true, () => ApplyTemplate(s.TrackTemplate, album, track, SamplePlaylist));
+        Check(nameof(AppSettings.VaTrackTemplate), s.VaTrackTemplate, true, () => ApplyTemplate(s.VaTrackTemplate, album, track, SamplePlaylist));
+        Check(nameof(AppSettings.PlaylistTemplate), s.PlaylistTemplate, false, () => ApplyTemplate(s.PlaylistTemplate, album, track, SamplePlaylist));
+        Check(nameof(AppSettings.CdTemplate), s.CdTemplate, false, () => Regex.Replace(s.CdTemplate, "%DiscNumber%", "2", RegexOptions.IgnoreCase));
+
+        return issues;
+    }
+
     public static string MakeSafeFilename(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return name;
@@ -435,3 +585,9 @@ public class TemplateService
         return kept.Append(ellipsis).ToString();
     }
 }
+
+/// <summary>Chemins d'exemple produits par les modèles en vigueur (voir <see cref="TemplateService.Preview"/>).</summary>
+public sealed record TemplatePreview(string Album, string Compilation, string Playlist);
+
+/// <summary>Un défaut d'un modèle : le champ concerné, un code d'erreur et, au besoin, le détail.</summary>
+public sealed record TemplateIssue(string Field, string Code, string? Detail = null);

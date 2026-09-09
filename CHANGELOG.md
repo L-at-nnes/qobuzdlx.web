@@ -54,6 +54,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   n'offraient que le texte par défaut. Chaque case déroule désormais le texte, la position et un
   exemple de résultat. Les espaces sont conservés tels que saisis, et la règle d'assemblage est
   la même pour l'aperçu et pour l'écriture des tags.
+- **Aperçu en direct des modèles de nommage et avertissements.** Les modèles ne se vérifiaient qu'en
+  lançant un téléchargement. La page Réglages montre désormais le chemin obtenu pour une piste
+  d'album (disque 2, version dans le titre), une compilation et une playlist, calculé par le code
+  même du téléchargement, et signale : un modèle de piste vide, une balise inconnue, mal orthographiée
+  ou inutilisable dans ce modèle (`%TrackNumber%` dans un dossier d'album), un modèle qui commence
+  par `/` ou une lettre de lecteur ou contient `..`, et les caractères que le nettoyage des noms
+  remplacera (dont `\`, qui n'est pas un séparateur).
+- **Un modèle de piste ne peut plus faire sortir le fichier du dossier de l'album.** Le nom de fichier
+  n'était pas nettoyé comme les dossiers : un modèle `/etc/%TrackTitle%` ou `../../x` était
+  combiné tel quel au chemin. Chaque composant est maintenant nettoyé (`.`, `..`, barre initiale), un
+  modèle vide donne l'identifiant de la piste comme nom, et le dossier de disque obéit à la même règle.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

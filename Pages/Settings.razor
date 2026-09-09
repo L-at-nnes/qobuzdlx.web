@@ -1,6 +1,8 @@
 @page "/settings"
 @inject SettingsService SettingsSvc
 @inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject TemplateService Templates
 @inherits LocalizedComponentBase
 
 <h3 style="margin-bottom:16px;">@Loc["settings.title"]</h3>
@@ -61,6 +63,22 @@
             <input type="text" @bind="S.CdTemplate" @bind:after="Save" />
         </div>
     </div>
+
+    @{
+        var preview = Templates.Preview();
+        var issues = Templates.Validate();
+    }
+    <div class="template-preview">
+        <div class="template-preview-title">@Loc["settings.templates.preview"]</div>
+        <div class="template-preview-row"><span>@Loc["settings.templates.preview.album"]</span><code>@preview.Album</code></div>
+        <div class="template-preview-row"><span>@Loc["settings.templates.preview.compilation"]</span><code>@preview.Compilation</code></div>
+        <div class="template-preview-row"><span>@Loc["settings.templates.preview.playlist"]</span><code>@preview.Playlist</code></div>
+        <div class="template-preview-note">@Loc["settings.templates.preview.note"]</div>
+    </div>
+    @foreach (var issue in issues)
+    {
+        <div class="template-issue">&#9888; @IssueText(issue)</div>
+    }
 
     <!-- Template Variables Reference -->
     <details class="template-help" style="margin-top:16px;">
@@ -385,6 +403,20 @@
 
     private void Save() => SettingsSvc.Save();
 
+    private string IssueText(TemplateIssue issue) =>
+        Loc.T($"settings.templates.issue.{issue.Code}", FieldLabel(issue.Field), issue.Detail ?? "");
+
+    private string FieldLabel(string field) => field switch
+    {
+        nameof(Models.AppSettings.ArtistTemplate) => Loc["settings.templates.artist"],
+        nameof(Models.AppSettings.AlbumTemplate) => Loc["settings.templates.album"],
+        nameof(Models.AppSettings.TrackTemplate) => Loc["settings.templates.track"],
+        nameof(Models.AppSettings.VaTrackTemplate) => Loc["settings.templates.vaTrack"],
+        nameof(Models.AppSettings.PlaylistTemplate) => Loc["settings.templates.playlist"],
+        nameof(Models.AppSettings.CdTemplate) => Loc["settings.templates.cd"],
+        _ => field
+    };
+
     // Format Qobuz (5 = MP3 320, 6 = FLAC 16bit, 7 = FLAC 24bit <=96kHz, 27 = FLAC 24bit 192kHz)
     // et extension du fichier produit, enregistrés ensemble pour rester cohérents.
     private void SetQuality(string formatId, string audioFormat)
@@ -410,8 +442,11 @@
         _accessPasswordSaved = true;
         StateHasChanged();
         await Task.Delay(3000);
-        _accessPasswordSaved = false;
-        StateHasChanged();
+        // Le nouveau mot de passe invalide les cookies émis pour l'ancien : on renvoie l'auteur du
+        // changement sur l'écran de verrouillage plutôt que de le laisser dans un circuit qui
+        // survit par inertie. Il ressaisit aussitôt le mot de passe, ce qui révèle une faute de
+        // frappe tant qu'elle est encore rattrapable.
+        Nav.NavigateTo("/settings", forceLoad: true);
     }
 
     private async Task RemoveAccessPassword()

@@ -166,6 +166,11 @@ Available templates:
 | Favorites | `Favorites` | Favorites folder name |
 | CD | `CD %DiscNumber%` | Multi-disc subfolder |
 
+The Settings page previews the resulting path for an album track, a compilation track and a
+playlist track as you edit the templates, and warns about an empty track template, unknown or
+misplaced `%tags%`, templates starting with `/` or containing `..`, and characters that will be
+replaced in names (`\ : * ? " < > |`; only `/` separates folders).
+
 <details>
 <summary><strong>All template variables</strong></summary>
 
