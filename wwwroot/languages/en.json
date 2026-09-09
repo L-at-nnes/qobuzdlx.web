@@ -245,6 +245,8 @@
   "settings.artwork.title": "Artwork",
   "settings.artwork.embedded": "Embedded artwork size",
   "settings.artwork.saved": "Saved artwork size",
+  "settings.artwork.original": "Original (as supplied by the label)",
+  "settings.artwork.originalEmbedded": "Original (large: repeated in every file)",
   "settings.artwork.dontSave": "Do not save artwork to disk",
 
   "settings.advanced.title": "Advanced options",

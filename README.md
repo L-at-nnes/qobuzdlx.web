@@ -201,8 +201,8 @@ Additional tagging options:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Embedded art size | 600px | Size of cover art embedded in audio files |
-| Saved art size | 600px | Size of `cover.jpg` saved to disk |
+| Embedded art size | 600px | Size of cover art embedded in audio files (50 to 600 px, or the original) |
+| Saved art size | 600px | Size of `cover.jpg` saved to disk (50 to 600 px, or the original) |
 | Save to disk | Enabled | Save a separate `cover.jpg` file |
 
 ### Advanced

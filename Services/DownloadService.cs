@@ -1462,6 +1462,32 @@ public class DownloadService
 
     // ─── Artwork ───
 
+    private const string DefaultCoverSize = "600";
+
+    /// <summary>
+    /// Address of the cover at a given size: Qobuz serves the same picture as <c>…_50.jpg</c> to
+    /// <c>…_600.jpg</c>, and <c>…_org.jpg</c> for the file as supplied by the label.
+    /// </summary>
+    public static string CoverUrl(QobuzAlbum album, string size) => album.Image.Large.Replace("_600", $"_{size}");
+
+    /// <summary>
+    /// Downloads the cover at the requested size. The original is not available for every release: when
+    /// Qobuz refuses it, the 600 px version is used rather than going without a cover.
+    /// </summary>
+    private async Task<byte[]> FetchCoverAsync(QobuzAlbum album, string size)
+    {
+        try
+        {
+            return await ArtworkHttp.GetByteArrayAsync(CoverUrl(album, size));
+        }
+        catch (HttpRequestException ex) when (size != DefaultCoverSize)
+        {
+            _logger.LogWarning("Cover size {Size} unavailable for album {Album} ({Error}), using {Fallback}",
+                size, album.Id, ex.Message, DefaultCoverSize);
+            return await ArtworkHttp.GetByteArrayAsync(CoverUrl(album, DefaultCoverSize));
+        }
+    }
+
     private async Task DownloadArtworkAsync(string downloadPath, QobuzAlbum album)
     {
         var s = _settings.Settings;
@@ -1473,8 +1499,7 @@ public class DownloadService
                 var coverPath = Path.Combine(downloadPath, "Cover.jpg");
                 if (!System.IO.File.Exists(coverPath))
                 {
-                    var url = album.Image.Large.Replace("_600", $"_{s.SavedArtSize}");
-                    var data = await ArtworkHttp.GetByteArrayAsync(url);
+                    var data = await FetchCoverAsync(album, s.SavedArtSize);
                     Directory.CreateDirectory(downloadPath);
                     await System.IO.File.WriteAllBytesAsync(coverPath, data);
                 }
@@ -1484,8 +1509,7 @@ public class DownloadService
             var embeddedPath = EmbeddedArtPath(album);
             if (!System.IO.File.Exists(embeddedPath))
             {
-                var url = album.Image.Large.Replace("_600", $"_{s.EmbeddedArtSize}");
-                var data = await ArtworkHttp.GetByteArrayAsync(url);
+                var data = await FetchCoverAsync(album, s.EmbeddedArtSize);
                 await System.IO.File.WriteAllBytesAsync(embeddedPath, data);
             }
         }

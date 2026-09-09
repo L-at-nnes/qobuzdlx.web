@@ -245,6 +245,8 @@
   "settings.artwork.title": "Pochette",
   "settings.artwork.embedded": "Taille pochette intégrée",
   "settings.artwork.saved": "Taille pochette sauvegardée",
+  "settings.artwork.original": "Originale (fournie par le label)",
+  "settings.artwork.originalEmbedded": "Originale (volumineuse : répétée dans chaque fichier)",
   "settings.artwork.dontSave": "Ne pas sauvegarder la pochette sur le disque",
 
   "settings.advanced.title": "Options avancées",

@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`playlist/search`) et les met en file d'un clic, avec leur pochette et leur auteur ; « Voir plus »
   s'applique aussi à elles. La recherche de labels n'est pas proposée (un label se télécharge toujours en
   collant son lien).
+- **Pochette en taille originale.** Les listes de taille de pochette (intégrée et sauvegardée) s'arrêtaient
+  à 600 px ; elles proposent maintenant « Originale », la pochette telle que fournie par le label
+  (`…_org.jpg`). Pour les sorties qui n'en ont pas, Qobuz la refuse : l'application se rabat alors
+  sur la version 600 px au lieu de se passer de pochette. L'originale intégrée est répétée dans chaque
+  fichier d'un album, d'où l'avertissement dans la liste.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
