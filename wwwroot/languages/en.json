@@ -242,6 +242,12 @@
   "settings.tag.explicitInTitle": "'Explicit' tag in title",
   "settings.tag.cleanInTitle": "'Clean' tag in title",
 
+  "settings.tag.titleText": "Text added to the title",
+  "settings.tag.titlePosition": "Position",
+  "settings.tag.position.prefix": "Before the title",
+  "settings.tag.position.suffix": "After the title",
+  "settings.tag.titleExample": "Example: {0}",
+  "settings.tag.titleHint": "Spaces count: text placed after the title must start with a space (otherwise it reads 'Title(Explicit)'), text placed before it must end with one.",
   "settings.artwork.title": "Artwork",
   "settings.artwork.embedded": "Embedded artwork size",
   "settings.artwork.saved": "Saved artwork size",

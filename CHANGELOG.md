@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`…_org.jpg`). Pour les sorties qui n'en ont pas, Qobuz la refuse : l'application se rabat alors
   sur la version 600 px au lieu de se passer de pochette. L'originale intégrée est répétée dans chaque
   fichier d'un album, d'où l'avertissement dans la liste.
+- **Réglages des tags `(Explicit)` / `(Clean)` dans l'interface.** Le texte ajouté au titre et sa
+  position (avant ou après) n'étaient modifiables que dans `settings.json` ; les cases à cocher
+  n'offraient que le texte par défaut. Chaque case déroule désormais le texte, la position et un
+  exemple de résultat. Les espaces sont conservés tels que saisis, et la règle d'assemblage est
+  la même pour l'aperçu et pour l'écriture des tags.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

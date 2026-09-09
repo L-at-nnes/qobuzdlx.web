@@ -147,6 +147,11 @@ public class TaggingService
         return url == null ? null : LocaleSegmentRegex.Replace(url, "");
     }
 
+    /// <summary>Ajoute le marqueur au titre : devant (0) ou derrière (1). Les espaces du marqueur sont
+    /// conservés tels quels, c'est à celui qui le saisit de prévoir « [E] » ou « (Explicit) ».</summary>
+    public static string ApplyTitleTag(string title, string tag, int prefixOrSuffix) =>
+        prefixOrSuffix == 0 ? tag + title : title + tag;
+
     private void SetCommonTags(TagLib.File file, QobuzAlbum album, QobuzTrack track, AppSettings s)
     {
         if (s.GenreTag) file.Tag.Genres = new[] { album.Genre?.Name ?? "" };
@@ -162,19 +167,9 @@ public class TaggingService
             var title = _templates.FormatTrackTitle(track);
 
             if (track.ParentalWarning && s.ExplicitTagInTitle && !string.IsNullOrWhiteSpace(s.ExplicitTitleTagText))
-            {
-                if (s.ExplicitTitleTagPrefixOrSuffix == 0)
-                    title = s.ExplicitTitleTagText + title;
-                else
-                    title += s.ExplicitTitleTagText;
-            }
+                title = ApplyTitleTag(title, s.ExplicitTitleTagText, s.ExplicitTitleTagPrefixOrSuffix);
             else if (!track.ParentalWarning && s.CleanTagInTitle && !string.IsNullOrWhiteSpace(s.CleanTitleTagText))
-            {
-                if (s.CleanTitleTagPrefixOrSuffix == 0)
-                    title = s.CleanTitleTagText + title;
-                else
-                    title += s.CleanTitleTagText;
-            }
+                title = ApplyTitleTag(title, s.CleanTitleTagText, s.CleanTitleTagPrefixOrSuffix);
 
             file.Tag.Title = title;
         }

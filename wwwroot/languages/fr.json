@@ -242,6 +242,12 @@
   "settings.tag.explicitInTitle": "Tag 'Explicit' dans le titre",
   "settings.tag.cleanInTitle": "Tag 'Clean' dans le titre",
 
+  "settings.tag.titleText": "Texte ajouté au titre",
+  "settings.tag.titlePosition": "Position",
+  "settings.tag.position.prefix": "Avant le titre",
+  "settings.tag.position.suffix": "Après le titre",
+  "settings.tag.titleExample": "Exemple : {0}",
+  "settings.tag.titleHint": "Les espaces comptent : un texte placé après le titre doit commencer par une espace (sinon on obtient « Titre(Explicit) »), un texte placé avant doit en finir par une.",
   "settings.artwork.title": "Pochette",
   "settings.artwork.embedded": "Taille pochette intégrée",
   "settings.artwork.saved": "Taille pochette sauvegardée",

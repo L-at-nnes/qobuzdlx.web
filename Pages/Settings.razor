@@ -218,7 +218,42 @@
 
     <div style="margin-top:12px;">
         <div class="setting-item"><input type="checkbox" @bind="S.ExplicitTagInTitle" @bind:after="Save" /><label>@Loc["settings.tag.explicitInTitle"]</label></div>
+        @if (S.ExplicitTagInTitle)
+        {
+            <div class="field-row title-tag-row">
+                <div class="form-group">
+                    <label>@Loc["settings.tag.titleText"]</label>
+                    <input type="text" @bind="S.ExplicitTitleTagText" @bind:after="Save" />
+                </div>
+                <div class="form-group">
+                    <label>@Loc["settings.tag.titlePosition"]</label>
+                    <select @bind="S.ExplicitTitleTagPrefixOrSuffix" @bind:after="Save">
+                        <option value="0">@Loc["settings.tag.position.prefix"]</option>
+                        <option value="1">@Loc["settings.tag.position.suffix"]</option>
+                    </select>
+                </div>
+                <div class="title-tag-example">@Loc.T("settings.tag.titleExample", TaggingService.ApplyTitleTag("Song", S.ExplicitTitleTagText, S.ExplicitTitleTagPrefixOrSuffix))</div>
+            </div>
+        }
         <div class="setting-item"><input type="checkbox" @bind="S.CleanTagInTitle" @bind:after="Save" /><label>@Loc["settings.tag.cleanInTitle"]</label></div>
+        @if (S.CleanTagInTitle)
+        {
+            <div class="field-row title-tag-row">
+                <div class="form-group">
+                    <label>@Loc["settings.tag.titleText"]</label>
+                    <input type="text" @bind="S.CleanTitleTagText" @bind:after="Save" />
+                </div>
+                <div class="form-group">
+                    <label>@Loc["settings.tag.titlePosition"]</label>
+                    <select @bind="S.CleanTitleTagPrefixOrSuffix" @bind:after="Save">
+                        <option value="0">@Loc["settings.tag.position.prefix"]</option>
+                        <option value="1">@Loc["settings.tag.position.suffix"]</option>
+                    </select>
+                </div>
+                <div class="title-tag-example">@Loc.T("settings.tag.titleExample", TaggingService.ApplyTitleTag("Song", S.CleanTitleTagText, S.CleanTitleTagPrefixOrSuffix))</div>
+            </div>
+        }
+        <div class="template-hint">@Loc["settings.tag.titleHint"]</div>
     </div>
 </div>
 

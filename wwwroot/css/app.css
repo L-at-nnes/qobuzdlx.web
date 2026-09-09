@@ -206,6 +206,10 @@ html, body {
     padding: 24px;
 }
 
+.title-tag-row { margin: 4px 0 12px 28px; }
+.title-tag-row .form-group { flex: 0 1 220px; }
+.title-tag-example { flex: 1 1 100%; font-size: 0.8em; color: var(--text-secondary); white-space: pre; }
+
 .load-more { width: 100%; margin-top: 12px; }
 
 .filter-check { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85em; color: var(--text-secondary); cursor: pointer; }
