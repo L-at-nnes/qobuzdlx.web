@@ -42,6 +42,10 @@ public class QueueItem
     public int Skipped { get; set; }
     public IReadOnlyList<FailedTrack> Failures { get; set; } = Array.Empty<FailedTrack>();
 
+    /// <summary>Fichiers de la playlist déjà en place, conservés d'un « relancer les échecs » à l'autre
+    /// pour que le fichier .m3u8 final les liste tous.</summary>
+    public IReadOnlyList<PlaylistEntry> PlaylistEntries { get; set; } = Array.Empty<PlaylistEntry>();
+
     /// <summary>Renseigné par « relancer les échecs » : seules ces pistes sont traitées.</summary>
     public IReadOnlySet<int>? OnlyTrackIds { get; set; }
 
@@ -54,6 +58,7 @@ public class QueueItem
         Downloaded = 0;
         Skipped = 0;
         Failures = Array.Empty<FailedTrack>();
+        PlaylistEntries = Array.Empty<PlaylistEntry>();
         OnlyTrackIds = null;
     }
 }
@@ -236,6 +241,9 @@ public class DownloadService
         Record(item => { if (result.AlreadyExisted) item.Skipped++; else item.Downloaded++; });
 
     private void RecordSkipped() => Record(item => item.Skipped++);
+
+    private void RecordPlaylistEntry(PlaylistEntry entry) =>
+        Record(item => item.PlaylistEntries = item.PlaylistEntries.Where(e => e.Index != entry.Index).Append(entry).ToArray());
 
     private void RecordFailure(int trackId, string title, string error) =>
         Record(item => item.Failures = item.Failures.Append(new FailedTrack(trackId, title, error)).ToArray());
@@ -990,6 +998,7 @@ public class DownloadService
         var tracks = playlist.Tracks?.Items ?? new List<QobuzTrack>();
         int total = tracks.Count;
         var s = _settings.Settings;
+        string? playlistFolder = null;
 
         for (int i = 0; i < total; i++)
         {
@@ -1011,11 +1020,14 @@ public class DownloadService
 
                 var downloadPath = _templates.CreatePath(s.DownloadLocation, s.ArtistTemplate, s.AlbumTemplate, s.PlaylistTemplate, album, item, playlist);
                 Directory.CreateDirectory(downloadPath);
+                playlistFolder ??= downloadPath;
 
                 try
                 {
                     await DownloadArtworkAsync(downloadPath, album);
-                    RecordResult(await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct));
+                    var result = await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct);
+                    RecordResult(result);
+                    RecordPlaylistEntry(new PlaylistEntry(i, result.FilePath, item.Duration, PlaylistEntryTitle(item)));
                 }
                 finally
                 {
@@ -1028,6 +1040,40 @@ public class DownloadService
                 Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message));
                 RecordFailure(item.Id, _templates.FormatTrackTitle(item), ex.Message);
             }
+        }
+
+        if (s.CreatePlaylistFile && playlistFolder != null)
+            WritePlaylistFile(playlist, playlistFolder);
+    }
+
+    private string PlaylistEntryTitle(QobuzTrack track)
+    {
+        var title = _templates.FormatTrackTitle(track);
+        return string.IsNullOrEmpty(track.Performer?.Name) ? title : $"{track.Performer.Name} - {title}";
+    }
+
+    /// <summary>
+    /// Écrit « Nom de la playlist.m3u8 » dans le dossier de la playlist, avec tous les fichiers connus de
+    /// l'élément — ceux de cette passe et ceux d'une passe précédente. Une pièce en échec n'y figure pas
+    /// jusqu'à ce qu'un « relancer les échecs » la récupère.
+    /// </summary>
+    private void WritePlaylistFile(QobuzPlaylist playlist, string folder)
+    {
+        var entries = _currentItem?.PlaylistEntries ?? Array.Empty<PlaylistEntry>();
+        if (entries.Count == 0) return;
+
+        var name = TemplateService.TruncateToBytes(TemplateService.MakeSafeFilename(playlist.Name), maxBytes: 200);
+        if (name.Length == 0) name = playlist.Id.ToString();
+        var path = Path.Combine(folder, name + ".m3u8");
+
+        try
+        {
+            System.IO.File.WriteAllText(path, M3uPlaylist.Build(folder, entries), new System.Text.UTF8Encoding(false));
+            Log(_loc.T("log.playlistFileWritten", Path.GetFileName(path)));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log(_loc.T("log.playlistFileFailed", ex.Message));
         }
     }
 

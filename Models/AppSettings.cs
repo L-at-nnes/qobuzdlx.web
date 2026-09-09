@@ -73,6 +73,7 @@ public class AppSettings
     public bool DownloadGoodies { get; set; } = true;
     public bool DownloadSpeed { get; set; }
     public bool UseItemPosInPlaylist { get; set; }
+    public bool CreatePlaylistFile { get; set; } = true;
     public bool LogFailedDownloads { get; set; } = true;
     public string DuplicateFileMode { get; set; } = "skip"; // skip, rename, overwrite
     // Langue de l'interface : "fr" | "en". Vide = pas encore choisie, on détecte alors la langue

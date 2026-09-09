@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   n'était pas nettoyé comme les dossiers : un modèle `/etc/%TrackTitle%` ou `../../x` était
   combiné tel quel au chemin. Chaque composant est maintenant nettoyé (`.`, `..`, barre initiale), un
   modèle vide donne l'identifiant de la piste comme nom, et le dossier de disque obéit à la même règle.
+- **Fichier de playlist `.m3u8`.** Télécharger une playlist produisait un dossier de fichiers
+  sans l'ordre de la playlist. Un `Nom de la playlist.m3u8` (M3U étendu, UTF-8) est maintenant écrit
+  dans le dossier, avec les durées, des chemins relatifs et l'ordre d'origine : la bibliothèque reste
+  lisible si on la déplace. Les pistes en échec n'y figurent pas, et « Relancer les échecs » les
+  ajoute au même fichier. Désactivable (« Créer un fichier .m3u8 pour les playlists »).
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
