@@ -11,6 +11,8 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 ## Features
 
 - **Web-based UI** — Dark theme, responsive, accessible from any browser
+- **Android app** — A WebView shell that points at your own server ([android/](android/)), plus an
+  installable PWA if you prefer the browser
 - **Multiple download types** — Albums, tracks, playlists, artists, labels, favorites
 - **Bilingual UI** — French and English, one-click switch, browser language detected on first run
 - **Search** — Search Qobuz by albums, tracks, artists or playlists directly from the UI, with sorting by
@@ -27,6 +29,10 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 - **Download report** — Each queue entry shows how many tracks were downloaded, skipped or failed,
   lists the failures with their reason, and can retry just those tracks
 - **Persistent settings** — All configuration saved to JSON, survives restarts
+- **Configuration test** — One button in Settings checks that the download and config folders are
+  writable, that `flac` is installed, and that the Qobuz session and app credentials are accepted
+- **Optional access password** — Protects the whole app; unlocking lasts 30 days per device and
+  survives container restarts
 - **Docker-ready** — Multi-stage Alpine image, lightweight and portable
 
 ---
@@ -242,6 +248,28 @@ Qobuz store links (e.g. `https://www.qobuz.com/fr-fr/album/...`) are also suppor
 
 ---
 
+## Android
+
+Two ways to get the app on your phone, both pointing at your own server.
+
+**Install from the browser.** Open your instance in Chrome and pick *Add to home screen*. You get
+the icon and a window without an address bar. Nothing to build.
+
+**Or build the APK.** [`android/`](android/) holds a small Kotlin project — a WebView shell around
+the same interface, so there is no second UI to maintain. It adds what a browser tab cannot do:
+the server address is remembered, rotating the phone no longer reloads the page, and the app
+recovers on its own after a spell in the background.
+
+The setup screen accepts `192.168.1.42`, `qobuz.mydomain.com` or a full URL, tries HTTPS then HTTP
+(with and without port 8080), and only saves an address once `/healthz` has answered. Build
+instructions and release signing are in [android/README.md](android/README.md).
+
+> **Reverse proxy:** make sure WebSockets are proxied. Without them SignalR silently falls back to
+> long polling — the app still works, but every click gains 300–800 ms and the battery drains.
+> Check for a `101 Switching Protocols` on `/_blazor` in DevTools › Network.
+
+---
+
 ## Build from Source
 
 ### Prerequisites
@@ -298,8 +326,11 @@ QobuzDLX.Web/
 │   ├── DownloadService.cs   # Core download engine
 │   ├── SettingsService.cs   # Persistent JSON settings
 │   ├── TemplateService.cs   # Path/filename templating
-│   └── TaggingService.cs    # ID3v2 & Vorbis tagging
+│   ├── TaggingService.cs    # ID3v2 & Vorbis tagging
+│   ├── AppGuardService.cs   # Access password hashing & unlock state
+│   └── AppAccessGate.cs     # App-wide unlock throttling
 ├── wwwroot/css/app.css      # Dark theme styles
+├── android/                 # Android app (Kotlin, WebView shell)
 ├── Program.cs               # App entry point
 ├── Dockerfile               # Multi-stage Docker build
 └── docker-compose.yml       # Compose configuration

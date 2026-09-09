@@ -3,6 +3,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject TemplateService Templates
+@inject ConfigurationCheckService Checks
 @inherits LocalizedComponentBase
 
 <h3 style="margin-bottom:16px;">@Loc["settings.title"]</h3>
@@ -331,6 +332,26 @@
     </div>
 </div>
 
+<!-- Configuration test -->
+<div class="card">
+    <div class="card-title">@Loc["settings.check.title"]</div>
+    <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:12px;">@Loc["settings.check.description"]</p>
+    <button class="btn btn-secondary" @onclick="RunChecks" disabled="@_checking">@(_checking ? Loc["settings.check.running"] : Loc["settings.check.run"])</button>
+    @if (_checkResults != null)
+    {
+        <ul class="check-list">
+            @foreach (var result in _checkResults)
+            {
+                <li class="check-@result.Status.ToString().ToLowerInvariant()">
+                    <span class="check-icon">@CheckIcon(result.Status)</span>
+                    <strong>@Loc[$"settings.check.{result.Check}"]</strong>
+                    <span class="check-message">@Loc.T($"settings.check.msg.{result.Check}.{result.Code}", result.Detail ?? "")</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
 <!-- App Access Password -->
 <div class="card">
     <div class="card-title">@Loc["settings.access.title"]</div>
@@ -403,6 +424,29 @@
     private string _accessPasswordMessage = "";
 
     private void Save() => SettingsSvc.Save();
+
+    private bool _checking;
+    private IReadOnlyList<CheckResult>? _checkResults;
+
+    private async Task RunChecks()
+    {
+        _checking = true;
+        try
+        {
+            _checkResults = await Checks.RunAsync();
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    private static string CheckIcon(CheckStatus status) => status switch
+    {
+        CheckStatus.Ok => "\u2713",
+        CheckStatus.Warning => "\u26A0",
+        _ => "\u2717"
+    };
 
     private string IssueText(TemplateIssue issue) =>
         Loc.T($"settings.templates.issue.{issue.Code}", FieldLabel(issue.Field), issue.Detail ?? "");

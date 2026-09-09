@@ -291,6 +291,15 @@ public class QobuzApiService
         }
     }
 
+    /// <summary>
+    /// Vrai si le couple app_id / app_secret en usage est accepté par Qobuz pour les requêtes signées,
+    /// condition de tout téléchargement. Faux aussi quand Qobuz est injoignable.
+    /// </summary>
+    public Task<bool> AppCredentialsAreValidAsync() =>
+        string.IsNullOrEmpty(_appId) || string.IsNullOrEmpty(_appSecret)
+            ? Task.FromResult(false)
+            : TestSecretAsync(_appId, _appSecret);
+
     // ─── Authentication ───
 
     public async Task<QobuzLoginResponse> LoginWithEmailAsync(string appId, string email, string password)

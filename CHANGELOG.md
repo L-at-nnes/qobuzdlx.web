@@ -70,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dans le dossier, avec les durées, des chemins relatifs et l'ordre d'origine : la bibliothèque reste
   lisible si on la déplace. Les pistes en échec n'y figurent pas, et « Relancer les échecs » les
   ajoute au même fichier. Désactivable (« Créer un fichier .m3u8 pour les playlists »).
+- **Test de configuration.** Un dossier en lecture seule, `flac` absent ou une session expirée ne se
+  découvraient qu'au fil du journal, piste après piste. Un bouton des Réglages vérifie d'un coup que
+  les dossiers de téléchargement et de configuration sont réellement inscriptibles (par l'écriture
+  d'un fichier d'essai), que `flac` répond, que la session Qobuz est valide et que les clés de
+  l'application sont acceptées pour les requêtes signées — la panne de la 1.5.1 —, et nomme chaque
+  problème. L'appel à `flac` est factorisé dans `FlacCli`, commun au téléchargement et au test.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

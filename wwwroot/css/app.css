@@ -206,6 +206,15 @@ html, body {
     padding: 24px;
 }
 
+/* Test de configuration */
+.check-list { list-style: none; margin-top: 14px; font-size: 0.9em; }
+.check-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+.check-icon { flex: 0 0 18px; font-weight: 700; }
+.check-ok .check-icon { color: var(--success); }
+.check-warning .check-icon { color: #e8a33d; }
+.check-error .check-icon { color: #e74c3c; }
+.check-message { flex: 1 1 260px; color: var(--text-secondary); overflow-wrap: anywhere; }
+
 /* Aperçu des modèles de nommage */
 .template-preview { margin-top: 16px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85em; }
 .template-preview-title { font-weight: 600; margin-bottom: 8px; }

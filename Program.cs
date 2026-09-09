@@ -49,6 +49,7 @@ builder.Services.AddSingleton<QobuzApiService>();
 builder.Services.AddSingleton<TemplateService>();
 builder.Services.AddSingleton<TaggingService>();
 builder.Services.AddSingleton<DownloadService>();
+builder.Services.AddSingleton<ConfigurationCheckService>();
 builder.Services.AddSingleton<SearchStateService>();
 // La langue est un réglage global (settings.json), comme le reste : singleton.
 builder.Services.AddSingleton<LocalizationService>();

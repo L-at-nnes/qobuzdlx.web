@@ -1325,38 +1325,6 @@ public class DownloadService
         }
     }
 
-    private readonly record struct FlacRun(int ExitCode, string Error);
-
-    /// <summary>
-    /// Runs the flac CLI and returns its exit code and error output. Throws when flac cannot be started
-    /// (not installed) and, if <paramref name="ct"/> fires, kills the process before propagating.
-    /// </summary>
-    private static async Task<FlacRun> RunFlacAsync(IEnumerable<string> arguments, CancellationToken ct)
-    {
-        var startInfo = new ProcessStartInfo("flac")
-        {
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        foreach (var argument in arguments)
-            startInfo.ArgumentList.Add(argument);
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("flac could not be started");
-
-        // Both pipes are drained while waiting: once a pipe buffer is full flac blocks on its
-        // write, and WaitForExitAsync would then never return.
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-
-        using (ct.Register(() => KillQuietly(process)))
-            await process.WaitForExitAsync(ct);
-
-        await stdout;
-        return new FlacRun(process.ExitCode, (await stderr).Trim());
-    }
-
     /// <summary>
     /// Re-encodes the file with the flac CLI so that its STREAMINFO MD5 is valid. A failure is not
     /// fatal — the track stays playable — so it is reported in the log and the download goes on.
@@ -1366,7 +1334,7 @@ public class DownloadService
         try
         {
             // -s: without it flac streams its progress to stderr, a few hundred kilobytes per file.
-            var run = await RunFlacAsync(new[] { "-s", "-f", "-8", path }, ct);
+            var run = await FlacCli.RunAsync(new[] { "-s", "-f", "-8", path }, ct);
             if (run.ExitCode != 0)
                 Log(_loc.T("log.md5FixFailed", run.Error.Length > 0 ? run.Error : $"exit code {run.ExitCode}"));
         }
@@ -1386,10 +1354,10 @@ public class DownloadService
     /// </summary>
     private async Task VerifyFlacIntegrityAsync(string path, CancellationToken ct)
     {
-        FlacRun run;
+        FlacResult run;
         try
         {
-            run = await RunFlacAsync(new[] { "-t", "-s", path }, ct);
+            run = await FlacCli.RunAsync(new[] { "-t", "-s", path }, ct);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -1406,12 +1374,6 @@ public class DownloadService
     {
         try { System.IO.File.Delete(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best effort */ }
-    }
-
-    private static void KillQuietly(Process process)
-    {
-        try { process.Kill(entireProcessTree: true); }
-        catch (InvalidOperationException) { /* already exited */ }
     }
 
     // ─── HTTP stream download helpers ───

@@ -13,12 +13,14 @@ public class SettingsService
     private AppSettings _settings;
     private readonly object _lock = new();
 
+    /// <summary>Dossier de configuration (volume /config dans l'image Docker).</summary>
+    public string ConfigDirectory { get; }
+
     public SettingsService(ILogger<SettingsService> logger)
     {
         _logger = logger;
-        _configPath = Path.Combine(
-            Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config",
-            "settings.json");
+        ConfigDirectory = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/config";
+        _configPath = Path.Combine(ConfigDirectory, "settings.json");
 
         _settings = Load();
     }
