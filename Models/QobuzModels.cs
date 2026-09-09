@@ -124,6 +124,7 @@ public class QobuzPlaylist
     [JsonProperty("name")] public string Name { get; set; } = "";
     [JsonProperty("description")] public string? Description { get; set; }
     [JsonProperty("tracks_count")] public int TracksCount { get; set; }
+    [JsonProperty("owner")] public QobuzPerformer? Owner { get; set; }
     [JsonProperty("images150")] public List<string>? Images150 { get; set; }
     [JsonProperty("image_rectangle")] public List<string>? ImageRectangle { get; set; }
     [JsonProperty("tracks")] public QobuzItemList<QobuzTrack>? Tracks { get; set; }
@@ -180,6 +181,11 @@ public class QobuzSearchAlbumResult
 public class QobuzSearchTrackResult
 {
     [JsonProperty("tracks")] public QobuzItemList<QobuzTrack> Tracks { get; set; } = new();
+}
+
+public class QobuzSearchPlaylistResult
+{
+    [JsonProperty("playlists")] public QobuzItemList<QobuzPlaylist> Playlists { get; set; } = new();
 }
 
 public class QobuzSearchArtistResult

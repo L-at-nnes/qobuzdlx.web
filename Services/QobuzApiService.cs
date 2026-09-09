@@ -418,6 +418,12 @@ public class QobuzApiService
         return await AuthGetAsync<QobuzSearchArtistResult>(url);
     }
 
+    public async Task<QobuzSearchPlaylistResult?> SearchPlaylistsAsync(string query, int limit = 50, int offset = 0)
+    {
+        var url = $"{BaseUrl}playlist/search?query={Uri.EscapeDataString(query)}&app_id={_appId}&limit={limit}&offset={offset}";
+        return await AuthGetAsync<QobuzSearchPlaylistResult>(url);
+    }
+
     // ─── Playlist ───
 
     public async Task<QobuzPlaylist?> GetPlaylistAsync(string playlistId, int limit = 500, int offset = 0)

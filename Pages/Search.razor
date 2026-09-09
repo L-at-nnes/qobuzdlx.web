@@ -17,6 +17,7 @@
         <button class="btn btn-primary" @onclick='() => DoSearch("albums")' disabled="@_searching">@Loc["search.albums"]</button>
         <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">@Loc["search.tracks"]</button>
         <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">@Loc["search.artists"]</button>
+        <button class="btn btn-secondary" @onclick='() => DoSearch("playlists")' disabled="@_searching">@Loc["search.playlists"]</button>
     </div>
     <label class="filter-check">
         <input type="checkbox" @bind="State.HiResOnly" />
@@ -230,6 +231,44 @@ else if (HasNoResults)
     </div>
 }
 
+@if (State.Playlists != null && State.Playlists.Count > 0)
+{
+    <div class="card">
+        <div class="card-title">
+            @Loc["search.playlists"] (@Loc.P("search.results", State.Playlists.Count))
+        </div>
+        <div class="search-results">
+            @foreach (var playlist in State.Playlists)
+            {
+                var playlistUrl = PlaylistUrl(playlist.Id);
+                <div class="search-result-row">
+                    @if (!string.IsNullOrEmpty(playlist.Images150?.FirstOrDefault()))
+                    {
+                        <img src="@playlist.Images150![0]" alt="" />
+                    }
+                    else
+                    {
+                        <div class="artist-avatar-placeholder">&#9835;</div>
+                    }
+                    <div class="search-result-info">
+                        <div class="title">@playlist.Name</div>
+                        <div class="artist">@playlist.Owner?.Name &middot; @Loc.P("search.trackCount", playlist.TracksCount)</div>
+                    </div>
+                    @if (Download.IsDone(playlistUrl))
+                    {
+                        <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                    }
+                    <button class="btn btn-primary btn-sm" @onclick="() => QueuePlaylist(playlist)" disabled="@Download.IsQueued(playlistUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
+                </div>
+            }
+        </div>
+        @if (State.HasMorePlaylists)
+        {
+            <button class="btn btn-secondary load-more" @onclick="LoadMore" disabled="@_loadingMore">@Loc.T("search.loadMore", State.Playlists!.Count, State.PlaylistsTotal)</button>
+        }
+    </div>
+}
+
 @if (TotalSelected > 0)
 {
     <div class="selection-bar">
@@ -279,6 +318,7 @@ else if (HasNoResults)
         "albums" => State.Albums is { Count: 0 },
         "tracks" => State.Tracks is { Count: 0 },
         "artists" => State.Artists is { Count: 0 },
+        "playlists" => State.Playlists is { Count: 0 },
         _ => false
     };
 
@@ -319,6 +359,7 @@ else if (HasNoResults)
         State.Albums = null;
         State.Tracks = null;
         State.Artists = null;
+        State.Playlists = null;
         State.ExpandedArtistId = 0;
         State.ArtistAlbums = null;
 
@@ -331,6 +372,7 @@ else if (HasNoResults)
                 State.Albums = null;
                 State.Tracks = null;
                 State.Artists = null;
+                State.Playlists = null;
             }
         }
         finally
@@ -353,6 +395,7 @@ else if (HasNoResults)
             {
                 "albums" => State.Albums?.Count ?? 0,
                 "tracks" => State.Tracks?.Count ?? 0,
+                "playlists" => State.Playlists?.Count ?? 0,
                 _ => State.Artists?.Count ?? 0
             };
 
@@ -380,6 +423,10 @@ else if (HasNoResults)
             case "artists":
                 var artistResult = await Api.SearchArtistsAsync(State.LastQuery, PageSize, offset);
                 State.AppendArtists(artistResult?.Artists?.Items ?? new(), artistResult?.Artists?.Total ?? 0);
+                break;
+            case "playlists":
+                var playlistResult = await Api.SearchPlaylistsAsync(State.LastQuery, PageSize, offset);
+                State.AppendPlaylists(playlistResult?.Playlists?.Items ?? new(), playlistResult?.Playlists?.Total ?? 0);
                 break;
         }
     }
@@ -449,6 +496,7 @@ else if (HasNoResults)
     private static string AlbumUrl(string id) => $"https://play.qobuz.com/album/{id}";
     private static string TrackUrl(int id) => $"https://play.qobuz.com/track/{id}";
     private static string ArtistUrl(int id) => $"https://play.qobuz.com/artist/{id}";
+    private static string PlaylistUrl(long id) => $"https://play.qobuz.com/playlist/{id}";
 
     private static QueueRequest AlbumRequest(QobuzAlbum a) => new(
         AlbumUrl(a.Id),
@@ -468,6 +516,9 @@ else if (HasNoResults)
 
     private void QueueArtist(QobuzArtist artist) => ToastFor(Download.Enqueue(
         ArtistUrl(artist.Id), artist.Name, null, artist.Picture));
+
+    private void QueuePlaylist(QobuzPlaylist playlist) => ToastFor(Download.Enqueue(
+        PlaylistUrl(playlist.Id), playlist.Name, playlist.Owner?.Name, playlist.Images150?.FirstOrDefault()));
 
     private EnqueueResult Enqueue(QueueRequest r) =>
         Download.Enqueue(r.Url, r.Label, r.SubLabel, r.Thumbnail);

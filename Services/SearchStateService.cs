@@ -13,6 +13,7 @@ public class SearchStateService
     public List<QobuzAlbum>? Albums { get; set; }
     public List<QobuzTrack>? Tracks { get; set; }
     public List<QobuzArtist>? Artists { get; set; }
+    public List<QobuzPlaylist>? Playlists { get; set; }
 
     /// <summary>Masque ce qui n'est pas Hi-Res. Conservé ici comme les tris : il survit à la navigation.</summary>
     public bool HiResOnly { get; set; }
@@ -21,10 +22,12 @@ public class SearchStateService
     public int AlbumsTotal { get; set; }
     public int TracksTotal { get; set; }
     public int ArtistsTotal { get; set; }
+    public int PlaylistsTotal { get; set; }
 
     public bool HasMoreAlbums => Albums != null && Albums.Count < AlbumsTotal;
     public bool HasMoreTracks => Tracks != null && Tracks.Count < TracksTotal;
     public bool HasMoreArtists => Artists != null && Artists.Count < ArtistsTotal;
+    public bool HasMorePlaylists => Playlists != null && Playlists.Count < PlaylistsTotal;
 
     // Les listes sont remplacées et jamais modifiées : cet objet est partagé par tous les circuits
     // ouverts, et l'un d'eux peut être en train d'énumérer l'ancienne liste pendant l'ajout.
@@ -44,6 +47,12 @@ public class SearchStateService
     {
         Artists = Append(Artists, page);
         ArtistsTotal = total;
+    }
+
+    public void AppendPlaylists(IEnumerable<QobuzPlaylist> page, int total)
+    {
+        Playlists = Append(Playlists, page);
+        PlaylistsTotal = total;
     }
 
     private static List<T> Append<T>(List<T>? current, IEnumerable<T> page) =>

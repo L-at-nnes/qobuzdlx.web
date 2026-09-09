@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pas 16 bits / 44,1 kHz. Le filtre s'applique à l'affichage (les résultats déjà chargés restent en
   mémoire), conserve le compteur de résultats visibles, et « Tout sélectionner » ne sélectionne
   plus que ce qui est affiché sans effacer les sélections faites ailleurs.
+- **Recherche de playlists.** Un quatrième bouton cherche parmi les playlists publiques Qobuz
+  (`playlist/search`) et les met en file d'un clic, avec leur pochette et leur auteur ; « Voir plus »
+  s'applique aussi à elles. La recherche de labels n'est pas proposée (un label se télécharge toujours en
+  collant son lien).
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

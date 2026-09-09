@@ -52,6 +52,7 @@
   "search.albums": "Albums",
   "search.tracks": "Tracks",
   "search.artists": "Artists",
+  "search.playlists": "Playlists",
   "search.searching": "Searching...",
   "search.hiResOnly": "Hi-Res only (more than 16-bit / 44.1 kHz)",
   "search.loadMore": "Show more ({0} of {1})",
