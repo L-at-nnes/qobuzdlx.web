@@ -76,6 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   d'un fichier d'essai), que `flac` répond, que la session Qobuz est valide et que les clés de
   l'application sont acceptées pour les requêtes signées — la panne de la 1.5.1 —, et nomme chaque
   problème. L'appel à `flac` est factorisé dans `FlacCli`, commun au téléchargement et au test.
+- **Journal de téléchargement : niveau de détail réglable et export.** Un sélecteur au-dessus du
+  journal (page Téléchargement) choisit entre « Échecs seulement » (les échecs et le bilan de chaque
+  élément), « Normal » (comme avant) et « Détaillé » (qualité obtenue, taille et débit de chaque
+  piste, chaque essai raté). Le filtre s'applique à l'écriture : le journal, limité à 1200 lignes, n'est
+  pas noyé sous un détail dont on n'a pas voulu. « Exporter » enregistre le journal dans un fichier
+  daté, précédé de la version, de la date et du niveau ; « Copier » le place dans le presse-papiers,
+  voie de repli pour l'application Android, dont le WebView ne sait pas enregistrer un fichier.
+  Ce niveau remplace deux cases des Réglages qui n'avaient jamais eu d'effet (« Afficher la vitesse »
+  et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

@@ -44,6 +44,18 @@
             document.documentElement.lang = lang;
         };
 
+        // Export du journal : un fichier fabriqué par la page, sans aller-retour vers le serveur.
+        window.downloadTextFile = function (filename, text) {
+            var url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        };
+
         // Journal de téléchargement : avec une file qui enchaîne les éléments, les nouvelles lignes
         // sortent sans arrêt du cadre visible. Le garde-fou sur l'élément évite une exception si le
         // rendu a retiré le nœud entre-temps.

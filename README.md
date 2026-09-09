@@ -25,7 +25,8 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 - **Artwork** — Embedded cover art + saved to disk, configurable sizes
 - **Goodies** — Downloads bonus materials (booklets, etc.) when available
 - **FLAC MD5 fix** — Optional automatic MD5 checksum repair
-- **Real-time progress** — Live progress bar, download speed, and log output
+- **Real-time progress** — Live progress bar, download speed, and a log with an adjustable level of
+  detail that can be exported
 - **Download report** — Each queue entry shows how many tracks were downloaded, skipped or failed,
   lists the failures with their reason, and can retry just those tracks
 - **Persistent settings** — All configuration saved to JSON, survives restarts
@@ -225,9 +226,8 @@ Additional tagging options:
 | Playlist file | Enabled | Write a `.m3u8` playlist (relative paths, playlist order) next to the downloaded tracks of a playlist |
 | Verify integrity | Enabled | Decode every downloaded FLAC with `flac -t`; a damaged file is downloaded again (requires `flac` CLI, about a second per track, skipped when `flac` is missing) |
 | Download goodies | Enabled | Download booklets and bonus materials |
-| Print speed | Disabled | Show download speed in logs |
 | Duplicate handling | Skip | `skip`, `rename`, or `overwrite` existing files |
-| Log failed downloads | Enabled | Log errors to output |
+| Log detail | Normal | How much the download log keeps: failures only, normal, or detailed (quality, size and speed of every track, failed attempts). Chosen above the log on the Download page, where it can also be exported or copied |
 
 ---
 

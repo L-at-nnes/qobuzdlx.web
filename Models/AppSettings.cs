@@ -1,5 +1,16 @@
 namespace QobuzDLX.Web.Models;
 
+/// <summary>Ce que le journal de téléchargement retient : chaque niveau contient le précédent.</summary>
+public enum LogDetail
+{
+    /// <summary>Les échecs et le bilan de chaque élément.</summary>
+    Errors = 0,
+    /// <summary>Le déroulement : élément, piste, qualité, fichiers ignorés.</summary>
+    Normal = 1,
+    /// <summary>Normal, plus la qualité obtenue, la taille et le débit de chaque piste et chaque essai raté.</summary>
+    Detailed = 2
+}
+
 public class AppSettings
 {
     // App access protection
@@ -71,10 +82,9 @@ public class AppSettings
     public bool FixMD5s { get; set; }
     public bool VerifyIntegrity { get; set; } = true;
     public bool DownloadGoodies { get; set; } = true;
-    public bool DownloadSpeed { get; set; }
     public bool UseItemPosInPlaylist { get; set; }
     public bool CreatePlaylistFile { get; set; } = true;
-    public bool LogFailedDownloads { get; set; } = true;
+    public LogDetail LogDetail { get; set; } = LogDetail.Normal;
     public string DuplicateFileMode { get; set; } = "skip"; // skip, rename, overwrite
     // Langue de l'interface : "fr" | "en". Vide = pas encore choisie, on détecte alors la langue
     // du navigateur au premier rendu. Nom volontairement différent de l'ancien "Language" (vestige

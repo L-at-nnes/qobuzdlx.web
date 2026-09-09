@@ -362,7 +362,7 @@ public class DownloadService
     {
         if (!TryParseQobuzUrl(url, out var canonical, out var kind, out var refId))
         {
-            Log(_loc.T("log.invalidUrl", url));
+            Log(_loc.T("log.invalidUrl", url), LogDetail.Errors);
             return EnqueueResult.InvalidUrl;
         }
 
@@ -571,6 +571,13 @@ public class DownloadService
         if (changed) { Signal(); RaiseQueueChanged(); }
     }
 
+    /// <summary>Le journal tel qu'affiché, précédé d'une ligne d'en-tête (version, date, niveau), pour l'export.</summary>
+    public string ExportLog()
+    {
+        var header = $"# QobuzDLX {AppInfo.Version} - {DateTime.Now:yyyy-MM-dd HH:mm:ss} - log detail: {_settings.Settings.LogDetail}";
+        return string.Join('\n', LogSnapshot().Prepend(header)) + '\n';
+    }
+
     public void ClearLog()
     {
         lock (_gate) _log.Clear();
@@ -641,8 +648,12 @@ public class DownloadService
         }
     }
 
-    private void Log(string msg)
+    private void Log(string msg, LogDetail level = LogDetail.Normal)
     {
+        // Filtré à l'écriture et non à l'affichage : le journal en mémoire est borné, le noyer sous un
+        // détail que personne n'a demandé ferait sortir les lignes utiles.
+        if (level > _settings.Settings.LogDetail) return;
+
         lock (_gate)
         {
             _log.Add(msg);
@@ -824,7 +835,7 @@ public class DownloadService
             }
 
             if (item.Downloaded + item.Skipped + item.Failures.Count > 0)
-                Log(_loc.T("log.itemSummary", item.Downloaded, item.Skipped, item.Failures.Count));
+                Log(_loc.T("log.itemSummary", item.Downloaded, item.Skipped, item.Failures.Count), LogDetail.Errors);
 
             Log(_loc["log.complete"]);
             SetStatus(item, QueueItemStatus.Completed);
@@ -833,7 +844,7 @@ public class DownloadService
         {
             // Avant les autres : l'interruption provoquée par OnSessionRejected arrive ici en
             // OperationCanceledException ou en erreur d'API, selon l'endroit où l'élément se trouvait.
-            Log(_loc.T("log.error", _loc["error.sessionExpired"]));
+            Log(_loc.T("log.error", _loc["error.sessionExpired"]), LogDetail.Errors);
             SetStatus(item, QueueItemStatus.Failed, _loc["error.sessionExpired"]);
         }
         catch (OperationCanceledException)
@@ -845,7 +856,7 @@ public class DownloadService
         }
         catch (Exception ex)
         {
-            Log(_loc.T("log.error", ex.Message));
+            Log(_loc.T("log.error", ex.Message), LogDetail.Errors);
             _logger.LogError(ex, "Download failed for {Url}", item.Url);
             SetStatus(item, QueueItemStatus.Failed, ex.Message);
         }
@@ -910,7 +921,7 @@ public class DownloadService
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    Log(_loc.T("log.trackFailed", track.Id, ex.Message));
+                    Log(_loc.T("log.trackFailed", track.Id, ex.Message), LogDetail.Errors);
                     RecordFailure(track.Id, _templates.FormatTrackTitle(track), ex.Message);
                 }
             }
@@ -958,7 +969,7 @@ public class DownloadService
         var track = await _api.GetTrackAsync(trackId);
         if (track == null)
         {
-            Log(_loc["log.trackNotFound"]);
+            Log(_loc["log.trackNotFound"], LogDetail.Errors);
             RecordFailure(int.TryParse(trackId, out var id) ? id : 0, trackId, _loc["log.trackNotFound"]);
             return;
         }
@@ -969,7 +980,7 @@ public class DownloadService
 
         if (album == null)
         {
-            Log(_loc["log.albumInfoUnavailable"]);
+            Log(_loc["log.albumInfoUnavailable"], LogDetail.Errors);
             RecordFailure(track.Id, _templates.FormatTrackTitle(track), _loc["log.albumInfoUnavailable"]);
             return;
         }
@@ -1037,7 +1048,7 @@ public class DownloadService
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message));
+                Log(_loc.T("log.playlistTrackFailed", item.Id, ex.Message), LogDetail.Errors);
                 RecordFailure(item.Id, _templates.FormatTrackTitle(item), ex.Message);
             }
         }
@@ -1073,7 +1084,7 @@ public class DownloadService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Log(_loc.T("log.playlistFileFailed", ex.Message));
+            Log(_loc.T("log.playlistFileFailed", ex.Message), LogDetail.Errors);
         }
     }
 
@@ -1093,7 +1104,7 @@ public class DownloadService
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
             try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
+            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message), LogDetail.Errors); }
         }
     }
 
@@ -1102,7 +1113,7 @@ public class DownloadService
     private async Task DownloadLabelAsync(string labelId, CancellationToken ct)
     {
         var label = await _api.GetLabelAsync(labelId);
-        if (label?.Albums?.Items == null) { Log(_loc["log.labelNotFound"]); return; }
+        if (label?.Albums?.Items == null) { Log(_loc["log.labelNotFound"], LogDetail.Errors); return; }
 
         var albums = label.Albums.Items;
         int total = albums.Count;
@@ -1115,7 +1126,7 @@ public class DownloadService
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.album", i + 1, total), albums[i].Title);
             try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message)); }
+            catch (Exception ex) { Log(_loc.T("log.albumFailed", albums[i].Id, ex.Message), LogDetail.Errors); }
         }
     }
 
@@ -1135,7 +1146,7 @@ public class DownloadService
             UpdateProgress((int)((double)i / total * 100), _loc.T("download.status.favAlbum", i + 1, total));
             try { using (EnterScope(i, total)) await DownloadAlbumAsync(albums[i].Id, ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.favAlbumFailed", albums[i].Id, ex.Message)); }
+            catch (Exception ex) { Log(_loc.T("log.favAlbumFailed", albums[i].Id, ex.Message), LogDetail.Errors); }
         }
     }
 
@@ -1156,7 +1167,7 @@ public class DownloadService
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Log(_loc.T("log.favTrackFailed", tracks[i].Id, ex.Message));
+                Log(_loc.T("log.favTrackFailed", tracks[i].Id, ex.Message), LogDetail.Errors);
                 RecordFailure(tracks[i].Id, _templates.FormatTrackTitle(tracks[i]), ex.Message);
             }
         }
@@ -1174,7 +1185,7 @@ public class DownloadService
             ct.ThrowIfCancellationRequested();
             try { using (EnterScope(i, artists.Count)) await DownloadArtistAsync(artists[i].Id.ToString(), ct); }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Log(_loc.T("log.favArtistFailed", artists[i].Id, ex.Message)); }
+            catch (Exception ex) { Log(_loc.T("log.favArtistFailed", artists[i].Id, ex.Message), LogDetail.Errors); }
         }
     }
 
@@ -1205,7 +1216,7 @@ public class DownloadService
         // not stay behind in the config volume.
         try
         {
-            await DownloadWithQualityFallbackAsync(track, tempFile, ct);
+            var download = await DownloadWithQualityFallbackAsync(track, tempFile, ct);
 
             // Fix MD5 for FLAC
             if (s.FixMD5s && s.AudioFormat.Contains("flac"))
@@ -1233,6 +1244,9 @@ public class DownloadService
             }
 
             System.IO.File.Move(tempFile, filePath, s.DuplicateFileMode == "overwrite");
+
+            var megabytes = download.Transfer.Bytes / 1048576.0;
+            Log(_loc.T("log.trackTransfer", download.QualityLabel, megabytes, megabytes / Math.Max(download.Transfer.Elapsed.TotalSeconds, 0.001)), LogDetail.Detailed);
             Log(_loc["log.done"]);
             return new TrackResult(filePath, AlreadyExisted: false);
         }
@@ -1244,7 +1258,13 @@ public class DownloadService
 
     /// <summary>Downloads the track into <paramref name="tempFile"/>, stepping down the quality chain
     /// when a quality keeps failing. Throws when no quality could be downloaded.</summary>
-    private async Task DownloadWithQualityFallbackAsync(QobuzTrack track, string tempFile, CancellationToken ct)
+    /// <summary>Octets reçus et durée d'un téléchargement.</summary>
+    private readonly record struct Transfer(long Bytes, TimeSpan Elapsed);
+
+    /// <summary>Ce qu'a donné le téléchargement d'une piste : la qualité obtenue et son transfert.</summary>
+    private readonly record struct DownloadedTrack(string QualityLabel, Transfer Transfer);
+
+    private async Task<DownloadedTrack> DownloadWithQualityFallbackAsync(QobuzTrack track, string tempFile, CancellationToken ct)
     {
         var s = _settings.Settings;
 
@@ -1256,6 +1276,7 @@ public class DownloadService
         var qualityChain = BuildQualityFallbackChain(s.QualityFormat);
         Exception? lastError = null;
         bool downloaded = false;
+        DownloadedTrack? result = null;
 
         foreach (var (qFormat, qLabel) in qualityChain)
         {
@@ -1282,10 +1303,11 @@ public class DownloadService
                     if (stream.Sample)
                         throw new PreviewOnlyException(_loc["error.previewOnly"]);
 
-                    await DownloadStreamToFileAsync(stream.Url, tempFile, ct);
+                    var transfer = await DownloadStreamToFileAsync(stream.Url, tempFile, ct);
                     if (s.VerifyIntegrity && s.AudioFormat.Contains("flac"))
                         await VerifyFlacIntegrityAsync(tempFile, ct);
 
+                    result = new DownloadedTrack(qLabel, transfer);
                     downloaded = true;
                     lastError = null;
                     qualityError = null;
@@ -1296,6 +1318,7 @@ public class DownloadService
                 catch (Exception ex)
                 {
                     qualityError = ex;
+                    Log(_loc.T("log.attemptFailed", attempt, attemptsPerQuality, qLabel, ex.Message), LogDetail.Detailed);
                     try { if (System.IO.File.Exists(tempFile)) System.IO.File.Delete(tempFile); } catch { }
 
                     if (attempt < attemptsPerQuality)
@@ -1315,14 +1338,16 @@ public class DownloadService
             else if (qualityError != null)
             {
                 lastError = qualityError;
-                Log(_loc.T("log.qualityFailed", qLabel, attemptsPerQuality, qualityError.Message));
+                Log(_loc.T("log.qualityFailed", qLabel, attemptsPerQuality, qualityError.Message), LogDetail.Errors);
             }
         }
 
-        if (!downloaded)
+        if (!downloaded || result is not { } downloadedTrack)
         {
             throw lastError ?? new IOException(_loc["error.downloadAllQualitiesFailed"]);
         }
+
+        return downloadedTrack;
     }
 
     /// <summary>
@@ -1336,13 +1361,13 @@ public class DownloadService
             // -s: without it flac streams its progress to stderr, a few hundred kilobytes per file.
             var run = await FlacCli.RunAsync(new[] { "-s", "-f", "-8", path }, ct);
             if (run.ExitCode != 0)
-                Log(_loc.T("log.md5FixFailed", run.Error.Length > 0 ? run.Error : $"exit code {run.ExitCode}"));
+                Log(_loc.T("log.md5FixFailed", run.Error.Length > 0 ? run.Error : $"exit code {run.ExitCode}"), LogDetail.Errors);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "flac MD5 fix failed");
-            Log(_loc.T("log.md5FixFailed", ex.Message));
+            Log(_loc.T("log.md5FixFailed", ex.Message), LogDetail.Errors);
         }
     }
 
@@ -1412,7 +1437,7 @@ public class DownloadService
     /// Downloads a signed Qobuz stream URL to a local temp file in one shot.
     /// Throws on any failure (caller handles fallback to a lower quality).
     /// </summary>
-    private async Task DownloadStreamToFileAsync(string url, string tempFile, CancellationToken ct)
+    private async Task<Transfer> DownloadStreamToFileAsync(string url, string tempFile, CancellationToken ct)
     {
         // Start clean — never resume; signed URLs are essentially single-use here.
         if (System.IO.File.Exists(tempFile))
@@ -1458,6 +1483,8 @@ public class DownloadService
         {
             throw new IOException(_loc.T("error.incompleteDownload", bytesRead, totalBytes));
         }
+
+        return new Transfer(bytesRead, sw.Elapsed);
     }
 
     // ─── Artwork ───
@@ -1533,7 +1560,7 @@ public class DownloadService
             await System.IO.File.WriteAllBytesAsync(filePath, data, ct);
             Log(_loc["log.done"]);
         }
-        catch (Exception ex) { Log(_loc.T("log.goodyFailed", ex.Message)); }
+        catch (Exception ex) { Log(_loc.T("log.goodyFailed", ex.Message), LogDetail.Errors); }
     }
 
     /// <summary>Keyed by album as well as session: a leftover from one album can then never be

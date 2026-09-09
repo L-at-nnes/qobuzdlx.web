@@ -193,12 +193,19 @@
 <div class="card">
     <div class="card-title">
         <span>@Loc["download.log"]</span>
-        @if (log.Count > 0)
-        {
-            <div class="queue-toolbar">
+        <div class="queue-toolbar">
+            <select class="sort-select" title='@Loc["download.logDetail"]' @bind="Settings.Settings.LogDetail" @bind:after="Settings.Save">
+                <option value="@LogDetail.Errors">@Loc["download.logDetail.errors"]</option>
+                <option value="@LogDetail.Normal">@Loc["download.logDetail.normal"]</option>
+                <option value="@LogDetail.Detailed">@Loc["download.logDetail.detailed"]</option>
+            </select>
+            @if (log.Count > 0)
+            {
+                <button class="btn btn-secondary btn-sm" @onclick="ExportLog">@Loc["download.logExport"]</button>
+                <button class="btn btn-secondary btn-sm" @onclick="CopyLog">@Loc["download.logCopy"]</button>
                 <button class="btn btn-secondary btn-sm" @onclick="Download.ClearLog">@Loc["queue.clearLog"]</button>
-            </div>
-        }
+            }
+        </div>
     </div>
     <div class="log-output" @ref="_logRef">
         @foreach (var line in log)
@@ -273,6 +280,14 @@
         "27" => "FLAC 24bit 192kHz",
         _ => Loc["download.quality.unknown"]
     };
+
+    // Deux voies pour sortir le journal : le fichier, et le presse-papiers pour les navigateurs (la
+    // coquille Android en tête) qui ne savent pas enregistrer un fichier généré par la page.
+    private async Task ExportLog() =>
+        await JS.InvokeVoidAsync("downloadTextFile", $"qobuzdlx-log-{DateTime.Now:yyyyMMdd-HHmmss}.txt", Download.ExportLog());
+
+    private async Task CopyLog() =>
+        await JS.InvokeVoidAsync("copyToClipboard", Download.ExportLog());
 
     private void OnKeyDown(KeyboardEventArgs e)
     {
