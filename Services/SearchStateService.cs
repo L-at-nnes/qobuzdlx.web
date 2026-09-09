@@ -14,6 +14,9 @@ public class SearchStateService
     public List<QobuzTrack>? Tracks { get; set; }
     public List<QobuzArtist>? Artists { get; set; }
 
+    /// <summary>Masque ce qui n'est pas Hi-Res. Conservé ici comme les tris : il survit à la navigation.</summary>
+    public bool HiResOnly { get; set; }
+
     // Nombre total de résultats côté Qobuz, pour savoir s'il reste des pages.
     public int AlbumsTotal { get; set; }
     public int TracksTotal { get; set; }

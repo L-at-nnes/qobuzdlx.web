@@ -18,6 +18,10 @@
         <button class="btn btn-secondary" @onclick='() => DoSearch("tracks")' disabled="@_searching">@Loc["search.tracks"]</button>
         <button class="btn btn-secondary" @onclick='() => DoSearch("artists")' disabled="@_searching">@Loc["search.artists"]</button>
     </div>
+    <label class="filter-check">
+        <input type="checkbox" @bind="State.HiResOnly" />
+        <span>@Loc["search.hiResOnly"]</span>
+    </label>
 </div>
 
 @if (_searching)
@@ -38,8 +42,8 @@ else if (HasNoResults)
 {
     <div class="card">
         <div class="card-title">
-            @Loc["search.albums"] (@Loc.P("search.results", State.Albums.Count))
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(_selectedAlbums.Count == State.Albums.Count ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
+            @Loc["search.albums"] (@Loc.P("search.results", VisibleAlbums(State.Albums, SearchSort.Relevance).Count()))
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllAlbums">@(AllVisibleAlbumsSelected ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
             <select class="sort-select" @bind="State.AlbumSort">
                 <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
                 <option value="@SearchSort.TitleAsc">@Loc["sort.titleAsc"]</option>
@@ -55,7 +59,7 @@ else if (HasNoResults)
             </select>
         </div>
         <div class="search-results">
-            @foreach (var album in SearchSorter.SortAlbums(State.Albums, State.AlbumSort))
+            @foreach (var album in VisibleAlbums(State.Albums, State.AlbumSort))
             {
                 var albumId = album.Id;
                 var albumUrl = AlbumUrl(albumId);
@@ -87,8 +91,8 @@ else if (HasNoResults)
 {
     <div class="card">
         <div class="card-title">
-            @Loc["search.tracks"] (@Loc.P("search.results", State.Tracks.Count))
-            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(_selectedTracks.Count == State.Tracks.Count ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
+            @Loc["search.tracks"] (@Loc.P("search.results", VisibleTracks(State.Tracks, SearchSort.Relevance).Count()))
+            <button class="btn btn-link btn-sm select-all-btn" @onclick="ToggleSelectAllTracks">@(AllVisibleTracksSelected ? Loc["search.deselectAll"] : Loc["search.selectAll"])</button>
             <select class="sort-select" @bind="State.TrackSort">
                 <option value="@SearchSort.Relevance">@Loc["sort.relevance"]</option>
                 <option value="@SearchSort.TitleAsc">@Loc["sort.titleAsc"]</option>
@@ -102,7 +106,7 @@ else if (HasNoResults)
             </select>
         </div>
         <div class="search-results">
-            @foreach (var track in SearchSorter.SortTracks(State.Tracks, State.TrackSort))
+            @foreach (var track in VisibleTracks(State.Tracks, State.TrackSort))
             {
                 var trackId = track.Id;
                 var trackUrl = TrackUrl(trackId);
@@ -191,7 +195,7 @@ else if (HasNoResults)
                                         <option value="@SearchSort.LabelAsc">@Loc["sort.labelAsc"]</option>
                                     </select>
                                 </div>
-                                @foreach (var album in SearchSorter.SortAlbums(State.ArtistAlbums, State.ArtistAlbumSort))
+                                @foreach (var album in VisibleAlbums(State.ArtistAlbums, State.ArtistAlbumSort))
                                 {
                                     var aId = album.Id;
                                     var aUrl = AlbumUrl(aId);
@@ -253,6 +257,21 @@ else if (HasNoResults)
     private HashSet<string> _selectedAlbums = new();
     private HashSet<int> _selectedTracks = new();
     private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
+
+    // Ce qui est à l'écran : la liste triée, privée de ce que le filtre Hi-Res masque.
+    private IEnumerable<QobuzAlbum> VisibleAlbums(IEnumerable<QobuzAlbum> albums, SearchSort sort) =>
+        SearchSorter.SortAlbums(State.HiResOnly ? albums.Where(a => SearchSorter.IsHiRes(a)) : albums, sort);
+
+    private IEnumerable<QobuzTrack> VisibleTracks(IEnumerable<QobuzTrack> tracks, SearchSort sort) =>
+        SearchSorter.SortTracks(State.HiResOnly ? tracks.Where(t => SearchSorter.IsHiRes(t)) : tracks, sort);
+
+    private bool AllVisibleAlbumsSelected =>
+        State.Albums != null && VisibleAlbums(State.Albums, SearchSort.Relevance).Any()
+        && VisibleAlbums(State.Albums, SearchSort.Relevance).All(a => _selectedAlbums.Contains(a.Id));
+
+    private bool AllVisibleTracksSelected =>
+        State.Tracks != null && VisibleTracks(State.Tracks, SearchSort.Relevance).Any()
+        && VisibleTracks(State.Tracks, SearchSort.Relevance).All(t => _selectedTracks.Contains(t.Id));
 
     // La recherche a abouti mais n'a rien trouvé : distinct d'un échec, où les listes sont nulles.
     private bool HasNoResults => !_searching && State.LastSearchType switch
@@ -501,19 +520,21 @@ else if (HasNoResults)
     private void ToggleSelectAllAlbums()
     {
         if (State.Albums == null) return;
-        if (_selectedAlbums.Count == State.Albums.Count)
-            _selectedAlbums.Clear();
+        var visible = VisibleAlbums(State.Albums, SearchSort.Relevance).Select(a => a.Id).ToList();
+        if (AllVisibleAlbumsSelected)
+            _selectedAlbums.ExceptWith(visible);
         else
-            _selectedAlbums = new(State.Albums.Select(a => a.Id));
+            _selectedAlbums.UnionWith(visible);
     }
 
     private void ToggleSelectAllTracks()
     {
         if (State.Tracks == null) return;
-        if (_selectedTracks.Count == State.Tracks.Count)
-            _selectedTracks.Clear();
+        var visible = VisibleTracks(State.Tracks, SearchSort.Relevance).Select(t => t.Id).ToList();
+        if (AllVisibleTracksSelected)
+            _selectedTracks.ExceptWith(visible);
         else
-            _selectedTracks = new(State.Tracks.Select(t => t.Id));
+            _selectedTracks.UnionWith(visible);
     }
 
     private void ClearSelection()

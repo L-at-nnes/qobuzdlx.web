@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affiche « n sur total » et disparaît quand tout est chargé. Il prolonge la dernière recherche
   exécutée, pas ce qui a été retapé dans le champ depuis, et un échec garde les résultats déjà
   affichés.
+- **Recherche : filtre « Hi-Res uniquement ».** Une case masque les albums et pistes qui ne dépassent
+  pas 16 bits / 44,1 kHz. Le filtre s'applique à l'affichage (les résultats déjà chargés restent en
+  mémoire), conserve le compteur de résultats visibles, et « Tout sélectionner » ne sélectionne
+  plus que ce qui est affiché sans effacer les sélections faites ailleurs.
 
 ### Fixed
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute

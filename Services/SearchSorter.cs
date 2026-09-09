@@ -78,6 +78,18 @@ public static class SearchSorter
         _ => artists
     };
 
+    // ─── Filtre Hi-Res ───
+
+    /// <summary>
+    /// Hi-Res au sens usuel de Qobuz : plus que le CD (16 bits, 44,1 kHz), par la profondeur ou par la
+    /// fréquence. Une valeur absente (0) ne passe pas pour du Hi-Res.
+    /// </summary>
+    public static bool IsHiRes(QobuzAlbum album) => IsHiRes(album.MaximumBitDepth, album.MaximumSamplingRate);
+
+    public static bool IsHiRes(QobuzTrack track) => IsHiRes(track.MaximumBitDepth, track.MaximumSamplingRate);
+
+    private static bool IsHiRes(int bitDepth, double samplingRate) => bitDepth > 16 || samplingRate > 44.1;
+
     // ─── Date helpers ───
     // Release dates are ISO strings ("YYYY-MM-DD") and are sometimes missing. Sorting on a first
     // key "has no date" keeps undated entries at the bottom in both directions.
