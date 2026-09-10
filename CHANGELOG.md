@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Chrome signalait une balise obsolète dans la console.** La page ne déclarait que la balise
+  `apple-mobile-web-app-capable` ; Chrome demande désormais `mobile-web-app-capable`, qui est ajoutée
+  (l'ancienne reste pour iOS).
 - **L'aperçu des modèles ignorait « Numéroter selon la position dans la playlist ».** L'exemple de
   playlist affichait toujours le numéro de piste de l'album, alors que le téléchargement utilise la
   position dans la playlist quand l'option est cochée. L'aperçu applique la même règle.
