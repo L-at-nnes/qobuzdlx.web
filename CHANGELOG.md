@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Le commentaire des fichiers affichait les entités HTML de la description.** Qobuz envoie la
+  description de l'album en HTML : `&copy;` ou `&eacute;` se retrouvaient tels quels dans l'étiquette
+  `COMMENT`. Les entités sont décodées avant l'écriture. Constaté sur un album réel.
 - **La connexion renvoyait toujours à la recherche.** Ouvrir `/telechargement` ou `/settings` sans
   session Qobuz (après un redémarrage du serveur, une déconnexion ou une session expirée) passait par
   la page de connexion, puis atterrissait sur la recherche : l'adresse demandée était perdue. La

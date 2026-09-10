@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using QobuzDLX.Web.Models;
 using TagLib;
@@ -54,6 +55,16 @@ public class TaggingService
         _logger.LogDebug("File tagging completed: {Path}", filePath);
     }
 
+    /// <summary>
+    /// Qobuz sends the description as HTML: line breaks as tags, accents and © as entities
+    /// (<c>&amp;copy;</c>), which a tag reader would otherwise show verbatim.
+    /// </summary>
+    public static string BuildComment(string template, string? description) =>
+        template
+            .Replace("%description%", WebUtility.HtmlDecode(description ?? ""))
+            .Replace("<br/>", Environment.NewLine)
+            .Replace("<br />", Environment.NewLine);
+
     private void SetFlacTags(TagLib.File file, TagLib.Ogg.XiphComment tags, QobuzAlbum album, QobuzTrack track, AppSettings s)
     {
         if (s.TrackTag) file.Tag.Track = (uint)track.TrackNumber;
@@ -65,11 +76,7 @@ public class TaggingService
 
         if (s.CommentTag && !string.IsNullOrEmpty(s.CommentText))
         {
-            var comment = s.CommentText
-                .Replace("%description%", album.Description ?? "")
-                .Replace("<br/>", Environment.NewLine)
-                .Replace("<br />", Environment.NewLine);
-            tags.SetField("COMMENT", new[] { comment });
+            tags.SetField("COMMENT", new[] { BuildComment(s.CommentText, album.Description) });
         }
 
         if (s.UrlTag)
@@ -104,10 +111,7 @@ public class TaggingService
 
         if (s.CommentTag && !string.IsNullOrEmpty(s.CommentText))
         {
-            mp3Tag.Comment = s.CommentText
-                .Replace("%description%", album.Description ?? "")
-                .Replace("<br/>", Environment.NewLine)
-                .Replace("<br />", Environment.NewLine);
+            mp3Tag.Comment = BuildComment(s.CommentText, album.Description);
         }
 
         if (s.TrackTag)
