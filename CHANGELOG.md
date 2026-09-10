@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Des favoris vides se terminaient sans un mot.** Télécharger une bibliothèque de favoris vide
+  affichait « Téléchargement terminé » et un journal sans la moindre explication. Le journal indique
+  maintenant « Aucun favori à télécharger. ».
 - **Un label n'était téléchargé que pour ses 500 premiers albums.** Même plafond de Qobuz que pour les
   favoris, mais plus vite atteint : Columbia/Legacy compte près de 2 000 albums. Toutes les pages du
   catalogue sont désormais lues.

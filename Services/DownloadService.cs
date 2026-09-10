@@ -1136,7 +1136,7 @@ public class DownloadService
     {
         var s = _settings.Settings;
         var favs = await _api.GetFavoritesAsync(s.UserId, "albums");
-        if (favs?.Albums?.Items == null) return;
+        if (favs?.Albums?.Items is not { Count: > 0 }) { Log(_loc["log.favoritesEmpty"]); return; }
 
         var albums = favs.Albums.Items;
         int total = albums.Count;
@@ -1154,7 +1154,7 @@ public class DownloadService
     {
         var s = _settings.Settings;
         var favs = await _api.GetFavoritesAsync(s.UserId, "tracks");
-        if (favs?.Tracks?.Items == null) return;
+        if (favs?.Tracks?.Items is not { Count: > 0 }) { Log(_loc["log.favoritesEmpty"]); return; }
 
         var tracks = favs.Tracks.Items;
         int total = tracks.Count;
@@ -1177,7 +1177,7 @@ public class DownloadService
     {
         var s = _settings.Settings;
         var favs = await _api.GetFavoritesAsync(s.UserId, "artists");
-        if (favs?.Artists?.Items == null) return;
+        if (favs?.Artists?.Items is not { Count: > 0 }) { Log(_loc["log.favoritesEmpty"]); return; }
 
         var artists = favs.Artists.Items;
         for (int i = 0; i < artists.Count; i++)

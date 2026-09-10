@@ -182,6 +182,7 @@
   "log.favAlbumFailed": "Fav album {0} failed: {1}",
   "log.favTrackFailed": "Fav track {0} failed: {1}",
   "log.favArtistFailed": "Fav artist {0} failed: {1}",
+  "log.favoritesEmpty": "No favorites to download.",
   "log.labelNotFound": "Label not found",
   "log.fileExists": "File for track {0} already exists, skipping.",
   "log.downloadingTrack": "Downloading - {0} {1}...",

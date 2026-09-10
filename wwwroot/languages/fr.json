@@ -182,6 +182,7 @@
   "log.favAlbumFailed": "Échec de l'album favori {0} : {1}",
   "log.favTrackFailed": "Échec de la piste favorite {0} : {1}",
   "log.favArtistFailed": "Échec de l'artiste favori {0} : {1}",
+  "log.favoritesEmpty": "Aucun favori à télécharger.",
   "log.labelNotFound": "Label introuvable",
   "log.fileExists": "Le fichier de la piste {0} existe déjà, ignoré.",
   "log.downloadingTrack": "Téléchargement - {0} {1}...",
