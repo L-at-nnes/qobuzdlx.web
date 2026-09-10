@@ -108,9 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **L'aperçu des modèles ignorait « Numéroter selon la position dans la playlist ».** L'exemple de
   playlist affichait toujours le numéro de piste de l'album, alors que le téléchargement utilise la
   position dans la playlist quand l'option est cochée. L'aperçu applique la même règle.
-- **Le commentaire des fichiers affichait les entités HTML de la description.** Qobuz envoie la
-  description de l'album en HTML : `&copy;` ou `&eacute;` se retrouvaient tels quels dans l'étiquette
-  `COMMENT`. Les entités sont décodées avant l'écriture. Constaté sur un album réel.
+- **Le commentaire des fichiers contenait le HTML de la description.** Qobuz envoie la description
+  de l'album en HTML : `<p>`, `<em>` et entités comme `&copy;` ou `&eacute;` se retrouvaient tels quels
+  dans l'étiquette `COMMENT`. Les balises sont retirées (les paragraphes deviennent des retours à la
+  ligne) et les entités décodées avant l'écriture. Constaté sur un album réel.
 - **La connexion renvoyait toujours à la recherche.** Ouvrir `/telechargement` ou `/settings` sans
   session Qobuz (après un redémarrage du serveur, une déconnexion ou une session expirée) passait par
   la page de connexion, puis atterrissait sur la recherche : l'adresse demandée était perdue. La

@@ -55,15 +55,24 @@ public class TaggingService
         _logger.LogDebug("File tagging completed: {Path}", filePath);
     }
 
+    private static readonly Regex LineBreakTagRegex = new(@"<br\s*/?>|</p>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex HtmlTagRegex = new("<[^>]+>", RegexOptions.Compiled);
+
     /// <summary>
-    /// Qobuz sends the description as HTML: line breaks as tags, accents and © as entities
-    /// (<c>&amp;copy;</c>), which a tag reader would otherwise show verbatim.
+    /// Qobuz sends the description as HTML (paragraphs, emphasis, accents and © as entities such as
+    /// <c>&amp;copy;</c>): a tag reader would show all of it verbatim, so it is turned into plain text.
     /// </summary>
     public static string BuildComment(string template, string? description) =>
         template
-            .Replace("%description%", WebUtility.HtmlDecode(description ?? ""))
+            .Replace("%description%", HtmlToText(description ?? ""))
             .Replace("<br/>", Environment.NewLine)
             .Replace("<br />", Environment.NewLine);
+
+    private static string HtmlToText(string html)
+    {
+        var withBreaks = LineBreakTagRegex.Replace(html, Environment.NewLine);
+        return WebUtility.HtmlDecode(HtmlTagRegex.Replace(withBreaks, "")).Trim();
+    }
 
     private void SetFlacTags(TagLib.File file, TagLib.Ogg.XiphComment tags, QobuzAlbum album, QobuzTrack track, AppSettings s)
     {
