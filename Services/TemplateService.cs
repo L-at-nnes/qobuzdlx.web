@@ -507,10 +507,14 @@ public class TemplateService
             return TrackFilePath(folder, downloadType, album, track, playlist).Replace('\\', '/');
         }
 
+        // The download renumbers playlist tracks by their position when asked to; so must the preview
+        var playlistTrack = NewSampleTrack(playlistTrackId: 1);
+        if (s.UseItemPosInPlaylist) playlistTrack.TrackNumber = playlistTrack.Position;
+
         return new TemplatePreview(
             PathOf("album", SampleAlbum, NewSampleTrack(), null),
             PathOf("album", SampleCompilation, NewSampleTrack(trackNumber: 7, discNumber: 1), null),
-            PathOf("playlist", SampleAlbum, NewSampleTrack(playlistTrackId: 1), SamplePlaylist));
+            PathOf("playlist", SampleAlbum, playlistTrack, SamplePlaylist));
     }
 
     // Characters that MakeSafeFilename rewrites: a backslash is not a separator, only "/" is
