@@ -87,6 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Une piste d'une compilation « Various Artists » dans une playlist créait un dossier au nom du
+  fichier.** Le modèle de piste des compilations remplaçait, par erreur, tout modèle appliqué à une
+  piste — dont le modèle du **dossier de playlist** : le dossier devenait
+  `1 - Artiste - Titre/` et le `.m3u8` se remplissait de chemins en `../`. Le choix du modèle V/A se
+  fait désormais uniquement pour le nom du fichier. Au passage, un `/` dans le modèle V/A crée bien un
+  sous-dossier, comme dans les autres modèles.
 - **Le téléchargement de n'importe quelle playlist échouait.** Qobuz renvoie désormais des
   identifiants de piste de playlist (`playlist_track_id`) supérieurs à 2³¹, par exemple
   12 424 235 026, que le modèle lisait comme un entier 32 bits : la lecture de la playlist s'arrêtait

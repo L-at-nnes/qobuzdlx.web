@@ -105,6 +105,25 @@ public class TemplateService
         return components.Length == 0 ? "_" : string.Join('/', components);
     }
 
+    /// <summary>
+    /// Applies the track file name template: the compilation one for a "Various Artists" release, where
+    /// %ArtistName% stands for the artist of the track and not for the release's. The choice is made here,
+    /// for the track name only: every other template (artist, album, playlist folder) is applied as it is,
+    /// otherwise a track of a compilation would turn the playlist folder name into a file name.
+    /// </summary>
+    public string ApplyTrackTemplate(QobuzAlbum album, QobuzTrack track, QobuzPlaylist? playlist)
+    {
+        var s = _settings.Settings;
+        if (!IsVariousArtists(album))
+            return ApplyTemplate(s.TrackTemplate, album, track, playlist);
+
+        var template = PercentRegex.Replace(s.VaTrackTemplate, m => m.Value.ToLower()).Replace("%artistname%", "%trackartist%");
+        return ApplyTemplate(template, album, track, playlist);
+    }
+
+    private bool IsVariousArtists(QobuzAlbum album) =>
+        VariousArtistsNames.Any(n => n.Equals(GetReleaseArtists(album), StringComparison.OrdinalIgnoreCase));
+
     public string ApplyTemplate(string template, QobuzAlbum? album, QobuzTrack? track, QobuzPlaylist? playlist)
     {
         var s = _settings.Settings;
@@ -114,17 +133,6 @@ public class TemplateService
 
         // Preserve path separators
         template = template.Replace("/", "{slash}");
-
-        // VA track template swap
-        if (track != null && album != null)
-        {
-            var artistName = GetReleaseArtists(album);
-            if (VariousArtistsNames.Any(n => n.Equals(artistName, StringComparison.OrdinalIgnoreCase)))
-            {
-                template = PercentRegex.Replace(s.VaTrackTemplate, m => m.Value.ToLower());
-                template = template.Replace("%artistname%", "%trackartist%");
-            }
-        }
 
         string fileFormat = s.AudioFormat.ToUpper().TrimStart('.');
 
@@ -381,7 +389,7 @@ public class TemplateService
 
         // The template is user input and may hold "/" (sub-folders), ".." or a leading "/": every
         // component is cleaned like the folder names, so the file cannot leave the download folder.
-        var fileName = SanitizePathSegment(ApplyTemplate(s.TrackTemplate, album, track, playlist));
+        var fileName = SanitizePathSegment(ApplyTrackTemplate(album, track, playlist));
         if (fileName.Length == 0) fileName = track.Id.ToString();   // blank template: still a usable name
         fileName += s.AudioFormat;
 
