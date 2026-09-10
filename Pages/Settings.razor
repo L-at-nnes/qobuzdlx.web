@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject TemplateService Templates
 @inject ConfigurationCheckService Checks
+@inject QobuzApiService Api
 @inherits LocalizedComponentBase
 
 <h3 style="margin-bottom:16px;">@Loc["settings.title"]</h3>
@@ -420,6 +421,14 @@
     private string _accessPasswordError = "";
     private bool _accessPasswordSaved;
     private string _accessPasswordMessage = "";
+
+    // Comme la Recherche et le Téléchargement : sans session Qobuz, la page n'aurait ni menu ni mise en
+    // page (le layout n'affiche la barre latérale que connecté) et se perdrait dans la coque de connexion.
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        if (!Api.IsLoggedIn) Nav.NavigateTo("/login");
+    }
 
     private void Save() => SettingsSvc.Save();
 

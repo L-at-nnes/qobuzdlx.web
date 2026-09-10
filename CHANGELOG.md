@@ -87,6 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **La page Paramètres s'affichait sans menu quand on n'était pas connecté à Qobuz.** La Recherche
+  et le Téléchargement renvoyaient vers la connexion, pas les Paramètres : après une déconnexion ou
+  une session expirée, la page s'ouvrait dans la coque étroite de l'écran de connexion, sans barre
+  latérale et avec des cartes de largeurs disparates. Elle renvoie maintenant vers la connexion,
+  comme les autres. Constaté après la restauration d'un `settings.json` à l'ancienne session.
 - **La touche Entrée ne validait pas la page de connexion.** Les champs n'étaient pas dans un
   formulaire : ni Entrée, ni la touche « Aller » d'un clavier mobile ne connectaient, et le
   gestionnaire de mots de passe ne reconnaissait pas les champs (Chrome le signalait). La connexion
