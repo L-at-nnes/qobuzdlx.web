@@ -332,7 +332,7 @@ else if (HasNoResults)
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
+        if (!Api.IsLoggedIn) { Nav.RedirectToLogin(); return; }
 
         // OnQueueChanged uniquement : sans cet abonnement, ni le grisage ni la marque ✓ ne se
         // rafraîchiraient quand un élément se termine. S'abonner en plus à OnProgressChanged

@@ -232,7 +232,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        if (!Api.IsLoggedIn) { Nav.NavigateTo("/login"); return; }
+        if (!Api.IsLoggedIn) { Nav.RedirectToLogin(); return; }
         Download.OnProgressChanged += OnProgress;
         Download.OnQueueChanged += OnProgress;
     }

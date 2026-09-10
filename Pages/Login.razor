@@ -83,6 +83,9 @@
     private bool _loading;
     private bool _useToken;
 
+    // Page demandée avant d'être renvoyé ici, rejointe une fois connecté
+    private string _returnUrl = "/";
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -97,6 +100,7 @@
         var query = QueryHelpers.ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
         if (query.ContainsKey("expired"))
             _error = Loc["login.error.sessionExpired"];
+        _returnUrl = LoginRedirect.ReturnUrl(query.TryGetValue("returnUrl", out var requested) ? requested.ToString() : null);
     }
 
     // Auto-login if token and secret are persisted
@@ -109,7 +113,7 @@
         if (await PersistedSessionIsValidAsync(s))
         {
             Api.SetCredentials(s.AppId, s.AppSecret, s.UserAuthToken);
-            Nav.NavigateTo("/", forceLoad: false);
+            Nav.NavigateTo(_returnUrl, forceLoad: false);
         }
         else
         {
@@ -216,6 +220,6 @@
             s.UserLabel = result.User?.Credential?.Parameters?.ShortLabel ?? "";
         });
 
-        Nav.NavigateTo("/", forceLoad: true);
+        Nav.NavigateTo(_returnUrl, forceLoad: true);
     }
 }

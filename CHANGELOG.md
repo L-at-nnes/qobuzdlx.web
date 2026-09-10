@@ -87,6 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **La connexion renvoyait toujours à la recherche.** Ouvrir `/telechargement` ou `/settings` sans
+  session Qobuz (après un redémarrage du serveur, une déconnexion ou une session expirée) passait par
+  la page de connexion, puis atterrissait sur la recherche : l'adresse demandée était perdue. La
+  connexion mémorise la page d'origine (`returnUrl`) et y revient, par mot de passe comme par jeton.
+  Seuls les chemins locaux sont acceptés ; une adresse externe ou la page de connexion elle-même
+  ramène à l'accueil.
 - **L'écran de verrouillage restait bloqué après la fin du délai.** Après cinq mots de passe faux,
   « Réessayez dans 30 secondes » et le champ désactivé étaient rendus une fois et ne bougeaient plus :
   le compte à rebours restait figé et le champ ne se rouvrait qu'après un rechargement manuel de la

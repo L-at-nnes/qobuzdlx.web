@@ -427,7 +427,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        if (!Api.IsLoggedIn) Nav.NavigateTo("/login");
+        if (!Api.IsLoggedIn) Nav.RedirectToLogin();
     }
 
     private void Save() => SettingsSvc.Save();
