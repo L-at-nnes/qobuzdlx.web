@@ -190,6 +190,9 @@ replaced in names (`\ : * ? " < > |`; only `/` separates folders).
 **Playlist-specific:**
 `%PlaylistID%`, `%PlaylistTitle%`
 
+The quality variables (`%BitDepth%`, `%SampleRate%` and the `%…WithQuality%` ones) describe the file
+that is downloaded: the chosen quality, capped by what the release offers.
+
 **Disc-specific:**
 `%DiscNumber%` *(multi-disc folder and track templates; empty in album and playlist folder templates)*
 

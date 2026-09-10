@@ -136,6 +136,11 @@ public class TemplateService
 
         string fileFormat = s.AudioFormat.ToUpper().TrimStart('.');
 
+        // What is downloaded, not what the release could offer: the folder of a 24/96 album fetched in
+        // 16-bit must not be called "24bit-96kHz".
+        var albumQuality = album == null ? default : EffectiveQuality(s.QualityFormat, album.MaximumBitDepth, album.MaximumSamplingRate);
+        var trackQuality = track == null ? default : EffectiveQuality(s.QualityFormat, track.MaximumBitDepth, track.MaximumSamplingRate);
+
         // Track tags
         if (track != null)
         {
@@ -153,8 +158,8 @@ public class TemplateService
                 .Replace("%trackcomposer%", track.Composer?.Name ?? "")
                 .Replace("%tracknumber%", track.TrackNumber.ToString().PadLeft(padLen, '0'))
                 .Replace("%isrc%", track.ISRC ?? "")
-                .Replace("%trackbitdepth%", track.MaximumBitDepth.ToString())
-                .Replace("%tracksamplerate%", Rate(track.MaximumSamplingRate));
+                .Replace("%trackbitdepth%", trackQuality.BitDepth.ToString())
+                .Replace("%tracksamplerate%", Rate(trackQuality.SamplingRate));
 
             var titleFormatted = FormatTrackTitle(track);
             template = template.Replace("%tracktitle%", titleFormatted);
@@ -165,7 +170,7 @@ public class TemplateService
 
             // Track format with quality
             template = RenameFormatTemplate(template, s.QualityFormat, fileFormat,
-                track.MaximumBitDepth, track.MaximumSamplingRate,
+                trackQuality.BitDepth, trackQuality.SamplingRate,
                 "%trackformatwithhiresquality%", "%trackformatwithquality%");
         }
 
@@ -193,14 +198,14 @@ public class TemplateService
                 .Replace("%releasedate%", album.ReleaseDateOriginal?.Trim() ?? "")
                 .Replace("%year%", year)
                 .Replace("%releasetype%", productType)
-                .Replace("%bitdepth%", album.MaximumBitDepth.ToString())
-                .Replace("%samplerate%", Rate(album.MaximumSamplingRate))
+                .Replace("%bitdepth%", albumQuality.BitDepth.ToString())
+                .Replace("%samplerate%", Rate(albumQuality.SamplingRate))
                 .Replace("%albumtitle%", albumTitle)
                 .Replace("%format%", fileFormat);
 
             // Album format with quality
             template = RenameFormatTemplate(template, s.QualityFormat, fileFormat,
-                album.MaximumBitDepth, album.MaximumSamplingRate,
+                albumQuality.BitDepth, albumQuality.SamplingRate,
                 "%formatwithhiresquality%", "%formatwithquality%");
         }
 
@@ -216,7 +221,7 @@ public class TemplateService
             if (album != null)
             {
                 template = RenameFormatTemplate(template, s.QualityFormat, fileFormat,
-                    album.MaximumBitDepth, album.MaximumSamplingRate,
+                    albumQuality.BitDepth, albumQuality.SamplingRate,
                     "%formatwithhiresquality%", "%formatwithquality%");
             }
             else
@@ -238,6 +243,37 @@ public class TemplateService
 
         // The template may contain "/" (folder separators): the limit applies to each component.
         return string.Join('/', template.Split('/').Select(segment => TruncateToBytes(segment)));
+    }
+
+    private readonly record struct Quality(int BitDepth, double SamplingRate);
+
+    /// <summary>
+    /// Quality of the file that the chosen format yields for a release or a track whose best is
+    /// (<paramref name="maxBitDepth"/>, <paramref name="maxSamplingRate"/>). Qobuz serves the best quality
+    /// that does not exceed the format asked for: CD quality for 5 (MP3) and 6, up to 24-bit/96 kHz for 7
+    /// (a 176.4 kHz master comes down to 88.2 kHz), the best available for 27.
+    /// </summary>
+    private static Quality EffectiveQuality(string formatId, int maxBitDepth, double maxSamplingRate)
+    {
+        const int cdBits = 16;
+        const double cdRate = 44.1;
+
+        switch (formatId)
+        {
+            case "5":
+            case "6":
+                return new Quality(maxBitDepth > 0 ? Math.Min(maxBitDepth, cdBits) : cdBits,
+                                   maxSamplingRate > 0 ? Math.Min(maxSamplingRate, cdRate) : cdRate);
+            case "7":
+                var rate = maxSamplingRate switch
+                {
+                    > 96 => maxSamplingRate == 176.4 ? 88.2 : 96,
+                    _ => maxSamplingRate
+                };
+                return new Quality(Math.Min(maxBitDepth, 24), rate);
+            default:
+                return new Quality(maxBitDepth, maxSamplingRate);
+        }
     }
 
     /// <summary>

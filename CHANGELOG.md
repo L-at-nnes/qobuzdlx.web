@@ -87,6 +87,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Les variables de qualité des modèles décrivaient la meilleure qualité de l'album, pas celle
+  téléchargée.** Avec « FLAC 16 bits » choisi, un album disponible en 24 bits / 96 kHz donnait un
+  dossier `Titre [FLAC (24bit-96kHz)]` rempli de fichiers en 16 bits / 44,1 kHz. `%BitDepth%`,
+  `%SampleRate%`, `%FormatWithQuality%`, `%FormatWithHiResQuality%` et leurs équivalents « piste »
+  suivent désormais la qualité réellement obtenue : celle du format choisi, plafonnée par ce que la
+  sortie propose (16 bits / 44,1 kHz pour MP3 et FLAC 16 bits, 24 bits / 96 kHz au plus pour le
+  format ≤ 96 kHz, 88,2 kHz pour un master en 176,4 kHz). Constaté en comparant le nom du dossier
+  aux fichiers produits.
 - **Le journal détaillé annonçait la qualité demandée, pas celle reçue.** Demander du 24 bits /
   192 kHz pour une piste en 16 bits / 44,1 kHz ne produit aucune erreur : Qobuz sert la meilleure
   qualité disponible. Le journal écrivait pourtant « Qualité obtenue : FLAC 24bit/192kHz » pour un
