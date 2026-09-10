@@ -499,10 +499,35 @@ public class QobuzApiService
 
     // ─── Favorites ───
 
-    public async Task<QobuzFavorites?> GetFavoritesAsync(string userId, string type, int limit = 500, int offset = 0)
+    /// <summary>
+    /// Toute la liste de favoris du type demandé. Qobuz plafonne chaque réponse à 500 éléments : sans
+    /// pagination, une bibliothèque plus grande était téléchargée tronquée, sans rien le signaler.
+    /// </summary>
+    public async Task<QobuzFavorites?> GetFavoritesAsync(string userId, string type)
     {
-        var url = $"{BaseUrl}favorite/getUserFavorites?user_id={userId}&app_id={_appId}&type={type}&limit={limit}&offset={offset}";
-        return await AuthGetAsync<QobuzFavorites>(url);
+        Task<QobuzFavorites?> Page(int offset) => AuthGetAsync<QobuzFavorites>(
+            $"{BaseUrl}favorite/getUserFavorites?user_id={userId}&app_id={_appId}&type={type}&limit=500&offset={offset}");
+
+        var favorites = await Page(0);
+        if (favorites == null) return null;
+
+        // Seule la liste du type demandé est renseignée, les autres restent nulles
+        await CompleteAsync(favorites.Albums, async offset => (await Page(offset))?.Albums);
+        await CompleteAsync(favorites.Tracks, async offset => (await Page(offset))?.Tracks);
+        await CompleteAsync(favorites.Artists, async offset => (await Page(offset))?.Artists);
+        return favorites;
+    }
+
+    /// <summary>Ajoute les pages suivantes à une liste dont le total dépasse ce que la première réponse contenait.</summary>
+    private static async Task CompleteAsync<T>(QobuzItemList<T>? list, Func<int, Task<QobuzItemList<T>?>> fetchPage)
+    {
+        if (list == null) return;
+        while (list.Items.Count < list.Total)
+        {
+            var next = await fetchPage(list.Items.Count);
+            if (next == null || next.Items.Count == 0) break;
+            list.Items.AddRange(next.Items);
+        }
     }
 
     // ─── Helpers ───
