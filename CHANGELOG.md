@@ -87,6 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Le téléchargement de n'importe quelle playlist échouait.** Qobuz renvoie désormais des
+  identifiants de piste de playlist (`playlist_track_id`) supérieurs à 2³¹, par exemple
+  12 424 235 026, que le modèle lisait comme un entier 32 bits : la lecture de la playlist s'arrêtait
+  sur « JSON integer … is too large or small for an Int32 » avant la première piste. Constaté lors
+  d'un essai contre le vrai service ; le champ est maintenant lu en 64 bits.
 - **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
   erreur de la résolution dynamique était avalée, y compris un refus d'authentification : chaque
   clic sur « Se connecter » tentait donc jusqu'à cinq logins avec les mêmes identifiants, puis

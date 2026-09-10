@@ -115,7 +115,7 @@ public class QobuzTrack
     [JsonProperty("composer")] public QobuzComposer? Composer { get; set; }
     [JsonProperty("performers")] public string? Performers { get; set; }
     [JsonProperty("album")] public QobuzAlbum? Album { get; set; }
-    [JsonProperty("playlist_track_id")] public int? PlaylistTrackId { get; set; }
+    [JsonProperty("playlist_track_id")] public long? PlaylistTrackId { get; set; }
 }
 
 public class QobuzPlaylist
