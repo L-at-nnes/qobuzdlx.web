@@ -87,6 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **La touche Entrée ne validait pas la page de connexion.** Les champs n'étaient pas dans un
+  formulaire : ni Entrée, ni la touche « Aller » d'un clavier mobile ne connectaient, et le
+  gestionnaire de mots de passe ne reconnaissait pas les champs (Chrome le signalait). La connexion
+  est maintenant un vrai formulaire. Avant l'établissement du circuit, le navigateur ne peut pas le
+  soumettre de lui-même (en GET, l'e-mail et le mot de passe auraient fini dans l'URL ; en POST, ils
+  auraient mené à une erreur 400). Constaté en essayant de se connecter au clavier.
 - **Les variables de qualité des modèles décrivaient la meilleure qualité de l'album, pas celle
   téléchargée.** Avec « FLAC 16 bits » choisi, un album disponible en 24 bits / 96 kHz donnait un
   dossier `Titre [FLAC (24bit-96kHz)]` rempli de fichiers en 16 bits / 44,1 kHz. `%BitDepth%`,

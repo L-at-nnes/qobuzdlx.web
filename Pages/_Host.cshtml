@@ -17,11 +17,115 @@
     <meta name="color-scheme" content="dark" />
     <title>@Loc["app.title"]</title>
     <base href="~/" />
+
+    @* iOS ignore le manifeste : le mode plein écran et l'icône de l'écran d'accueil passent par
+       les meta apple-*, d'où la duplication apparente avec site.webmanifest. *@
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="manifest" href="site.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="QobuzDLX" />
+
     <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
     <component type="typeof(App)" render-mode="ServerPrerendered" />
-    <script src="_framework/blazor.server.js"></script>
+
+    @* Blazor bascule lui-même les classes components-reconnect-* sur cet élément. Sans cet
+       élément dans le document, il injecte son propre bandeau, gris clair et illisible sur le
+       thème sombre. *@
+    <div id="components-reconnect-modal" class="reconnect-overlay">
+        <div class="reconnect-card">
+            <div class="reconnect-spinner" aria-hidden="true"></div>
+            <p data-state="show">
+                @Loc["reconnect.trying"]
+                (<span id="components-reconnect-current-attempt">1</span>/<span id="components-reconnect-max-retries">6</span>)
+            </p>
+            <p data-state="failed">@Loc["reconnect.failed"]</p>
+            <p data-state="rejected">@Loc["reconnect.rejected"]</p>
+            <button type="button" class="btn btn-primary reconnect-reload" onclick="location.reload()">@Loc["reconnect.reload"]</button>
+        </div>
+    </div>
+
+    <script src="_framework/blazor.server.js" autostart="false"></script>
+    <script>
+        // Avec blazor.server.js les options sont au premier niveau. La forme
+        // Blazor.start({ circuit: { ... } }) appartient à blazor.web.js et serait ignorée sans
+        // le moindre avertissement.
+        Blazor.start({
+            configureSignalR: function (builder) {
+                // Pendants des HubOptions du serveur. Sans eux, le client garde ses valeurs par
+                // défaut (30 s / 15 s) et coupe la connexion le premier, ce qui rendrait vains
+                // les réglages côté serveur.
+                return builder.withServerTimeout(60000).withKeepAliveInterval(20000);
+            },
+            reconnectionOptions: {
+                maxRetries: 6,
+                retryIntervalMilliseconds: 2000
+            }
+        }).then(function () { window.qbdlxReady = true; });
+
+        // Un formulaire qui se valide par le circuit (page de connexion) ne doit pas être soumis par le
+        // navigateur tant que Blazor n'est pas prêt : appuyer sur Entrée trop tôt provoquerait un POST
+        // sans destinataire. Le formulaire de déverrouillage, lui, poste volontairement vers /auth/unlock.
+        document.addEventListener('submit', function (e) {
+            if (!window.qbdlxReady && e.target.hasAttribute('data-needs-circuit')) e.preventDefault();
+        }, true);
+    </script>
+    <script>
+        // Reprise après un gel de l'onglet. Tout l'état de l'application vit dans des services
+        // singleton (file de téléchargement, recherche, réglages, session Qobuz) : un
+        // rechargement complet restitue l'écran tel quel et n'interrompt aucun téléchargement.
+        (function () {
+            var modal = document.getElementById('components-reconnect-modal');
+            var LAST_RELOAD_KEY = 'qbdlx.lastReload';
+
+            function isDown() {
+                return modal.classList.contains('components-reconnect-show')
+                    || isDead();
+            }
+
+            // failed : les tentatives sont épuisées. rejected : le serveur ne connaît plus ce
+            // circuit (rétention expirée, ou redémarrage). Dans les deux cas, seul un
+            // rechargement complet remet l'application en marche.
+            function isDead() {
+                return modal.classList.contains('components-reconnect-failed')
+                    || modal.classList.contains('components-reconnect-rejected');
+            }
+
+            function reloadOnce() {
+                if (!navigator.onLine) return;
+                var last = +(sessionStorage.getItem(LAST_RELOAD_KEY) || 0);
+                if (Date.now() - last < 5000) return; // garde-fou contre une boucle de rechargement
+                sessionStorage.setItem(LAST_RELOAD_KEY, Date.now());
+                location.reload();
+            }
+
+            new MutationObserver(function () { if (isDead()) reloadOnce(); })
+                .observe(modal, { attributes: true, attributeFilter: ['class'] });
+
+            // Appelé au retour au premier plan, pour ne pas laisser regarder six tentatives.
+            // Exposé globalement : l'application Android le déclenche depuis onResume, la Page
+            // Visibility API n'étant pas fiable dans un WebView mis en pause selon la version
+            // de Chromium embarquée.
+            window.qbdlxResume = function () {
+                if (!isDown()) return;
+                if (window.Blazor && typeof Blazor.reconnect === 'function') {
+                    Promise.resolve(Blazor.reconnect())
+                        .then(function (ok) { if (ok === false) reloadOnce(); })
+                        .catch(reloadOnce);
+                } else {
+                    reloadOnce();
+                }
+            };
+
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') window.qbdlxResume();
+            });
+            window.addEventListener('online', function () { if (isDown()) reloadOnce(); });
+        })();
+    </script>
     <script>
         window.copyToClipboard = function (text) {
             if (navigator.clipboard && window.isSecureContext) {

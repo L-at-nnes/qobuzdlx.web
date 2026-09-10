@@ -20,31 +20,38 @@
             </div>
         }
 
+        @* Un vrai formulaire : la touche Entrée (ou « Aller » du clavier mobile) valide, et le gestionnaire
+           de mots de passe reconnaît les champs. method="post" parce qu'avant l'établissement du circuit
+           le navigateur soumet le formulaire lui-même : en GET, l'adresse e-mail et le mot de passe
+           finiraient dans l'URL, donc dans l'historique et les journaux d'un proxy. Le script de
+           _Host.cshtml interdit d'ailleurs cette soumission native (data-needs-circuit) : sans circuit,
+           elle ne mènerait qu'à une erreur 400. *@
+        <form method="post" data-needs-circuit @onsubmit="DoLogin" @onsubmit:preventDefault>
         @if (_useToken)
         {
             <div class="form-group">
                 <label>@Loc["login.token"]</label>
-                <input type="password" @bind="_token" placeholder='@Loc["login.tokenPlaceholder"]' />
+                <input type="password" name="token" autocomplete="off" @bind="_token" placeholder='@Loc["login.tokenPlaceholder"]' />
             </div>
         }
         else
         {
             <div class="form-group">
                 <label>@Loc["login.email"]</label>
-                <input type="email" @bind="_email" placeholder='@Loc["login.emailPlaceholder"]' />
+                <input type="email" name="email" autocomplete="username" @bind="_email" placeholder='@Loc["login.emailPlaceholder"]' />
             </div>
             <div class="form-group">
                 <label>@Loc["login.password"]</label>
-                <input type="password" @bind="_password" placeholder='@Loc["login.passwordPlaceholder"]' />
+                <input type="password" name="password" autocomplete="current-password" @bind="_password" placeholder='@Loc["login.passwordPlaceholder"]' />
             </div>
         }
 
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;" @onclick="DoLogin" disabled="@_loading">
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;" disabled="@_loading">
             @(_loading ? Loc["login.submitting"] : Loc["login.submit"])
         </button>
 
         <div style="text-align:center;margin-top:12px;">
-            <button class="btn btn-sm btn-secondary" @onclick="() => _useToken = !_useToken">
+            <button type="button" class="btn btn-sm btn-secondary" @onclick="() => _useToken = !_useToken">
                 @(_useToken ? Loc["login.useEmail"] : Loc["login.useToken"])
             </button>
         </div>
@@ -62,6 +69,7 @@
                 </div>
             </div>
         </details>
+        </form>
     </div>
 </div>
 
