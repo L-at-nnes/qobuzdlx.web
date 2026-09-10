@@ -1287,7 +1287,9 @@ public class DownloadService
         // For each quality we make a few silent attempts (with a fresh signed URL each time)
         // before giving up and stepping down — most transient CDN cuts are fixed by a quick retry.
         // Qobuz CDN sometimes throttles / cuts very-high-res files (24bit/192kHz) for certain accounts.
-        const int attemptsPerQuality = 3;
+        // A file the CDN has not served yet is cut after ~5 s ("unexpected EOF") for the first three
+        // requests and served from the fourth: three attempts stopped exactly one short of it.
+        const int attemptsPerQuality = 5;
         var qualityChain = BuildQualityFallbackChain(s.QualityFormat);
         Exception? lastError = null;
         bool downloaded = false;

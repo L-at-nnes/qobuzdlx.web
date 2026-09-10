@@ -87,6 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Des pistes échouaient alors qu'une quatrième tentative aurait abouti.** Quand le CDN de Qobuz
+  n'a pas encore servi un fichier, il coupe les trois premières requêtes au bout de 5 s (« unexpected
+  EOF ») puis le sert normalement : les trois essais par qualité s'arrêtaient une tentative trop tôt,
+  et près d'une piste sur quatre d'un album « froid » finissait en échec, à relancer à la main.
+  Chaque qualité compte désormais cinq essais. Mesuré en rejouant la même piste : trois échecs de
+  5,3 s, puis des réussites en 0,3 s.
 - **Des favoris vides se terminaient sans un mot.** Télécharger une bibliothèque de favoris vide
   affichait « Téléchargement terminé » et un journal sans la moindre explication. Le journal indique
   maintenant « Aucun favori à télécharger. ».
