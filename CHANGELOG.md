@@ -87,6 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Le journal détaillé annonçait la qualité demandée, pas celle reçue.** Demander du 24 bits /
+  192 kHz pour une piste en 16 bits / 44,1 kHz ne produit aucune erreur : Qobuz sert la meilleure
+  qualité disponible. Le journal écrivait pourtant « Qualité obtenue : FLAC 24bit/192kHz » pour un
+  fichier en 16 bits. Il décrit désormais le flux réellement servi (`format_id`, `bit_depth`,
+  `sampling_rate` de la réponse). Constaté en comparant le journal au fichier produit.
 - **Une piste d'une compilation « Various Artists » dans une playlist créait un dossier au nom du
   fichier.** Le modèle de piste des compilations remplaçait, par erreur, tout modèle appliqué à une
   piste — dont le modèle du **dossier de playlist** : le dossier devenait

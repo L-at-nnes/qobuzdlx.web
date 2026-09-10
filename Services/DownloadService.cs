@@ -1258,6 +1258,21 @@ public class DownloadService
 
     /// <summary>Downloads the track into <paramref name="tempFile"/>, stepping down the quality chain
     /// when a quality keeps failing. Throws when no quality could be downloaded.</summary>
+    /// <summary>
+    /// Qualité du flux que Qobuz a réellement servi. Demander une qualité que la piste n'a pas ne produit
+    /// pas d'erreur : Qobuz répond avec la meilleure disponible (et une restriction
+    /// <c>FormatRestrictedByFormatAvailability</c>). Le journal doit donc décrire la réponse, pas la demande.
+    /// </summary>
+    private static string DescribeStream(QobuzStreamUrl stream, string requestedLabel)
+    {
+        if (stream.FormatId == 5 || stream.MimeType == "audio/mpeg")
+            return "MP3 320";
+
+        return stream.BitDepth > 0 && stream.SamplingRate > 0
+            ? $"FLAC {stream.BitDepth}bit/{stream.SamplingRate.ToString(System.Globalization.CultureInfo.InvariantCulture)}kHz"
+            : requestedLabel;
+    }
+
     /// <summary>Octets reçus et durée d'un téléchargement.</summary>
     private readonly record struct Transfer(long Bytes, TimeSpan Elapsed);
 
@@ -1307,7 +1322,7 @@ public class DownloadService
                     if (s.VerifyIntegrity && s.AudioFormat.Contains("flac"))
                         await VerifyFlacIntegrityAsync(tempFile, ct);
 
-                    result = new DownloadedTrack(qLabel, transfer);
+                    result = new DownloadedTrack(DescribeStream(stream, qLabel), transfer);
                     downloaded = true;
                     lastError = null;
                     qualityError = null;
