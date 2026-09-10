@@ -491,10 +491,18 @@ public class QobuzApiService
 
     // ─── Label ───
 
-    public async Task<QobuzLabel?> GetLabelAsync(string labelId, int limit = 500, int offset = 0)
+    /// <summary>
+    /// Le label avec tout son catalogue : Qobuz plafonne chaque réponse à 500 albums, alors qu'un grand
+    /// label en compte plusieurs milliers (près de 2 000 pour Columbia/Legacy).
+    /// </summary>
+    public async Task<QobuzLabel?> GetLabelAsync(string labelId)
     {
-        var url = $"{BaseUrl}label/get?label_id={labelId}&app_id={_appId}&extra=albums&limit={limit}&offset={offset}";
-        return await AuthGetAsync<QobuzLabel>(url);
+        Task<QobuzLabel?> Page(int offset) => AuthGetAsync<QobuzLabel>(
+            $"{BaseUrl}label/get?label_id={labelId}&app_id={_appId}&extra=albums&limit=500&offset={offset}");
+
+        var label = await Page(0);
+        await CompleteAsync(label?.Albums, async offset => (await Page(offset))?.Albums);
+        return label;
     }
 
     // ─── Favorites ───

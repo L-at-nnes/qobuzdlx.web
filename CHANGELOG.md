@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Un label n'était téléchargé que pour ses 500 premiers albums.** Même plafond de Qobuz que pour les
+  favoris, mais plus vite atteint : Columbia/Legacy compte près de 2 000 albums. Toutes les pages du
+  catalogue sont désormais lues.
 - **Les favoris au-delà de 500 éléments n'étaient pas téléchargés.** Qobuz plafonne chaque réponse à
   500 éléments et l'application ne lisait que la première page : une bibliothèque plus grande était
   téléchargée tronquée, sans message. Toutes les pages sont désormais lues (albums, titres, artistes).
