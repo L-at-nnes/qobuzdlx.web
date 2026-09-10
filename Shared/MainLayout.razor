@@ -145,11 +145,34 @@ else
         // de tous les circuits ouverts à chaque bloc de 80 Ko reçu.
         Download.OnQueueChanged += OnQueueChanged;
         Download.OnSessionExpired += OnSessionExpired;
+
+        if (Guard.IsLockedOut) _ = WatchLockoutAsync();
     }
 
     private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
 
     private void OnQueueChanged() => InvokeAsync(StateHasChanged);
+
+    private bool _disposed;
+
+    // L'écran de verrouillage est rendu une fois, avec « Réessayez dans N secondes » et un champ
+    // désactivé : sans ceci, le compte à rebours reste figé et le champ ne se rouvre qu'au rechargement
+    // de la page. On redessine chaque seconde tant que le blocage dure.
+    private async Task WatchLockoutAsync()
+    {
+        try
+        {
+            while (!_disposed && Guard.IsLockedOut)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // circuit fermé pendant l'attente
+        }
+    }
 
     // La session a été oubliée côté serveur : sans ce renvoi, l'interface continuerait de s'afficher
     // comme connectée jusqu'à la prochaine action.
@@ -171,6 +194,7 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
         Loc.OnLanguageChanged -= OnLanguageChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
         Download.OnQueueChanged -= OnQueueChanged;

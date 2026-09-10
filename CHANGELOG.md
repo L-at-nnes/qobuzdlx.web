@@ -87,6 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **L'écran de verrouillage restait bloqué après la fin du délai.** Après cinq mots de passe faux,
+  « Réessayez dans 30 secondes » et le champ désactivé étaient rendus une fois et ne bougeaient plus :
+  le compte à rebours restait figé et le champ ne se rouvrait qu'après un rechargement manuel de la
+  page. L'écran se redessine désormais chaque seconde tant que le blocage dure. Constaté en attendant
+  34 secondes devant l'écran.
 - **La page Paramètres s'affichait sans menu quand on n'était pas connecté à Qobuz.** La Recherche
   et le Téléchargement renvoyaient vers la connexion, pas les Paramètres : après une déconnexion ou
   une session expirée, la page s'ouvrait dans la coque étroite de l'écran de connexion, sans barre
