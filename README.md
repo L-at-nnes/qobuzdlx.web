@@ -226,7 +226,7 @@ Additional tagging options:
 |---------|---------|-------------|
 | Streamable check | Enabled | Skip non-streamable tracks |
 | Fix MD5s | Disabled | Repair FLAC MD5 checksums (requires `flac` CLI) |
-| Playlist file | Enabled | Write a `.m3u8` playlist (relative paths, playlist order) next to the downloaded tracks of a playlist |
+| Playlist file | Enabled | Write a `.m3u8` playlist (relative paths, playlist order) next to the downloaded tracks of a playlist. Two tracks that the templates name alike get their Qobuz id appended (`1 - Intro (123456).flac`) so neither is lost |
 | Verify integrity | Enabled | Decode every downloaded FLAC with `flac -t`; a damaged file is downloaded again (requires `flac` CLI, about a second per track, skipped when `flac` is missing) |
 | Download goodies | Enabled | Download booklets and bonus materials |
 | Duplicate handling | Skip | `skip`, `rename`, or `overwrite` existing files |
