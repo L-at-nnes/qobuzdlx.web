@@ -108,7 +108,9 @@ public class TaggingService
 
     private void SetMp3Tags(TagLib.File file, Id3v2Tag mp3Tag, QobuzAlbum album, QobuzTrack track, AppSettings s)
     {
-        if (s.UpcTag) UserTextInformationFrame.Get(mp3Tag, "BARCODE", true).Text = new[] { album.UPC ?? "" };
+        // TagLib drops an empty standard frame by itself but keeps a user-defined one: without a barcode
+        // the BARCODE frame would be written with no text.
+        if (s.UpcTag && !string.IsNullOrWhiteSpace(album.UPC)) UserTextInformationFrame.Get(mp3Tag, "BARCODE", true).Text = new[] { album.UPC };
         if (s.ExplicitTag) UserTextInformationFrame.Get(mp3Tag, "ITUNESADVISORY", true).Text = new[] { track.ParentalWarning ? "1" : "0" };
         if (s.IsrcTag) mp3Tag.SetTextFrame("TSRC", track.ISRC ?? "");
         if (s.LabelTag) mp3Tag.SetTextFrame("TPUB", album.Label?.Name ?? "");
