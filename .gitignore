@@ -1,1 +1,25 @@
-TODO.md
+# .NET build output and IDE files
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# Runtime data: the settings hold the Qobuz session token and app secret, never commit them
+/config/
+/downloads/
+/settings.json*
+qbdlx-temp/
+
+# Android
+android/.gradle/
+android/**/build/
+android/local.properties
+*.keystore
+*.jks
+
+# Local test material
+account.txt
+.playwright-mcp/
