@@ -4,7 +4,7 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -56,9 +56,12 @@ docker run -d \
   -p 8080:8080 \
   -v /path/to/downloads:/downloads \
   -v /path/to/config:/config \
+  -e ACCESS_PASSWORD=change-me-please \
   --restart unless-stopped \
   thimble9057/qobuzdlx.web
 ```
+
+`ACCESS_PASSWORD` is optional (see [Security](#security)).
 
 ### Using Docker Compose
 
@@ -74,6 +77,9 @@ services:
     volumes:
       - /path/to/downloads:/downloads
       - /path/to/config:/config
+    # Optional: protect the UI with a password (8 characters minimum)
+    # environment:
+    #   - ACCESS_PASSWORD=change-me-please
     restart: unless-stopped
 ```
 
@@ -110,8 +116,20 @@ chown -R 1000:1000 /path/to/downloads /path/to/config
 > the port uses *your* Qobuz account, can read the settings and can start downloads. Do not expose
 > it to the internet in that state.
 
-- **Set an access password** in *Settings* as soon as the app is reachable by anyone but you. A
-  warning banner stays visible until you do, and the server logs a warning at startup.
+- **Set an access password** as soon as the app is reachable by anyone but you, from another device
+  on your network or from the internet. Either set the `ACCESS_PASSWORD` environment variable
+  (8 characters minimum), or choose one in *Settings*. A warning banner stays visible until you do,
+  and the server logs a warning at startup.
+
+  ```yaml
+  environment:
+    - ACCESS_PASSWORD=change-me-please
+  ```
+
+  While the variable is set it is the password: it is applied at every start, and the *Settings*
+  page no longer offers to change or remove it. Remove the variable to manage the password from
+  *Settings* again; the last value stays in force until you do. A value shorter than 8 characters
+  stops the container at startup rather than leaving the app open.
 - **Put it behind a reverse proxy with HTTPS** if it is reachable from outside your network. The
   password and the unlock cookie otherwise travel in clear text.
 - **Behind an HTTPS reverse proxy, set `COOKIE_SECURE=true`.** The container only sees plain HTTP,
@@ -347,6 +365,16 @@ QobuzDLX.Web/
   subscription, or for restricted tracks, Qobuz only provides a 30-second preview: it is detected
   and the track is skipped with an explanatory message instead of being saved as a full track.
 - Docker (recommended) or .NET 8 runtime
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+QobuzDLX.Web is a web edition derived from the desktop application QobuzDownloaderX. The original
+web project was created by [thimble9057](https://gitlab.com/thimble9057/qobuzdlx.web); this fork,
+maintained by [L-at-nnes](https://gitlab.com/L-at-nnes/qobuzdlx.web), adds improvements on top of it.
 
 ---
 
