@@ -12,7 +12,8 @@ public static class LoginRedirect
     public static void RedirectToLogin(this NavigationManager nav)
     {
         var returnUrl = "/" + nav.ToBaseRelativePath(nav.Uri);
-        nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        // The home page is where the login leads anyway: no need to clutter the address with it
+        nav.NavigateTo(returnUrl == "/" ? "/login" : $"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 
     /// <summary>
