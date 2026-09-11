@@ -1036,7 +1036,8 @@ public class DownloadService
                 try
                 {
                     await DownloadArtworkAsync(downloadPath, album);
-                    var result = await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct);
+                    var result = await DownloadTrackToFileAsync("playlist", album, item, downloadPath, playlist, ct,
+                        PlaylistNameSuffix(i, item, album, downloadPath, playlist));
                     RecordResult(result);
                     RecordPlaylistEntry(new PlaylistEntry(i, result.FilePath, item.Duration, PlaylistEntryTitle(item)));
                 }
@@ -1055,6 +1056,20 @@ public class DownloadService
 
         if (s.CreatePlaylistFile && playlistFolder != null)
             WritePlaylistFile(playlist, playlistFolder);
+    }
+
+    /// <summary>
+    /// Les pistes d'une playlist viennent d'albums différents mais se retrouvent dans un seul dossier :
+    /// « 1 - Intro » de deux albums donnerait le même nom, la seconde étant alors écartée comme « déjà
+    /// présente » (ou écrasant la première) et l'entrée du .m3u8 pointant vers le mauvais morceau. La
+    /// piste qui trouve son nom pris par une autre entrée de la playlist y ajoute son identifiant.
+    /// </summary>
+    private string PlaylistNameSuffix(int index, QobuzTrack track, QobuzAlbum album, string folder, QobuzPlaylist playlist)
+    {
+        var plainPath = _templates.TrackFilePath(folder, "playlist", album, track, playlist);
+        var taken = _currentItem?.PlaylistEntries.Any(e =>
+            e.Index != index && string.Equals(e.FilePath, plainPath, StringComparison.OrdinalIgnoreCase)) == true;
+        return taken ? $" ({track.Id})" : "";
     }
 
     private string PlaylistEntryTitle(QobuzTrack track)
@@ -1191,12 +1206,12 @@ public class DownloadService
 
     // ─── Core: download a single track to file ───
 
-    private async Task<TrackResult> DownloadTrackToFileAsync(string downloadType, QobuzAlbum album, QobuzTrack track, string downloadPath, QobuzPlaylist? playlist, CancellationToken ct)
+    private async Task<TrackResult> DownloadTrackToFileAsync(string downloadType, QobuzAlbum album, QobuzTrack track, string downloadPath, QobuzPlaylist? playlist, CancellationToken ct, string nameSuffix = "")
     {
         var s = _settings.Settings;
 
         // Build file path (also drives the preview in Settings)
-        var filePath = _templates.TrackFilePath(downloadPath, downloadType, album, track, playlist);
+        var filePath = _templates.TrackFilePath(downloadPath, downloadType, album, track, playlist, nameSuffix);
 
         // Skip existing
         if (s.DuplicateFileMode == "skip" && System.IO.File.Exists(filePath))

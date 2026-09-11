@@ -87,6 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **Deux pistes de même nom dans une playlist n'en faisaient qu'une.** Une playlist réunit des albums
+  différents dans un seul dossier : deux pistes « 1 - Intro » (ou la version explicite et la version
+  propre d'un même titre) obtenaient le même nom de fichier, et la seconde était écartée comme
+  « déjà présente » en mode « ignorer » (ou écrasait la première), l'entrée du `.m3u8` pointant alors
+  vers le mauvais morceau. La piste dont le nom est déjà pris reçoit désormais son identifiant Qobuz
+  en suffixe : `1 - Intro (410560001).flac`. Constaté sur une vraie playlist (Starboy, deux éditions).
 - **Des pistes échouaient alors qu'une quatrième tentative aurait abouti.** Quand le CDN de Qobuz
   n'a pas encore servi un fichier, il coupe les trois premières requêtes au bout de 5 s (« unexpected
   EOF ») puis le sert normalement : les trois essais par qualité s'arrêtaient une tentative trop tôt,

@@ -419,7 +419,7 @@ public class TemplateService
     /// Full path of the file a track is written to. Shared by the download and by the preview in
     /// Settings, so that what the preview shows is what the download does.
     /// </summary>
-    public string TrackFilePath(string downloadPath, string downloadType, QobuzAlbum album, QobuzTrack track, QobuzPlaylist? playlist)
+    public string TrackFilePath(string downloadPath, string downloadType, QobuzAlbum album, QobuzTrack track, QobuzPlaylist? playlist, string nameSuffix = "")
     {
         var s = _settings.Settings;
 
@@ -427,7 +427,7 @@ public class TemplateService
         // component is cleaned like the folder names, so the file cannot leave the download folder.
         var fileName = SanitizePathSegment(ApplyTrackTemplate(album, track, playlist));
         if (fileName.Length == 0) fileName = track.Id.ToString();   // blank template: still a usable name
-        fileName += s.AudioFormat;
+        fileName += nameSuffix + s.AudioFormat;
 
         // Multi-disc releases get one folder per disc, except for a lone track or a playlist entry
         if (track.PlaylistTrackId == null && downloadType != "track" && album.MediaCount > 1 && !string.IsNullOrEmpty(s.CdTemplate))
