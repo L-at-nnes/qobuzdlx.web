@@ -87,6 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
 
 ### Fixed
+- **« Fusionner les noms d'artistes » n'avait aucun effet sur l'étiquette « artiste de l'album ».**
+  Une collaboration était toujours étiquetée « A & B », case décochée ou non (et le dossier, lui,
+  respectait la case) : l'étiquette suit désormais le réglage, et indique l'artiste principal de la
+  sortie quand il est décoché, comme le dossier. Constaté sur « John Coltrane and Johnny Hartman ».
 - **Deux pistes de même nom dans une playlist n'en faisaient qu'une.** Une playlist réunit des albums
   différents dans un seul dossier : deux pistes « 1 - Intro » (ou la version explicite et la version
   propre d'un même titre) obtenaient le même nom de fichier, et la seconde était écartée comme

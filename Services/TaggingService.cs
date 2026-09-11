@@ -196,17 +196,22 @@ public class TaggingService
     private void SetAlbumArtists(TagLib.File file, QobuzAlbum album, AppSettings s)
     {
         if (!s.AlbumArtistTag) return;
+        file.Tag.AlbumArtists = new[] { AlbumArtistName(album, s.MergeArtistNames) };
+    }
 
+    /// <summary>
+    /// Album artist: the release's main artist, or every main artist joined ("A, B &amp; C") when the
+    /// "merge artist names" option is on. The option used to be ignored here, so a collaboration was
+    /// always tagged with all its artists.
+    /// </summary>
+    public static string AlbumArtistName(QobuzAlbum album, bool mergeMainArtists)
+    {
         var mainArtists = album.Artists?.Where(a => a.Roles.Contains("main-artist")).ToList();
-        if (mainArtists != null && mainArtists.Count > 1)
-        {
-            var allButLast = string.Join(", ", mainArtists.Take(mainArtists.Count - 1).Select(a => a.Name));
-            file.Tag.AlbumArtists = new[] { $"{allButLast} & {mainArtists.Last().Name}" };
-        }
-        else
-        {
-            file.Tag.AlbumArtists = new[] { album.Artist?.Name ?? "" };
-        }
+        if (!mergeMainArtists || mainArtists is not { Count: > 1 })
+            return album.Artist?.Name ?? "";
+
+        var allButLast = string.Join(", ", mainArtists.Take(mainArtists.Count - 1).Select(a => a.Name));
+        return $"{allButLast} & {mainArtists.Last().Name}";
     }
 
     private void EmbedArtwork(TagLib.File file, string? artworkPath, AppSettings s)
