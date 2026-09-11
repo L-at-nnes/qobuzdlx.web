@@ -5,343 +5,113 @@ All notable changes to QobuzDLX.Web are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-12
 
 ### Added
-- **Les extraits de 30 secondes ne sont plus enregistrés comme des pistes entières.** Sans
-  abonnement actif, ou pour une piste restreinte, Qobuz ne fournit que l'extrait : il était
-  téléchargé, tagué et rangé à côté des vraies pistes. Il est désormais détecté (champ `sample` de
-  la réponse `track/getFileUrl`) et la piste est écartée avec un message explicite, sans nouvelle
-  tentative ni descente en qualité, puisque l'extrait est le même partout.
-- **Une session Qobuz qui expire pendant un téléchargement est gérée.** Un jeton refusé faisait
-  échouer l'élément en cours piste après piste, en journalisant la même erreur, tandis que
-  l'interface continuait de se présenter comme connectée. Sur la première réponse 401, la session
-  est oubliée, l'élément en cours s'arrête avec un message clair, les éléments en attente échouent
-  aussitôt sans appeler Qobuz, et toutes les pages ouvertes sont renvoyées à l'écran de connexion,
-  qui explique la situation. Après reconnexion, ↻ relance les éléments concernés.
-- **Vérification d'intégrité des fichiers FLAC** (réglage « Vérifier l'intégrité des fichiers FLAC »,
-  activé par défaut). Un téléchargement qui atteint la taille annoncée peut contenir des trames
-  abîmées, qu'on ne découvre qu'à l'écoute. Chaque fichier est décodé avec `flac -t` ; en cas
-  d'échec il est retéléchargé avec une nouvelle URL signée, puis avec une qualité inférieure, comme
-  pour toute coupure du CDN. Sans `flac` installé, la vérification est ignorée et le fichier accepté.
+- **Mot de passe d'accès par variable d'environnement.** `ACCESS_PASSWORD` (8 caractères minimum),
+  à placer dans `docker-compose.yml`, protège l'interface dès le premier démarrage : utile quand le
+  conteneur est joignable depuis le réseau local ou depuis internet. Tant qu'elle est définie, la
+  variable fait foi et les Réglages ne proposent plus de modifier ou de retirer le mot de passe. Une
+  valeur trop courte arrête le démarrage plutôt que de laisser l'interface ouverte.
+- **Fichier `LICENSE` (MIT)**, qui cite l'auteur du projet d'origine et les contributions de ce dépôt.
+- **Recherche : « Voir plus », filtre « Hi-Res uniquement » et playlists.** Les résultats ne
+  s'arrêtent plus aux 50 premiers ; une case masque ce qui ne dépasse pas 16 bits / 44,1 kHz ; un
+  quatrième bouton cherche parmi les playlists publiques de Qobuz et les met en file d'un clic.
 - **Bilan de chaque élément de la file et « Relancer les échecs ».** Un album, une playlist ou une
-  discographie s'affichait « Terminé » même quand des pistes avaient échoué ; il fallait fouiller le
-  journal. Chaque ligne indique désormais les pistes téléchargées, ignorées (déjà présentes,
-  indisponibles) et en échec, et déplie la liste des échecs avec leur raison. Le bouton « Relancer
-  les échecs » ne retraite que ces pistes, avec les dossiers, modèles et playlists de l'élément
-  d'origine (les fichiers bonus ne sont pas retéléchargés) ; le bilan déjà acquis est conservé. Le
-  bouton ↻ relance toujours l'élément entier, en repartant d'un bilan vierge.
-- **Recherche : bouton « Voir plus ».** Les résultats s'arrêtaient aux 50 premiers, sans moyen
-  d'aller plus loin. Un bouton charge la page suivante à la suite (albums, pistes et artistes),
-  affiche « n sur total » et disparaît quand tout est chargé. Il prolonge la dernière recherche
-  exécutée, pas ce qui a été retapé dans le champ depuis, et un échec garde les résultats déjà
-  affichés.
-- **Recherche : filtre « Hi-Res uniquement ».** Une case masque les albums et pistes qui ne dépassent
-  pas 16 bits / 44,1 kHz. Le filtre s'applique à l'affichage (les résultats déjà chargés restent en
-  mémoire), conserve le compteur de résultats visibles, et « Tout sélectionner » ne sélectionne
-  plus que ce qui est affiché sans effacer les sélections faites ailleurs.
-- **Recherche de playlists.** Un quatrième bouton cherche parmi les playlists publiques Qobuz
-  (`playlist/search`) et les met en file d'un clic, avec leur pochette et leur auteur ; « Voir plus »
-  s'applique aussi à elles. La recherche de labels n'est pas proposée (un label se télécharge toujours en
-  collant son lien).
-- **Pochette en taille originale.** Les listes de taille de pochette (intégrée et sauvegardée) s'arrêtaient
-  à 600 px ; elles proposent maintenant « Originale », la pochette telle que fournie par le label
-  (`…_org.jpg`). Pour les sorties qui n'en ont pas, Qobuz la refuse : l'application se rabat alors
-  sur la version 600 px au lieu de se passer de pochette. L'originale intégrée est répétée dans chaque
-  fichier d'un album, d'où l'avertissement dans la liste.
-- **Réglages des tags `(Explicit)` / `(Clean)` dans l'interface.** Le texte ajouté au titre et sa
-  position (avant ou après) n'étaient modifiables que dans `settings.json` ; les cases à cocher
-  n'offraient que le texte par défaut. Chaque case déroule désormais le texte, la position et un
-  exemple de résultat. Les espaces sont conservés tels que saisis, et la règle d'assemblage est
-  la même pour l'aperçu et pour l'écriture des tags.
-- **Aperçu en direct des modèles de nommage et avertissements.** Les modèles ne se vérifiaient qu'en
-  lançant un téléchargement. La page Réglages montre désormais le chemin obtenu pour une piste
-  d'album (disque 2, version dans le titre), une compilation et une playlist, calculé par le code
-  même du téléchargement, et signale : un modèle de piste vide, une balise inconnue, mal orthographiée
-  ou inutilisable dans ce modèle (`%TrackNumber%` dans un dossier d'album), un modèle qui commence
-  par `/` ou une lettre de lecteur ou contient `..`, et les caractères que le nettoyage des noms
-  remplacera (dont `\`, qui n'est pas un séparateur).
-- **Un modèle de piste ne peut plus faire sortir le fichier du dossier de l'album.** Le nom de fichier
-  n'était pas nettoyé comme les dossiers : un modèle `/etc/%TrackTitle%` ou `../../x` était
-  combiné tel quel au chemin. Chaque composant est maintenant nettoyé (`.`, `..`, barre initiale), un
-  modèle vide donne l'identifiant de la piste comme nom, et le dossier de disque obéit à la même règle.
-- **Fichier de playlist `.m3u8`.** Télécharger une playlist produisait un dossier de fichiers
-  sans l'ordre de la playlist. Un `Nom de la playlist.m3u8` (M3U étendu, UTF-8) est maintenant écrit
-  dans le dossier, avec les durées, des chemins relatifs et l'ordre d'origine : la bibliothèque reste
-  lisible si on la déplace. Les pistes en échec n'y figurent pas, et « Relancer les échecs » les
-  ajoute au même fichier. Désactivable (« Créer un fichier .m3u8 pour les playlists »).
-- **Test de configuration.** Un dossier en lecture seule, `flac` absent ou une session expirée ne se
-  découvraient qu'au fil du journal, piste après piste. Un bouton des Réglages vérifie d'un coup que
-  les dossiers de téléchargement et de configuration sont réellement inscriptibles (par l'écriture
-  d'un fichier d'essai), que `flac` répond, que la session Qobuz est valide et que les clés de
-  l'application sont acceptées pour les requêtes signées — la panne de la 1.5.1 —, et nomme chaque
-  problème. L'appel à `flac` est factorisé dans `FlacCli`, commun au téléchargement et au test.
-- **Journal de téléchargement : niveau de détail réglable et export.** Un sélecteur au-dessus du
-  journal (page Téléchargement) choisit entre « Échecs seulement » (les échecs et le bilan de chaque
-  élément), « Normal » (comme avant) et « Détaillé » (qualité obtenue, taille et débit de chaque
-  piste, chaque essai raté). Le filtre s'applique à l'écriture : le journal, limité à 1200 lignes, n'est
-  pas noyé sous un détail dont on n'a pas voulu. « Exporter » enregistre le journal dans un fichier
-  daté, précédé de la version, de la date et du niveau ; « Copier » le place dans le presse-papiers,
-  voie de repli pour l'application Android, dont le WebView ne sait pas enregistrer un fichier.
-  Ce niveau remplace deux cases des Réglages qui n'avaient jamais eu d'effet (« Afficher la vitesse »
-  et « Journaliser les échecs ») ; leurs valeurs, ignorées au chargement, disparaissent du fichier.
-
-### Fixed
-- **« Fusionner les noms d'artistes » n'avait aucun effet sur l'étiquette « artiste de l'album ».**
-  Une collaboration était toujours étiquetée « A & B », case décochée ou non (et le dossier, lui,
-  respectait la case) : l'étiquette suit désormais le réglage, et indique l'artiste principal de la
-  sortie quand il est décoché, comme le dossier. Constaté sur « John Coltrane and Johnny Hartman ».
-- **Deux pistes de même nom dans une playlist n'en faisaient qu'une.** Une playlist réunit des albums
-  différents dans un seul dossier : deux pistes « 1 - Intro » (ou la version explicite et la version
-  propre d'un même titre) obtenaient le même nom de fichier, et la seconde était écartée comme
-  « déjà présente » en mode « ignorer » (ou écrasait la première), l'entrée du `.m3u8` pointant alors
-  vers le mauvais morceau. La piste dont le nom est déjà pris reçoit désormais son identifiant Qobuz
-  en suffixe : `1 - Intro (410560001).flac`. Constaté sur une vraie playlist (Starboy, deux éditions).
-- **Des pistes échouaient alors qu'une quatrième tentative aurait abouti.** Quand le CDN de Qobuz
-  n'a pas encore servi un fichier, il coupe les trois premières requêtes au bout de 5 s (« unexpected
-  EOF ») puis le sert normalement : les trois essais par qualité s'arrêtaient une tentative trop tôt,
-  et près d'une piste sur quatre d'un album « froid » finissait en échec, à relancer à la main.
-  Chaque qualité compte désormais cinq essais. Mesuré en rejouant la même piste : trois échecs de
-  5,3 s, puis des réussites en 0,3 s.
-- **Des favoris vides se terminaient sans un mot.** Télécharger une bibliothèque de favoris vide
-  affichait « Téléchargement terminé » et un journal sans la moindre explication. Le journal indique
-  maintenant « Aucun favori à télécharger. ».
-- **Un label n'était téléchargé que pour ses 500 premiers albums.** Même plafond de Qobuz que pour les
-  favoris, mais plus vite atteint : Columbia/Legacy compte près de 2 000 albums. Toutes les pages du
-  catalogue sont désormais lues.
-- **Les favoris au-delà de 500 éléments n'étaient pas téléchargés.** Qobuz plafonne chaque réponse à
-  500 éléments et l'application ne lisait que la première page : une bibliothèque plus grande était
-  téléchargée tronquée, sans message. Toutes les pages sont désormais lues (albums, titres, artistes).
-- **Chrome signalait une balise obsolète dans la console.** La page ne déclarait que la balise
-  `apple-mobile-web-app-capable` ; Chrome demande désormais `mobile-web-app-capable`, qui est ajoutée
-  (l'ancienne reste pour iOS).
-- **L'aperçu des modèles ignorait « Numéroter selon la position dans la playlist ».** L'exemple de
-  playlist affichait toujours le numéro de piste de l'album, alors que le téléchargement utilise la
-  position dans la playlist quand l'option est cochée. L'aperçu applique la même règle.
-- **Le commentaire des fichiers contenait le HTML de la description.** Qobuz envoie la description
-  de l'album en HTML : `<p>`, `<em>` et entités comme `&copy;` ou `&eacute;` se retrouvaient tels quels
-  dans l'étiquette `COMMENT`. Les balises sont retirées (les paragraphes deviennent des retours à la
-  ligne) et les entités décodées avant l'écriture. Constaté sur un album réel.
-- **La connexion renvoyait toujours à la recherche.** Ouvrir `/telechargement` ou `/settings` sans
-  session Qobuz (après un redémarrage du serveur, une déconnexion ou une session expirée) passait par
-  la page de connexion, puis atterrissait sur la recherche : l'adresse demandée était perdue. La
-  connexion mémorise la page d'origine (`returnUrl`) et y revient, par mot de passe comme par jeton.
-  Seuls les chemins locaux sont acceptés ; une adresse externe ou la page de connexion elle-même
-  ramène à l'accueil.
-- **L'écran de verrouillage restait bloqué après la fin du délai.** Après cinq mots de passe faux,
-  « Réessayez dans 30 secondes » et le champ désactivé étaient rendus une fois et ne bougeaient plus :
-  le compte à rebours restait figé et le champ ne se rouvrait qu'après un rechargement manuel de la
-  page. L'écran se redessine désormais chaque seconde tant que le blocage dure. Constaté en attendant
-  34 secondes devant l'écran.
-- **La page Paramètres s'affichait sans menu quand on n'était pas connecté à Qobuz.** La Recherche
-  et le Téléchargement renvoyaient vers la connexion, pas les Paramètres : après une déconnexion ou
-  une session expirée, la page s'ouvrait dans la coque étroite de l'écran de connexion, sans barre
-  latérale et avec des cartes de largeurs disparates. Elle renvoie maintenant vers la connexion,
-  comme les autres. Constaté après la restauration d'un `settings.json` à l'ancienne session.
-- **La touche Entrée ne validait pas la page de connexion.** Les champs n'étaient pas dans un
-  formulaire : ni Entrée, ni la touche « Aller » d'un clavier mobile ne connectaient, et le
-  gestionnaire de mots de passe ne reconnaissait pas les champs (Chrome le signalait). La connexion
-  est maintenant un vrai formulaire. Avant l'établissement du circuit, le navigateur ne peut pas le
-  soumettre de lui-même (en GET, l'e-mail et le mot de passe auraient fini dans l'URL ; en POST, ils
-  auraient mené à une erreur 400). Constaté en essayant de se connecter au clavier.
-- **Les variables de qualité des modèles décrivaient la meilleure qualité de l'album, pas celle
-  téléchargée.** Avec « FLAC 16 bits » choisi, un album disponible en 24 bits / 96 kHz donnait un
-  dossier `Titre [FLAC (24bit-96kHz)]` rempli de fichiers en 16 bits / 44,1 kHz. `%BitDepth%`,
-  `%SampleRate%`, `%FormatWithQuality%`, `%FormatWithHiResQuality%` et leurs équivalents « piste »
-  suivent désormais la qualité réellement obtenue : celle du format choisi, plafonnée par ce que la
-  sortie propose (16 bits / 44,1 kHz pour MP3 et FLAC 16 bits, 24 bits / 96 kHz au plus pour le
-  format ≤ 96 kHz, 88,2 kHz pour un master en 176,4 kHz). Constaté en comparant le nom du dossier
-  aux fichiers produits.
-- **Le journal détaillé annonçait la qualité demandée, pas celle reçue.** Demander du 24 bits /
-  192 kHz pour une piste en 16 bits / 44,1 kHz ne produit aucune erreur : Qobuz sert la meilleure
-  qualité disponible. Le journal écrivait pourtant « Qualité obtenue : FLAC 24bit/192kHz » pour un
-  fichier en 16 bits. Il décrit désormais le flux réellement servi (`format_id`, `bit_depth`,
-  `sampling_rate` de la réponse). Constaté en comparant le journal au fichier produit.
-- **Une piste d'une compilation « Various Artists » dans une playlist créait un dossier au nom du
-  fichier.** Le modèle de piste des compilations remplaçait, par erreur, tout modèle appliqué à une
-  piste — dont le modèle du **dossier de playlist** : le dossier devenait
-  `1 - Artiste - Titre/` et le `.m3u8` se remplissait de chemins en `../`. Le choix du modèle V/A se
-  fait désormais uniquement pour le nom du fichier. Au passage, un `/` dans le modèle V/A crée bien un
-  sous-dossier, comme dans les autres modèles.
-- **Le téléchargement de n'importe quelle playlist échouait.** Qobuz renvoie désormais des
-  identifiants de piste de playlist (`playlist_track_id`) supérieurs à 2³¹, par exemple
-  12 424 235 026, que le modèle lisait comme un entier 32 bits : la lecture de la playlist s'arrêtait
-  sur « JSON integer … is too large or small for an Int32 » avant la première piste. Constaté lors
-  d'un essai contre le vrai service ; le champ est maintenant lu en 64 bits.
-- **Connexion : un mauvais mot de passe n'est plus rejoué sur chaque couple de repli.** Toute
-  erreur de la résolution dynamique était avalée, y compris un refus d'authentification : chaque
-  clic sur « Se connecter » tentait donc jusqu'à cinq logins avec les mêmes identifiants, puis
-  affichait « impossible d'obtenir les identifiants de l'application » au lieu de « identifiants
-  invalides ». Le couple `app_id` / `app_secret` est désormais validé **avant** le login, qui n'est
-  plus tenté qu'une seule fois ; un 400/401/403 signale alors de mauvais identifiants.
-- **Le repli de qualité ne bascule plus de FLAC vers MP3.** La chaîne 27 → 7 → 6 → 5 pouvait
-  enregistrer un flux MP3 sous l'extension `.flac` ; TagLib l'ouvrait alors comme du FLAC et la
-  piste échouait avec une erreur obscure. Une qualité FLAC ne se replie plus que sur une qualité
-  FLAC inférieure.
-- **Mauvaise pochette après l'échec d'une piste.** Quand une piste de playlist ou de favoris
-  échouait, la pochette temporaire n'était pas supprimée et la piste suivante — d'un autre album —
-  l'embarquait à son tour. Le nettoyage est désormais garanti (`finally`), et le fichier temporaire
-  porte l'identifiant de l'album pour qu'un résidu ne puisse plus être réutilisé.
-- **Un `settings.json` corrompu n'empêche plus le démarrage.** L'écriture n'était pas atomique et
-  la lecture ne gérait aucune erreur : une coupure pendant la sauvegarde laissait un JSON tronqué,
-  et le conteneur redémarrait en boucle. Les réglages sont désormais écrits dans un fichier voisin
-  puis substitués à l'original (l'ancienne version reste dans `settings.json.bak`). Au démarrage,
-  un fichier illisible est mis de côté sous `settings.json.corrupt-<date>` et la dernière version
-  saine est restaurée, au lieu de faire planter l'application.
-- **Redirection ouverte sur le déverrouillage.** `POST /auth/unlock` renvoyait vers la destination
-  fournie par le formulaire, même avec un mauvais mot de passe : `/\evil.com` ou `/<tabulation>/evil.com`
-  passaient le filtre et étaient lus par les navigateurs comme `//evil.com`. L'antislash et les
-  caractères de contrôle sont désormais refusés (`LocalRedirect`).
-- **Le palier de blocage du mot de passe d'accès ne redescendait jamais.** Après quelques séries
-  d'échecs — les siens ou ceux d'un tiers —, les blocages de 5 puis 15 minutes restaient la règle
-  jusqu'au prochain déverrouillage réussi. Une heure sans tentative fait désormais redescendre le
-  palier d'un cran et efface les échecs isolés. Le seau reste global : tant qu'un tiers insiste, il
-  continue de bloquer les autres.
-- **La langue du premier lancement n'est plus figée par une requête qui n'est pas un navigateur.**
-  La détection par `Accept-Language` s'exécutait sur toute requête : la sonde `/healthz` de
-  l'application Android (qui n'envoie pas l'en-tête) ou un outil de supervision enregistrait donc
-  le français pour tout le monde. Elle ne se déclenche plus que sur une navigation vers une page,
-  et uniquement si l'en-tête est présent.
-- **« Fix MD5s » ne peut plus bloquer un téléchargement.** `flac` était lancé avec ses sorties
-  redirigées mais jamais lues ; sa progression, écrite sur la sortie d'erreur, pouvait remplir le
-  tampon du tube et suspendre le processus — donc toute la file — indéfiniment. Les deux flux sont
-  désormais lus pendant l'attente et la progression est désactivée (`-s`). Un code de sortie non nul
-  apparaît dans le journal, et l'annulation termine le processus `flac` au lieu de le laisser
-  tourner.
-- **Plus de fichiers partiels abandonnés dans `/config/qbdlx-temp`.** Une annulation, une erreur de
-  tag ou un déplacement raté laissait le fichier en cours de téléchargement sur le volume de
-  configuration. Il est maintenant supprimé quoi qu'il arrive, et les restes d'un arrêt brutal
-  (fichiers `qbdlx_downloading-*` et pochettes temporaires) sont purgés au démarrage.
-- **La recherche n'échoue plus en silence.** Une erreur de l'API (session expirée, réseau) vidait
-  les résultats sans un mot, et une recherche sans résultat n'affichait rien non plus. Un message
-  distingue désormais l'échec de l'absence de résultat. Lancer une recherche avec la touche Entrée
-  pendant qu'une autre est en cours n'en démarre plus une seconde en parallèle.
-- **Une session Qobuz expirée est détectée.** Le jeton enregistré n'était jamais revalidé : après
-  un redémarrage, l'interface s'affichait comme connectée et chaque recherche échouait. Le jeton est
-  désormais vérifié au démarrage (un Qobuz injoignable ne déconnecte pas), et une réponse 401
-  pendant une recherche ramène à l'écran de connexion avec un message explicite. Un jeton refusé à
-  la connexion ne laisse plus l'interface se comporter comme si l'on était connecté.
-- **`%AlbumPA%` et ses variantes reflétaient l'avertissement parental de la piste.** Dès qu'une
-  piste était fournie (nom de fichier), les balises `%Album…%` étaient résolues avec le drapeau de
-  la piste avant que celui de l'album ne soit consulté. Chaque portée utilise maintenant son propre
-  drapeau.
-- **Les titres très longs ne font plus échouer les pistes.** Les noms de fichiers et de dossiers
-  n'étaient jamais raccourcis, alors que les systèmes de fichiers limitent chaque composant à 255
-  **octets** (ext4) — et un titre japonais ou cyrillique en pèse deux à trois par caractère. Chaque
-  composant est désormais tronqué à 240 octets UTF-8 (avec « … »), sans jamais couper un caractère
-  en deux. Les fichiers bonus sont concernés de la même façon.
-- **Les en-têtes d'identification Qobuz ne sont plus modifiés sur un client HTTP partagé.**
-  `X-App-Id` était ajouté et retiré dans `DefaultRequestHeaders` à chaque connexion ou
-  déconnexion, une opération qui n'est pas thread-safe si une requête est en cours — un
-  téléchargement, par exemple. Les en-têtes sont désormais posés requête par requête.
-- **Extension des fichiers bonus.** Elle était lue dans l'URL entière : une URL signée donnait
-  `.pdf?Expires=…`, un nom invalide sous Windows et sur les partages SMB. Seul le chemin est
-  désormais pris en compte.
-- **La barre de progression d'un artiste, d'un label ou des favoris ne repart plus de zéro à chaque
-  album.** Chaque album écrasait le pourcentage global avec son propre avancement ; il se loge
-  désormais dans la part de la barre qui lui revient.
-- **« Passer » ne télécharge plus les fichiers bonus de l'album sauté.** Le bouton interrompait les
-  pistes mais l'album continuait avec ses livrets.
-- **Numérotation des pistes d'une playlist.** Avec l'option « position dans la playlist », le
-  numéro était complété selon la taille de l'album d'origine : `7` et `35` voisinaient avec `120`
-  et le tri alphabétique des fichiers n'était plus celui de la playlist. Le complément suit
-  désormais la taille de la playlist.
-- **`%DiscNumber%` fonctionne dans le modèle de piste.** La balise était listée parmi les
-  variables disponibles mais n'était résolue que par le modèle du sous-dossier de disque ; partout
-  ailleurs elle donnait une chaîne vide.
-- **Garde du dossier de téléchargement.** Le contrôle « le chemin reste dans le dossier de
-  destination » comparait des préfixes de chaîne : `/downloads-evil` passait pour être dans
-  `/downloads`. Il compare désormais des composants de chemin.
-- **Un `..` à l'intérieur d'un nom n'est plus supprimé.** « Vol..2 » devenait « Vol2 ». Seuls les
-  composants `.` et `..` d'un chemin sont écartés ; les points et espaces en bout de chaque
-  composant sont retirés, comme l'exigent Windows et les partages SMB.
-- **Le tag « Qobuz URL » ne retire plus que `/fr-fr/`.** Les liens d'une autre langue (`/us-en/`,
-  `/de-de/`…) gardaient leur segment de langue dans le tag. Il est retiré quelle que soit la
-  langue, et la logique n'est plus dupliquée entre FLAC et MP3.
-- **Textes encore en dur, hors du catalogue de traduction.** Deux messages d'erreur de
-  téléchargement étaient toujours en français, et la page « introuvable » toujours en anglais,
-  quelle que soit la langue choisie.
-- **Les tirets en bout de nom ne sont plus supprimés.** Le nettoyage des noms de fichiers retirait
-  tout tiret initial ou final : « -OSC- » devenait « OSC ». Seuls les tirets séparateurs, collés à
-  un espace (le « - » laissé par `Titre:` ou par un champ vide), sont écartés.
-- **Pochette embarquée via l'API TagLib courante.** `AttachedPictureFrame` est obsolète dans
-  TagLibSharp 2.3 et produisait deux avertissements à la compilation ; `AttachmentFrame` le
-  remplace sans changer le résultat (vérifié en FLAC et en MP3).
+  discographie n'affiche plus « Terminé » quand des pistes ont échoué : chaque ligne indique les
+  pistes téléchargées, ignorées et en échec, avec la raison de chaque échec. Le nouveau bouton ne
+  retraite que les pistes en échec ; ↻ relance toujours l'élément entier.
+- **Vérification des fichiers FLAC** (`flac -t`, activée par défaut). Un fichier abîmé est
+  retéléchargé avec une nouvelle URL, puis dans une qualité inférieure. Sans `flac`, la vérification
+  est ignorée.
+- **Extraits de 30 secondes détectés.** Sans abonnement actif ou pour une piste restreinte, Qobuz ne
+  fournit qu'un extrait : il était rangé parmi les vraies pistes, il est désormais écarté avec un
+  message explicite.
+- **Session expirée pendant un téléchargement.** L'élément en cours s'arrête avec un message clair,
+  les suivants échouent aussitôt sans appeler Qobuz et toutes les pages ouvertes reviennent à
+  l'écran de connexion. Après reconnexion, ↻ relance les éléments concernés.
+- **Fichier de playlist `.m3u8`** écrit dans le dossier de chaque playlist (durées, chemins relatifs,
+  ordre d'origine). Désactivable dans les Réglages.
+- **Journal : niveau de détail et export.** « Échecs seulement », « Normal » ou « Détaillé »
+  (qualité obtenue, taille et débit de chaque piste, essais ratés). « Exporter » enregistre le
+  journal dans un fichier daté, « Copier » le place dans le presse-papiers (voie de repli pour
+  l'application Android). Ce niveau remplace deux cases des Réglages qui n'avaient jamais eu d'effet.
+- **Réglages : test de configuration.** Un bouton vérifie les dossiers de téléchargement et de
+  configuration, la présence de `flac`, la session Qobuz et les clés de l'application, et nomme
+  chaque problème.
+- **Réglages : aperçu en direct des modèles de nommage.** Le chemin obtenu pour une piste d'album,
+  une compilation et une playlist s'affiche pendant la saisie, avec un avertissement pour un modèle
+  vide, une balise inconnue ou mal placée, un chemin absolu, `..` ou des caractères qui seront
+  remplacés.
+- **Réglages : tags `(Explicit)` / `(Clean)` modifiables** (texte, position, exemple) et **pochette
+  en taille originale**, avec repli sur 600 px quand le label n'en fournit pas.
 
 ### Changed
-- **L'écran de verrouillage n'a plus de sélecteur de langue.** La langue est un réglage global :
-  tout visiteur non authentifié pouvait la changer pour tous les appareils connectés et provoquer
-  des réécritures de `settings.json`. L'écran suit la langue du navigateur détectée au premier
-  lancement ; le sélecteur reste disponible une fois connecté.
-- La version affichée dans la barre latérale et renvoyée par `/healthz` provient d'un seul endroit
-  (`AppInfo.Version`, lue dans le csproj). Elle était calculée deux fois, avec un repli « 1.5.1 »
-  écrit en dur qui serait devenu faux à la première montée de version.
-- **Les téléchargements réutilisent leurs connexions.** Un nouveau `HttpClient` était créé pour
-  chaque piste, pochette et fichier bonus : une connexion neuve (et un socket laissé en
-  `TIME_WAIT`) à chaque fichier, soit des centaines sur une discographie. Trois clients partagés,
-  un par type de transfert, portent désormais leurs délais d'attente (30 min, 2 min, 5 min).
-- **Les erreurs passagères de l'API Qobuz sont retentées.** Une réponse 429 (trop de requêtes) ou
-  502/503/504 faisait échouer l'appel sur-le-champ, donc une piste perdue au milieu d'une
-  discographie. Ces quatre statuts sont maintenant rejoués jusqu'à trois fois, en respectant
-  `Retry-After` (30 s au plus) ou, à défaut, avec 1 s puis 2 s d'attente. Les autres statuts (401,
-  404, 500…) et les connexions ne sont jamais rejoués.
-- **Une playlist ou une liste de favoris ne redemande plus le même album à chaque piste.** Chaque
-  piste déclenchait le chargement complet de son album (plusieurs appels pour une longue liste de
-  pistes), même quand dix pistes venaient du même disque. Les albums déjà chargés pendant
-  l'élément en cours sont conservés (50 au plus) et oubliés à la fin de l'élément.
-- **Délai d'attente explicite pour l'API Qobuz.** Le client utilisait le délai par défaut de
-  .NET (100 s) : si Qobuz cessait de répondre, une recherche ou une connexion restait figée près de
-  deux minutes. Il est fixé à 30 s.
-- **La page Téléchargement ne peut plus planter à la fin d'un élément.** Elle testait si un album
-  était en cours puis le relisait pour l'afficher ; si le worker le remettait à zéro entre les deux
-  lectures, le rendu levait une `NullReferenceException` et coupait le circuit. L'album est lu une
-  seule fois par rendu.
-- **Plus de suppression préalable du dossier temporaire au démarrage.** Pour migrer l'ancien
-  `qbdlx-temp` (à côté de la musique) vers `/config`, le code supprimait d'abord le dossier de
-  destination, puis tentait un déplacement qui peut échouer entre deux volumes Docker. Ces dossiers
-  ne contiennent que des restes de téléchargements : ils sont désormais nettoyés sur place — seuls
-  les fichiers `qbdlx_downloading-*` sont supprimés, et l'ancien dossier disparaît quand il est vide.
+- L'écran de verrouillage n'a plus de sélecteur de langue : la langue est un réglage global, qu'un
+  visiteur non authentifié pouvait changer pour tout le monde. Il suit la langue du navigateur.
+- Les téléchargements réutilisent leurs connexions HTTP au lieu d'en ouvrir une par fichier.
+- Les erreurs passagères de l'API Qobuz (429, 502, 503, 504) sont rejouées jusqu'à trois fois, et le
+  délai d'attente de l'API passe de 100 s à 30 s.
+- Une playlist ou une liste de favoris ne recharge plus le même album à chaque piste.
+- Chaque qualité compte désormais cinq essais au lieu de trois : un fichier que le CDN de Qobuz n'a
+  pas encore servi est coupé lors des premières requêtes, puis servi normalement.
+- La version affichée et celle de `/healthz` viennent d'une seule source (le `csproj`).
+
+### Fixed
+- **Téléchargement d'une playlist.** Qobuz renvoie des identifiants de piste de playlist supérieurs
+  à 2³¹ que l'application lisait comme des entiers 32 bits : aucune playlist ne se téléchargeait. Deux
+  pistes de même nom dans une playlist n'en faisaient plus qu'une ; la seconde reçoit maintenant son
+  identifiant en suffixe. Une piste de compilation « Various Artists » créait un dossier au nom du
+  fichier, et le `.m3u8` se remplissait de chemins en `../`.
+- **Qualité annoncée.** Les variables de modèle (`%BitDepth%`, `%FormatWithQuality%`…) et le journal
+  décrivaient la meilleure qualité de la sortie ou celle demandée, pas celle réellement reçue. Le
+  repli de qualité ne bascule plus de FLAC vers MP3, qui produisait un faux `.flac`.
+- **Listes de plus de 500 éléments.** Qobuz plafonne chaque réponse : les favoris et les labels
+  n'étaient téléchargés que pour leurs 500 premiers éléments (près de 2 000 albums pour
+  Columbia/Legacy). Des favoris vides se terminaient sans un mot.
+- **Fichiers et noms.** Un modèle de piste pouvait faire sortir le fichier du dossier de l'album ;
+  les titres très longs faisaient échouer les pistes (limite de 255 octets par composant) ; `Vol..2`
+  devenait `Vol2` et `-OSC-` devenait `OSC` ; l'extension des fichiers bonus contenait la requête de
+  l'URL ; le contrôle « reste dans le dossier de téléchargement » acceptait `/downloads-evil`.
+- **Numérotation et variables.** Le numéro d'une piste de playlist était complété selon la taille de
+  l'album d'origine ; `%DiscNumber%` restait vide dans le modèle de piste ; `%AlbumPA%` reflétait la
+  piste ; l'aperçu des modèles ignorait la position dans la playlist.
+- **Étiquettes.** « Fusionner les noms d'artistes » n'agissait pas sur l'artiste de l'album ; le
+  commentaire contenait le HTML de la description Qobuz ; le tag « Qobuz URL » ne retirait que la
+  langue `/fr-fr/` ; une pochette temporaire d'une piste en échec se retrouvait dans la piste
+  suivante.
+- **Fichiers temporaires.** Une annulation ou une erreur laissait des fichiers partiels dans
+  `/config/qbdlx-temp` ; ils sont supprimés, et les restes d'un arrêt brutal sont purgés au démarrage.
+  « Fix MD5s » pouvait bloquer toute la file en remplissant le tampon de `flac`.
+- **Connexion.** La touche Entrée ne validait pas la page de connexion ; après connexion,
+  `/telechargement` ou `/settings` atterrissait sur la recherche ; un mauvais mot de passe était
+  rejoué sur chaque couple de repli ; une session expirée n'était pas détectée au démarrage ; les
+  Paramètres s'affichaient sans menu hors connexion.
+- **Verrouillage.** Le compte à rebours de l'écran de verrouillage restait figé ; le palier de
+  blocage ne redescendait jamais ; la langue du premier lancement était figée par la sonde
+  `/healthz`.
+- **Réglages.** Un `settings.json` corrompu empêchait le démarrage : il est désormais écrit de façon
+  atomique et restauré depuis `settings.json.bak`.
+- **Interface.** La recherche échouait sans message ; la page Téléchargement pouvait planter à la fin
+  d'un élément ; la barre de progression d'un artiste ou d'un label repartait de zéro à chaque
+  album ; « Passer » téléchargeait quand même les fichiers bonus ; Chrome signalait une balise
+  obsolète dans la console.
+- Textes restés hors du catalogue de traduction, et pochette embarquée via l'API TagLib courante.
 
 ### Security
-- **Avertissement tant qu'aucun mot de passe d'accès n'est défini.** Par défaut, toute personne
-  qui joint le port utilise le compte Qobuz de l'instance, lit les réglages et lance des
-  téléchargements. Un bandeau reste affiché dans l'interface jusqu'à la définition d'un mot de
-  passe, un avertissement est écrit dans les journaux au démarrage, et le README ouvre désormais
-  par une section « Security ».
-- **Option `COOKIE_SECURE=true` pour le cookie d'accès.** Derrière un reverse proxy HTTPS, le
-  serveur ne voit que du HTTP et ne posait donc jamais le drapeau `Secure`, de sorte que le cookie
-  pouvait aussi partir sur une requête en clair vers le même hôte. Le déduire de `X-Forwarded-Proto`
-  aurait obligé à faire confiance à n'importe quel client ; l'opérateur le déclare donc lui-même.
-  Désactivé par défaut : un cookie `Secure` n'est pas accepté en HTTP simple.
-- **En-têtes de sécurité sur toutes les réponses.** `X-Frame-Options: DENY` et
-  `Content-Security-Policy: frame-ancestors 'none'` empêchent d'encadrer l'interface dans la page
-  d'un tiers (détournement de clic) ; `X-Content-Type-Options: nosniff` et
-  `Referrer-Policy: same-origin` complètent. Une CSP complète n'est pas posée : Blazor Server
-  repose sur des scripts et styles en ligne, et les vignettes viennent de serveurs d'images Qobuz.
-- **Empreinte du mot de passe d'accès renforcée et versionnée.** PBKDF2 passe de 100 000 à
-  600 000 itérations (recommandation OWASP pour HMAC-SHA256). L'empreinte porte désormais son
-  format et son nombre d'itérations (`pbkdf2-sha256$600000$sel$hash`) : relever le coût plus tard
-  ne rendra pas les empreintes existantes illisibles. Les anciens formats (PBKDF2 à 100 000
-  itérations, SHA-256 non salé) restent acceptés. Une empreinte dont le hash ou le sel est vide
-  ou de taille inattendue est refusée au lieu de valider n'importe quel mot de passe, et la
-  comparaison SHA-256 d'origine se fait désormais en temps constant.
-- **Les anciennes empreintes sont migrées au déverrouillage.** Le code promettait de migrer le
-  SHA-256 non salé « à la prochaine sauvegarde » sans jamais le faire. Le premier déverrouillage
-  réussi après la mise à jour réécrit désormais l'empreinte au format courant (SHA-256 non salé,
-  PBKDF2 à 100 000 itérations). Les autres appareils déjà déverrouillés devront alors se
-  déverrouiller une fois de plus : leur cookie porte l'empreinte de l'ancien hash.
-- **Règles minimales pour le mot de passe d'accès.** N'importe quelle saisie non vide était
-  acceptée, sans confirmation : une faute de frappe verrouillait l'instance derrière un mot de
-  passe inconnu. Un nouveau mot de passe doit faire au moins 8 caractères et être saisi deux fois.
-- **Réglages morts supprimés, dont un champ `Password`.** `AppSettings` déclarait un mot de passe
-  en clair que rien n'utilisait, ainsi que `UserAvatar` et `Theme`. Un piège pour qui aurait un
-  jour branché dessus ; ils disparaissent du fichier à la prochaine sauvegarde, sans effet sur les
-  installations existantes.
-- **Les erreurs de l'API Qobuz n'exposent plus le corps brut de la réponse.** Il était recopié tel
-  quel dans le message d'erreur, donc affiché dans la file de téléchargement et le journal : page
-  HTML d'un proxy, ou JSON contenant des champs qui n'avaient rien à faire à l'écran. L'interface
-  ne reçoit plus que le code HTTP et le champ `message` de Qobuz (limité à 200 caractères) ; le
-  corps complet reste dans les journaux du serveur.
+- Avertissement tant qu'aucun mot de passe d'accès n'est défini : bandeau dans l'interface, message
+  au démarrage et section « Security » en tête du README.
+- Option `COOKIE_SECURE=true` pour poser le drapeau `Secure` sur le cookie d'accès derrière un
+  reverse proxy HTTPS.
+- En-têtes de sécurité sur toutes les réponses (`X-Frame-Options`, `frame-ancestors`,
+  `X-Content-Type-Options`, `Referrer-Policy`).
+- Empreinte du mot de passe renforcée et versionnée : PBKDF2 à 600 000 itérations, anciens formats
+  acceptés puis migrés au premier déverrouillage. Un nouveau mot de passe doit faire au moins 8
+  caractères et être saisi deux fois.
+- Redirection ouverte corrigée sur le déverrouillage (`/\evil.com`, tabulation).
+- Les erreurs de l'API Qobuz n'exposent plus le corps brut de la réponse, et les réglages morts
+  (dont un champ `Password` en clair) sont supprimés.
+- Android : un certificat HTTPS refusé est expliqué au lieu d'afficher « Serveur injoignable ».
 
 ## [1.5.1] - 2026-09-28
 
