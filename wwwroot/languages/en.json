@@ -327,5 +327,6 @@
   "settings.access.tooShort": "The password must be at least {0} characters long.",
   "settings.access.mismatch": "The two entries do not match.",
   "settings.access.saved": "Password saved.",
+  "settings.access.managed": "Password active — set by the {0} environment variable, change it there",
   "settings.access.removed": "Password removed — app open."
 }

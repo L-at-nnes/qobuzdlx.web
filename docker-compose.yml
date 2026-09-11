@@ -7,4 +7,8 @@ services:
     volumes:
       - /path/to/downloads:/downloads
       - /path/to/config:/config
+    # Optional: protect the UI with a password (8 characters minimum). Recommended as soon as the
+    # container is reachable from outside this machine. Leave it out to set one in Settings instead.
+    # environment:
+    #   - ACCESS_PASSWORD=change-me-please
     restart: unless-stopped

@@ -327,5 +327,6 @@
   "settings.access.tooShort": "Le mot de passe doit contenir au moins {0} caractères.",
   "settings.access.mismatch": "Les deux saisies ne correspondent pas.",
   "settings.access.saved": "Mot de passe enregistré.",
+  "settings.access.managed": "Mot de passe actif — défini par la variable d'environnement {0}, à modifier là-bas",
   "settings.access.removed": "Mot de passe supprimé — application ouverte."
 }

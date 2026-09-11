@@ -124,6 +124,8 @@ var app = builder.Build();
 // logs toute clé de traduction manquante avant la première requête.
 var localization = app.Services.GetRequiredService<LocalizationService>();
 
+AccessPasswordEnvironment.Apply(app.Services.GetRequiredService<SettingsService>(), app.Logger);
+
 if (string.IsNullOrEmpty(app.Services.GetRequiredService<SettingsService>().Settings.AppAccessPasswordHash))
     app.Logger.LogWarning("No access password is set: anyone who can reach this server can use the linked Qobuz account. Set one in Settings.");
 

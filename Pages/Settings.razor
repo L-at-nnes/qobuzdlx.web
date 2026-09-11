@@ -358,7 +358,14 @@
         @Loc["settings.access.description"]
     </p>
 
-    @if (string.IsNullOrEmpty(S.AppAccessPasswordHash))
+    @if (AccessPasswordEnvironment.IsManaged)
+    {
+        <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
+            <span style="color:var(--success);font-size:0.85em;">@Loc.T("settings.access.managed", AccessPasswordEnvironment.VariableName)</span>
+        </div>
+    }
+    else if (string.IsNullOrEmpty(S.AppAccessPasswordHash))
     {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             <span style="color:var(--text-secondary);font-size:0.85em;">@Loc["settings.access.status"]</span>
