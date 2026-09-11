@@ -30,6 +30,10 @@ ENV CONFIG_PATH=/config
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 EXPOSE 8080
 
+# /healthz answers without the access password. busybox wget ships with the Alpine base image.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
+
 VOLUME ["/downloads", "/config"]
 
 USER qbdlx

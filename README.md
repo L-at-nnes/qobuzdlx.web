@@ -101,6 +101,8 @@ docker-compose up -d
 
 Open your browser at **http://localhost:8080**
 
+`docker ps` shows the container as `healthy` once the app answers on `/healthz`.
+
 ---
 
 ## Volumes

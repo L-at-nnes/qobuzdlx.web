@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`HEALTHCHECK` dans l'image Docker.** `docker ps` indique si l'application répond (`/healthz`, sans
+  mot de passe) et un orchestrateur peut redémarrer un conteneur resté muet.
+
 ### Changed
 - **`docker-compose.yml` durci.** `no-new-privileges` et `cap_drop: ALL` : l'application tourne avec un
   utilisateur sans privilège et écoute sur un port élevé, elle n'a besoin d'aucune capacité. Une ligne
