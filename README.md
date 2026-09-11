@@ -208,7 +208,7 @@ Toggle individual metadata tags from the Settings page:
 Album, Album Artist, Artist, Title, Track Number, Total Tracks, Disc Number, Total Discs, Genre, Year, Release Date, Composer, Copyright, Label, ISRC, UPC, Type, Explicit, Cover Art, URL, Custom Comment
 
 Additional tagging options:
-- Merge multiple artist names
+- Merge multiple artist names (the album artist tag reads "A & B" instead of the release's main artist; "Merge in folder names" does the same for the artist folder)
 - Add Explicit/Clean tags to track titles
 - Custom comment text with `%description%` placeholder
 
