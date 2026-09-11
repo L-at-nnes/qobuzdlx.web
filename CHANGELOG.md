@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`docker-compose.yml` durci.** `no-new-privileges` et `cap_drop: ALL` : l'application tourne avec un
+  utilisateur sans privilège et écoute sur un port élevé, elle n'a besoin d'aucune capacité. Une ligne
+  `build: .` en commentaire permet de construire l'image depuis le dépôt au lieu de tirer l'image
+  publiée, et `COOKIE_SECURE` y est rappelé à côté de `ACCESS_PASSWORD`.
+
 ### Fixed
 - **Un MP3 sans code-barres recevait une étiquette `BARCODE` vide.** TagLib écarte seul les cadres
   standard sans valeur, mais pas les cadres personnalisés : quand Qobuz ne fournit pas d'UPC, le

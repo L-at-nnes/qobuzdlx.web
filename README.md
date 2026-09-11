@@ -80,8 +80,18 @@ services:
     # Optional: protect the UI with a password (8 characters minimum)
     # environment:
     #   - ACCESS_PASSWORD=change-me-please
+    #   - COOKIE_SECURE=true   # only behind an HTTPS reverse proxy, see Security
     restart: unless-stopped
+    # The app needs no privileges: it runs as an unprivileged user and listens on a high port
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 ```
+
+The image above is the published one. To run the code of this repository instead, uncomment
+`build: .` in the compose file (it is in the repository root) and start it with
+`docker compose up -d --build`.
 
 Then run:
 

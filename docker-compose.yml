@@ -1,6 +1,9 @@
 services:
   qobuzdlx:
     image: thimble9057/qobuzdlx.web
+    # To run the code of this repository instead of the published image, uncomment the next line
+    # and start with `docker compose up -d --build`.
+    # build: .
     container_name: qobuzdlx
     ports:
       - "8080:8080"
@@ -11,4 +14,10 @@ services:
     # container is reachable from outside this machine. Leave it out to set one in Settings instead.
     # environment:
     #   - ACCESS_PASSWORD=change-me-please
+    #   - COOKIE_SECURE=true   # only behind an HTTPS reverse proxy, see the README
     restart: unless-stopped
+    # The app needs no privileges: it runs as an unprivileged user and listens on a high port.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
