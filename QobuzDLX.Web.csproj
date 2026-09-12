@@ -8,6 +8,14 @@
     <Version>1.6.0</Version>
   </PropertyGroup>
 
+  <!-- The test project lives in a sub-folder: keep its sources and build output out of the web app -->
+  <ItemGroup>
+    <Compile Remove="QobuzDLX.Web.Tests/**" />
+    <Content Remove="QobuzDLX.Web.Tests/**" />
+    <EmbeddedResource Remove="QobuzDLX.Web.Tests/**" />
+    <None Remove="QobuzDLX.Web.Tests/**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

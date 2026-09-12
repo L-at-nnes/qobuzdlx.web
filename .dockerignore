@@ -6,3 +6,9 @@ config/
 .git
 .vs
 screenshots/
+QobuzDLX.Web.Tests/
+*.sln
+
+# Projet Android : sans cette ligne le COPY . . du Dockerfile embarquerait toute l'arborescence
+# Gradle (et son cache build/) dans le contexte de build de l'image .NET.
+android/

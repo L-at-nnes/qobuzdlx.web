@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Projet de tests `QobuzDLX.Web.Tests` (xUnit) et solution `QobuzDLX.Web.sln`.** 53 tests, sans réseau
+  ni compte Qobuz : Qobuz et son CDN sont remplacés par un faux serveur local. Ils couvrent les modèles
+  de nommage et leur validation, les étiquettes, les noms de fichiers, l'analyse des liens, les
+  tentatives et la pagination de l'API, la file de téléchargement (bilan, relance, playlists, `.m3u8`),
+  le mot de passe d'accès (empreintes, blocage, redirections, variable d'environnement) et les réglages.
+  Lancer `dotnet test QobuzDLX.Web.sln`. Le dossier contenant désormais une solution à côté du projet,
+  le Dockerfile désigne explicitement `QobuzDLX.Web.csproj`.
 - **`HEALTHCHECK` dans l'image Docker.** `docker ps` indique si l'application répond (`/healthz`, sans
   mot de passe) et un orchestrateur peut redémarrer un conteneur resté muet.
 

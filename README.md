@@ -327,6 +327,19 @@ Two defaults are meant for the container and need adjusting on a workstation:
 | Configuration folder | `/config` | Set the `CONFIG_PATH` environment variable (on Windows `/config` would mean `C:\config`) |
 | Download folder | `/downloads` | Change it in *Settings*, first field |
 
+### Run the tests
+
+```bash
+cd qobuzdlx.web
+dotnet test QobuzDLX.Web.sln
+```
+
+The solution holds the web application and `QobuzDLX.Web.Tests` (xUnit). The tests need no network and
+no Qobuz account: Qobuz and its CDN are replaced by a local fake, and everything they write goes to a
+temporary folder removed at the end of the run. A full run takes about a minute, most of it spent waiting
+for the download retries. Because the folder now contains a solution next to the project, name the
+project when you build it by hand (`dotnet build QobuzDLX.Web.csproj`).
+
 ### Build Docker image
 
 ```bash
@@ -346,6 +359,7 @@ docker build -t thimble9057/qobuzdlx.web .
 | JSON | Newtonsoft.Json 13.0.3 |
 | Container | Alpine Linux (multi-stage build) |
 | FLAC tools | `flac` CLI (installed in container) |
+| Tests | xUnit |
 
 ---
 
@@ -372,6 +386,7 @@ QobuzDLX.Web/
 │   ├── AppGuardService.cs   # Access password hashing & unlock state
 │   └── AppAccessGate.cs     # App-wide unlock throttling
 ├── wwwroot/css/app.css      # Dark theme styles
+├── QobuzDLX.Web.Tests/      # xUnit tests (fake Qobuz, no network needed)
 ├── android/                 # Android app (Kotlin, WebView shell)
 ├── Program.cs               # App entry point
 ├── Dockerfile               # Multi-stage Docker build
