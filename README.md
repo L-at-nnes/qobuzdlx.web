@@ -312,16 +312,25 @@ instructions and release signing are in [android/README.md](android/README.md).
 ### Run locally
 
 ```bash
-cd QobuzDLX.Web
+cd qobuzdlx.web
 dotnet run
 ```
 
-The app will be available at `http://localhost:8080`.
+The app will be available at `http://localhost:8080`, on this machine only: outside Docker it listens
+on `localhost`. To reach it from another device, set `Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080`
+and set an access password first (see [Security](#security)).
+
+Two defaults are meant for the container and need adjusting on a workstation:
+
+| Setting | Container default | Locally |
+|---------|-------------------|---------|
+| Configuration folder | `/config` | Set the `CONFIG_PATH` environment variable (on Windows `/config` would mean `C:\config`) |
+| Download folder | `/downloads` | Change it in *Settings*, first field |
 
 ### Build Docker image
 
 ```bash
-cd QobuzDLX.Web
+cd qobuzdlx.web
 docker build -t thimble9057/qobuzdlx.web .
 ```
 

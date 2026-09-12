@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mot de passe) et un orchestrateur peut redémarrer un conteneur resté muet.
 
 ### Changed
+- **En dehors de Docker, l'application n'écoute plus que sur `localhost`.** `appsettings.json` la liait à
+  `0.0.0.0`, donc un `dotnet run` de développement était joignable par tout le réseau, sans mot de passe
+  par défaut. L'image Docker garde l'écoute sur toutes les interfaces, par `Kestrel__Endpoints__Http__Url`
+  dans le Dockerfile ; `ASPNETCORE_URLS`, qui n'avait aucun effet puisque la configuration Kestrel
+  l'emporte, est retiré. Le README documente `CONFIG_PATH` et le dossier de téléchargement pour un
+  lancement local.
 - **`docker-compose.yml` durci.** `no-new-privileges` et `cap_drop: ALL` : l'application tourne avec un
   utilisateur sans privilège et écoute sur un port élevé, elle n'a besoin d'aucune capacité. Une ligne
   `build: .` en commentaire permet de construire l'image depuis le dépôt au lieu de tirer l'image

@@ -24,7 +24,10 @@ RUN mkdir -p /downloads /config && chown -R qbdlx:qbdlx /downloads /config
 
 COPY --from=build --chown=qbdlx:qbdlx /app .
 
-ENV ASPNETCORE_URLS=http://+:8080
+# Outside Docker the app only listens on localhost (appsettings.json); the container must accept
+# connections from the published port. Kestrel:Endpoints takes precedence over ASPNETCORE_URLS, so this
+# is the one setting that decides the address.
+ENV Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080
 ENV CONFIG_PATH=/config
 # L'image de base positionne cette variable à true ; ICU étant installé, on la désactive.
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
