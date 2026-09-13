@@ -49,6 +49,7 @@ builder.Services.AddSingleton<QobuzApiService>();
 builder.Services.AddSingleton<TemplateService>();
 builder.Services.AddSingleton<TaggingService>();
 builder.Services.AddSingleton<DownloadService>();
+builder.Services.AddHostedService<SessionRestoreService>();
 builder.Services.AddSingleton<ConfigurationCheckService>();
 // Un état de recherche par appareil : la fabrique le choisit d'après le cookie d'accès du circuit.
 builder.Services.AddSingleton<SearchStateStore>();

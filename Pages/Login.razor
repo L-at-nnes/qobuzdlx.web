@@ -110,7 +110,8 @@
         if (string.IsNullOrEmpty(s.UserAuthToken) || string.IsNullOrEmpty(s.AppId) || string.IsNullOrEmpty(s.AppSecret))
             return;
 
-        if (await PersistedSessionIsValidAsync(s))
+        // Unreachable counts as valid: the token is kept rather than dropping the user at every network hiccup
+        if (await SessionRestoreService.CheckAsync(Api, s) != SessionCheck.Rejected)
         {
             Api.SetCredentials(s.AppId, s.AppSecret, s.UserAuthToken);
             Nav.NavigateTo(_returnUrl, forceLoad: false);
@@ -119,29 +120,6 @@
         {
             Settings.ClearQobuzSession();
             Nav.NavigateTo("/login?expired=1", forceLoad: true);
-        }
-    }
-
-    /// <summary>
-    /// Un jeton refusé par Qobuz est périmé. Toute autre défaillance (Qobuz injoignable, délai
-    /// dépassé) ne dit rien de sa validité : on le conserve plutôt que de déconnecter l'utilisateur
-    /// à chaque coupure réseau.
-    /// </summary>
-    private async Task<bool> PersistedSessionIsValidAsync(Models.AppSettings s)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        try
-        {
-            await Api.LoginWithTokenAsync(s.AppId, s.UserAuthToken, timeout.Token);
-            return true;
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        {
-            return false;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
-        {
-            return true;
         }
     }
 

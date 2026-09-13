@@ -183,6 +183,7 @@
   "log.favTrackFailed": "Fav track {0} failed: {1}",
   "log.favArtistFailed": "Fav artist {0} failed: {1}",
   "log.favoritesEmpty": "No favorites to download.",
+  "log.queueRestored": "Queue restored after a restart: {0} item(s) waiting.",
   "log.labelNotFound": "Label not found",
   "log.fileExists": "File for track {0} already exists, skipping.",
   "log.downloadingTrack": "Downloading - {0} {1}...",

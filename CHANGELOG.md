@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Projet de tests `QobuzDLX.Web.Tests` (xUnit) et solution `QobuzDLX.Web.sln`.** 53 tests, sans réseau
+- **File de téléchargement persistante.** Elle est enregistrée dans `/config/queue.json` à chaque
+  changement : un redémarrage du conteneur (mise à jour, coupure de courant) ne la fait plus oublier. Les
+  éléments terminés gardent leur bilan et leur ✓ dans la recherche (200 au plus). Un élément qui tournait
+  à l'arrêt repart du début, les pistes déjà écrites étant reconnues comme présentes. Quand des éléments
+  attendent, la session Qobuz enregistrée est rétablie au démarrage, sans ouvrir l'interface, et la file
+  reprend ; si Qobuz est injoignable, dix essais espacés de 30 s, et un jeton refusé laisse la file en
+  attente d'une connexion. Un fichier illisible est mis de côté (`queue.json.corrupt-…`) et la file repart
+  vide.
+- **Projet de tests `QobuzDLX.Web.Tests` (xUnit) et solution `QobuzDLX.Web.sln`.** 63 tests, sans réseau
   ni compte Qobuz : Qobuz et son CDN sont remplacés par un faux serveur local. Ils couvrent les modèles
   de nommage et leur validation, les étiquettes, les noms de fichiers, l'analyse des liens, les
   tentatives et la pagination de l'API, la file de téléchargement (bilan, relance, playlists, `.m3u8`),

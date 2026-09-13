@@ -42,6 +42,10 @@ public class QobuzApiService
     /// </summary>
     public event Action? SessionRejected;
 
+    /// <summary>Levé quand une session s'ouvre (connexion, jeton enregistré rétabli) : ce qui attendait
+    /// de pouvoir appeler Qobuz, comme une file de téléchargement restaurée, peut reprendre.</summary>
+    public event Action? SessionStarted;
+
     public QobuzApiService(ILogger<QobuzApiService> logger)
     {
         _logger = logger;
@@ -54,6 +58,8 @@ public class QobuzApiService
         _appId = appId;
         _appSecret = appSecret;
         _userAuthToken = userAuthToken;
+
+        if (!string.IsNullOrEmpty(userAuthToken)) SessionStarted?.Invoke();
     }
 
     // ─── App ID / Secret Retrieval ───

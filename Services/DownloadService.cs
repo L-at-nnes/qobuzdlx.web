@@ -96,6 +96,7 @@ public class DownloadService
     private readonly TaggingService _tagging;
     private readonly LocalizationService _loc;
     private readonly ILogger<DownloadService> _logger;
+    private readonly QueueStore _store;
 
     // ─── État partagé ───
     //
@@ -175,7 +176,10 @@ public class DownloadService
         _loc = loc;
         _logger = logger;
 
+        _store = new QueueStore(Path.Combine(_settings.ConfigDirectory, "queue.json"), logger);
+
         _api.SessionRejected += OnSessionRejected;
+        _api.SessionStarted += ResumePending;
 
         _appCt = _appCts.Token;
         // Sans cela, `docker stop` attendrait le délai de grâce complet pendant qu'un téléchargement
@@ -183,6 +187,62 @@ public class DownloadService
         lifetime.ApplicationStopping.Register(() => { try { _appCts.Cancel(); } catch { } });
 
         PurgeStaleTempFiles();
+        RestoreQueue();
+    }
+
+    // ─── File persistante ───
+
+    // Sérialise les écritures de queue.json : l'instantané est pris sous ce verrou, sinon un écrivain lent
+    // pourrait remplacer une version récente par une plus ancienne.
+    private readonly object _persistLock = new();
+
+    private void RestoreQueue()
+    {
+        var restored = _store.Load();
+        if (restored.Count == 0) return;
+
+        lock (_gate)
+        {
+            _queue.AddRange(restored);
+            ReindexLocked();
+        }
+
+        var waiting = restored.Count(i => i.Status == QueueItemStatus.Pending);
+        if (waiting > 0) Log(_loc.T("log.queueRestored", waiting));
+    }
+
+    private void PersistQueue()
+    {
+        try
+        {
+            lock (_persistLock)
+            {
+                List<PersistedQueueItem> snapshot;
+                lock (_gate) snapshot = _queue.Select(PersistedQueueItem.From).ToList();
+                _store.Save(snapshot);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "The download queue could not be saved");
+        }
+    }
+
+    /// <summary>Des éléments attendent d'être traités (file restaurée, session pas encore rétablie).</summary>
+    public bool HasPending
+    {
+        get { lock (_gate) return _queue.Any(i => i.Status == QueueItemStatus.Pending); }
+    }
+
+    /// <summary>Relance le traitement de ce qui attend, dès qu'une session Qobuz est ouverte.</summary>
+    private void ResumePending()
+    {
+        lock (_gate)
+        {
+            if (!_queue.Any(i => i.Status == QueueItemStatus.Pending)) return;
+            _worker ??= Task.Run(WorkerLoopAsync);
+        }
+        Signal();
     }
 
     private static string TempDirectory =>
@@ -629,7 +689,11 @@ public class DownloadService
         RaiseSafely(OnProgressChanged, nameof(OnProgressChanged));
     }
 
-    private void RaiseQueueChanged() => RaiseSafely(OnQueueChanged, nameof(OnQueueChanged));
+    private void RaiseQueueChanged()
+    {
+        PersistQueue();
+        RaiseSafely(OnQueueChanged, nameof(OnQueueChanged));
+    }
 
     /// <summary>
     /// Invoque chaque abonné séparément, en absorbant ses exceptions. Deux raisons, toutes deux

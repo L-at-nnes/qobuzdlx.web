@@ -20,6 +20,9 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
   button to go past the first 50 results. With an access password set, each device keeps its own
   search (query, results, sorting); without one, all visitors share a single search
 - **Batch downloads** — Paste multiple URLs and download them all at once
+- **Persistent queue** — The download queue is saved in `/config/queue.json`: after a restart of the
+  container the unfinished items resume on their own (the saved Qobuz session is restored at startup,
+  tracks already on disk are skipped) and what was already downloaded keeps its check mark in the search
 - **4 quality levels** — MP3 320, FLAC 16-bit, FLAC 24-bit (up to 96kHz), FLAC 24-bit (up to 192kHz)
 - **Full metadata tagging** — ID3v2.4 (MP3) and Vorbis Comments (FLAC) with 25+ configurable tags
 - **Customizable file/folder naming** — 60+ template variables for artist, album, track naming
@@ -111,7 +114,7 @@ Open your browser at **http://localhost:8080**
 | Path | Description |
 |------|-------------|
 | `/downloads` | Where downloaded music files are saved |
-| `/config` | Persistent configuration (`settings.json`, plus its `.bak` backup) |
+| `/config` | Persistent configuration: `settings.json` (plus its `.bak` backup) and `queue.json`, the download queue |
 
 ### File permissions
 

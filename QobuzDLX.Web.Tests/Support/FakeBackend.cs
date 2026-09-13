@@ -103,12 +103,16 @@ public static class FakeBackend
         return server;
     }
 
-    public static (Fixtures Fx, FakeQobuz Qobuz, string Downloads) NewLibrary()
+    /// <summary>
+    /// A service graph talking to the fake Qobuz, downloading into a fresh folder. <paramref name="configDir"/>
+    /// reuses a configuration folder (a restart); <paramref name="signIn"/> false leaves the session closed
+    /// until the test opens it.
+    /// </summary>
+    public static (Fixtures Fx, FakeQobuz Qobuz, string Downloads) NewLibrary(string? configDir = null, bool signIn = true)
     {
-        var fx = new Fixtures();
+        var fx = new Fixtures(configDir);
         var qobuz = new FakeQobuz();
         PrivateAccess.SetHttp(fx.Api, new HttpClient(qobuz));
-        fx.Api.SetCredentials("1", "secret", "tok");
 
         var downloads = Path.Combine(Path.GetTempPath(), "qbdlx-lib-" + Guid.NewGuid().ToString("N")[..6]);
         Directory.CreateDirectory(downloads);
@@ -120,8 +124,11 @@ public static class FakeBackend
             s.VerifyIntegrity = false;
             s.DownloadGoodies = false;
         });
+        if (signIn) SignIn(fx);
         return (fx, qobuz, downloads);
     }
+
+    public static void SignIn(Fixtures fx) => fx.Api.SetCredentials("1", "secret", "tok");
 
     public static QueueItem WaitFinished(Fixtures fx, string url, int seconds = 30)
     {
