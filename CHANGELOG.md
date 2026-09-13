@@ -51,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sauvegarde.
 
 ### Fixed
+- **Une mise à jour s'affichait avec l'ancienne feuille de style.** `css/app.css` était demandée sans
+  version : un navigateur qui l'avait déjà en cache la gardait, et les nouveautés apparaissaient sans mise
+  en forme jusqu'à un rechargement forcé. L'adresse porte maintenant la version de l'application.
 - **Deux appareils partageaient la même recherche.** La requête, les résultats et les tris vivaient
   dans un objet unique pour toute l'application : lancer une recherche sur l'ordinateur remplaçait celle
   du téléphone, et inversement. Chaque appareil, reconnu à son cookie d'accès, a désormais son propre
