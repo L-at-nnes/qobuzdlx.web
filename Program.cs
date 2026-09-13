@@ -50,7 +50,10 @@ builder.Services.AddSingleton<TemplateService>();
 builder.Services.AddSingleton<TaggingService>();
 builder.Services.AddSingleton<DownloadService>();
 builder.Services.AddSingleton<ConfigurationCheckService>();
-builder.Services.AddSingleton<SearchStateService>();
+// Un état de recherche par appareil : la fabrique le choisit d'après le cookie d'accès du circuit.
+builder.Services.AddSingleton<SearchStateStore>();
+builder.Services.AddScoped(services => services.GetRequiredService<SearchStateStore>()
+    .For(SearchStateStore.DeviceIdOf(services.GetRequiredService<AuthenticationStateProvider>())));
 // La langue est un réglage global (settings.json), comme le reste : singleton.
 builder.Services.AddSingleton<LocalizationService>();
 builder.Services.AddScoped<AppGuardService>();
@@ -222,6 +225,7 @@ app.MapPost("/auth/unlock", async (HttpContext ctx, SettingsService settings, Ap
         {
             new Claim(ClaimTypes.Name, "qbdlx"),
             new Claim(AppAccessGate.StampClaim, AppAccessGate.StampFor(hash)),
+            new Claim(AppAccessGate.DeviceClaim, Guid.NewGuid().ToString("N")),
         },
         CookieAuthenticationDefaults.AuthenticationScheme);
 

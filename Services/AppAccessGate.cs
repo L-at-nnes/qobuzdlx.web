@@ -23,6 +23,10 @@ public sealed class AppAccessGate
     /// <summary>Type du claim qui fige, dans le cookie, le mot de passe pour lequel il a été émis.</summary>
     public const string StampClaim = "qbdlx:stamp";
 
+    /// <summary>Identifiant d'appareil tiré à chaque déverrouillage : il sépare l'état de recherche de
+    /// chaque appareil (<see cref="SearchStateStore"/>).</summary>
+    public const string DeviceClaim = "qbdlx:device";
+
     private const int MaxAttempts = 5;
 
     // Palier suivant à chaque série d'échecs : réessayer en boucle coûte de plus en plus cher,

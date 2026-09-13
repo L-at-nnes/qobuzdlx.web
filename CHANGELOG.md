@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   publiée, et `COOKIE_SECURE` y est rappelé à côté de `ACCESS_PASSWORD`.
 
 ### Fixed
+- **Deux appareils partageaient la même recherche.** La requête, les résultats et les tris vivaient
+  dans un objet unique pour toute l'application : lancer une recherche sur l'ordinateur remplaçait celle
+  du téléphone, et inversement. Chaque appareil, reconnu à son cookie d'accès, a désormais son propre
+  état, qui survit toujours à la navigation et au rechargement de la page. Sans mot de passe d'accès il
+  n'y a pas de cookie, et tous les visiteurs continuent de partager un seul état. Les cookies émis
+  avant cette version n'identifient pas l'appareil : un nouveau déverrouillage suffit.
 - **Un MP3 sans code-barres recevait une étiquette `BARCODE` vide.** TagLib écarte seul les cadres
   standard sans valeur, mais pas les cadres personnalisés : quand Qobuz ne fournit pas d'UPC, le
   cadre était créé sans texte. Il est désormais omis. Les autres étiquettes (genre, compositeur,
