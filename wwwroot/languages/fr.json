@@ -115,7 +115,6 @@
   "log.attemptFailed": "Essai {0}/{1} en {2} échoué : {3}",
   "download.log": "Journal",
   "download.logEmpty": "Collez une URL Qobuz et cliquez sur Télécharger pour commencer.",
-  "download.status.complete": "Terminé",
   "download.status.track": "Piste {0}/{1}",
   "download.status.album": "Album {0}/{1}",
   "download.status.favAlbum": "Album favori {0}/{1}",
@@ -161,7 +160,6 @@
   "queue.kind.user": "Favoris",
 
   "log.invalidUrl": "URL invalide : {0}",
-  "log.couldNotParseUrl": "Impossible d'analyser l'URL",
   "log.checkingLink": "Vérification du lien...",
   "log.unsupportedUserLink": "Type de lien utilisateur non pris en charge",
   "log.unsupportedLinkType": "Type de lien '{0}' non pris en charge",

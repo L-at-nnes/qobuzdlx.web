@@ -115,7 +115,6 @@
   "log.attemptFailed": "Attempt {0}/{1} in {2} failed: {3}",
   "download.log": "Log",
   "download.logEmpty": "Paste a Qobuz URL and click Download to start.",
-  "download.status.complete": "Complete",
   "download.status.track": "Track {0}/{1}",
   "download.status.album": "Album {0}/{1}",
   "download.status.favAlbum": "Fav album {0}/{1}",
@@ -161,7 +160,6 @@
   "queue.kind.user": "Favorites",
 
   "log.invalidUrl": "Invalid URL: {0}",
-  "log.couldNotParseUrl": "Could not parse URL",
   "log.checkingLink": "Checking link...",
   "log.unsupportedUserLink": "Unsupported user link type",
   "log.unsupportedLinkType": "Link type '{0}' not supported",
