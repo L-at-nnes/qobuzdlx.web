@@ -212,7 +212,6 @@
   "settings.templates.track": "Track template (default)",
   "settings.templates.vaTrack": "Track template (V/A)",
   "settings.templates.playlist": "Playlist template",
-  "settings.templates.favorites": "Favorites template",
   "settings.templates.cd": "CD template",
   "settings.templates.preview": "Preview",
   "settings.templates.preview.album": "Album (disc 2)",

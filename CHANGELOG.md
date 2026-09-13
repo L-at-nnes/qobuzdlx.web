@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `build: .` en commentaire permet de construire l'image depuis le dépôt au lieu de tirer l'image
   publiée, et `COOKIE_SECURE` y est rappelé à côté de `ACCESS_PASSWORD`.
 
+### Removed
+- **Le réglage « Modèle Favoris ».** Il était modifiable dans les Réglages et documenté dans le README, mais
+  aucun téléchargement ne le lisait : les favoris sont rangés par artiste et par album, comme le reste.
+  La clé `FavoritesTemplate` d'un `settings.json` existant est ignorée et disparaît à la prochaine
+  sauvegarde.
+
 ### Fixed
 - **Deux appareils partageaient la même recherche.** La requête, les résultats et les tris vivaient
   dans un objet unique pour toute l'application : lancer une recherche sur l'ordinateur remplaçait celle

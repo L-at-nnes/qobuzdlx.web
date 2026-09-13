@@ -204,7 +204,6 @@ Available templates:
 | Track | `%TrackNumber% - %TrackTitle%` | Track filename |
 | VA Track | `%TrackNumber% - %TrackArtist% - %TrackTitle%` | Track filename for compilations |
 | Playlist | `%PlaylistTitle%` | Playlist folder name |
-| Favorites | `Favorites` | Favorites folder name |
 | CD | `CD %DiscNumber%` | Multi-disc subfolder |
 
 The Settings page previews the resulting path for an album track, a compilation track and a

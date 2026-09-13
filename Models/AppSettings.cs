@@ -37,7 +37,6 @@ public class AppSettings
     public string TrackTemplate { get; set; } = "%TrackNumber% - %TrackTitle%";
     public string VaTrackTemplate { get; set; } = "%TrackNumber% - %TrackArtist% - %TrackTitle%";
     public string PlaylistTemplate { get; set; } = "%PlaylistTitle%";
-    public string FavoritesTemplate { get; set; } = "Favorites";
     public string CdTemplate { get; set; } = "CD %DiscNumber%";
 
     // Tagging
