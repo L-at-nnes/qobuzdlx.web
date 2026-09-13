@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Liste des pistes d'un album ou d'une playlist dans la recherche.** Un clic sur la ligne la déplie :
+  numéro, titre (avec sa version), durée et mention « explicite » ; les albums de plusieurs disques ont
+  un intertitre par disque, les playlists indiquent l'artiste et l'album de chaque piste. Fonctionne
+  aussi pour les albums d'un artiste déplié. Les pistes ne sont demandées à Qobuz qu'à la première
+  ouverture, puis gardées jusqu'à la prochaine recherche ; la case à cocher et le bouton de
+  téléchargement de la ligne n'ouvrent ni ne ferment rien.
 - **File de téléchargement persistante.** Elle est enregistrée dans `/config/queue.json` à chaque
   changement : un redémarrage du conteneur (mise à jour, coupure de courant) ne la fait plus oublier. Les
   éléments terminés gardent leur bilan et leur ✓ dans la recherche (200 au plus). Un élément qui tournait

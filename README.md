@@ -17,7 +17,8 @@ A self-hosted web application for downloading high-quality music from Qobuz. Bui
 - **Bilingual UI** — French and English, one-click switch, browser language detected on first run
 - **Search** — Search Qobuz by albums, tracks, artists or playlists directly from the UI, with sorting by
   title, artist, release date, quality or track count, a Hi-Res only filter, and a "Show more"
-  button to go past the first 50 results. With an access password set, each device keeps its own
+  button to go past the first 50 results. Click an album or a playlist to unfold its track list
+  (numbers, titles, durations; discs and artists where relevant) before downloading it. With an access password set, each device keeps its own
   search (query, results, sorting); without one, all visitors share a single search
 - **Batch downloads** — Paste multiple URLs and download them all at once
 - **Persistent queue** — The download queue is saved in `/config/queue.json`: after a restart of the

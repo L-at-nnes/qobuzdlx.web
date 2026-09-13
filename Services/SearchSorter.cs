@@ -7,6 +7,18 @@ namespace QobuzDLX.Web.Services;
 /// sense for it (e.g. <see cref="CountDesc"/> means "most tracks" for albums and "most albums"
 /// for artists).
 /// </summary>
+public static class TrackDuration
+{
+    /// <summary>« 4:09 » ou « 1:02:03 » à partir d'un nombre de secondes.</summary>
+    public static string Format(int seconds)
+    {
+        var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return time.TotalHours >= 1
+            ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}"
+            : $"{time.Minutes}:{time.Seconds:00}";
+    }
+}
+
 public enum SearchSort
 {
     Relevance,

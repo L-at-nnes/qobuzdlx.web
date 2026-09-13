@@ -64,20 +64,29 @@ else if (HasNoResults)
             {
                 var albumId = album.Id;
                 var albumUrl = AlbumUrl(albumId);
-                <div class="search-result-row @(_selectedAlbums.Contains(albumId) ? "selected" : "")">
-                    <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(albumId)" @onchange="() => ToggleAlbum(albumId)" />
-                    <img src="@album.Image?.Thumbnail" alt="" />
-                    <div class="search-result-info">
-                        <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                        <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                var albumKey = SearchStateService.AlbumKey(albumId);
+                var albumOpen = State.IsExpanded(albumKey);
+                <div class="album-block">
+                    <div class="search-result-row expandable @(albumOpen ? "expanded" : "") @(_selectedAlbums.Contains(albumId) ? "selected" : "")" @onclick="() => ToggleAlbumTracks(albumId)">
+                        <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(albumId)" @onchange="() => ToggleAlbum(albumId)" @onclick:stopPropagation="true" />
+                        <img src="@album.Image?.Thumbnail" alt="" />
+                        <div class="search-result-info">
+                            <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
+                            <div class="artist">@album.Artist?.Name &middot; @album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                        </div>
+                        <span class="expand-icon">@(albumOpen ? "▾" : "▸")</span>
+                        @* La marque ✓ est FRÈRE du bouton, jamais enfant : à l'intérieur, la règle
+                           `.search-result-row .btn::before` du palier 640px l'écraserait. *@
+                        @if (Download.IsDone(albumUrl))
+                        {
+                            <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                        }
+                        <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" @onclick:stopPropagation="true" disabled="@Download.IsQueued(albumUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                     </div>
-                    @* La marque ✓ est FRÈRE du bouton, jamais enfant : à l'intérieur, la règle
-                       `.search-result-row .btn::before` du palier 640px l'écraserait. *@
-                    @if (Download.IsDone(albumUrl))
+                    @if (albumOpen)
                     {
-                        <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                        <TrackList Tracks="State.TracksOf(albumKey)" Loading="_loadingTracks.Contains(albumKey)" Failed="_failedTracks.Contains(albumKey)" />
                     }
-                    <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" disabled="@Download.IsQueued(albumUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                 </div>
             }
         </div>
@@ -200,18 +209,27 @@ else if (HasNoResults)
                                 {
                                     var aId = album.Id;
                                     var aUrl = AlbumUrl(aId);
-                                    <div class="search-result-row artist-album-row @(_selectedAlbums.Contains(aId) ? "selected" : "")">
-                                        <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(aId)" @onchange="() => ToggleAlbum(aId)" />
-                                        <img src="@album.Image?.Thumbnail" alt="" />
-                                        <div class="search-result-info">
-                                            <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
-                                            <div class="artist">@album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                                    var aKey = SearchStateService.AlbumKey(aId);
+                                    var aOpen = State.IsExpanded(aKey);
+                                    <div class="artist-album-block">
+                                        <div class="search-result-row expandable artist-album-row @(aOpen ? "expanded" : "") @(_selectedAlbums.Contains(aId) ? "selected" : "")" @onclick="() => ToggleAlbumTracks(aId)">
+                                            <input type="checkbox" class="select-checkbox" checked="@_selectedAlbums.Contains(aId)" @onchange="() => ToggleAlbum(aId)" @onclick:stopPropagation="true" />
+                                            <img src="@album.Image?.Thumbnail" alt="" />
+                                            <div class="search-result-info">
+                                                <div class="title">@album.Title @(album.Version != null ? $"({album.Version})" : "")</div>
+                                                <div class="artist">@album.ReleaseDateOriginal &middot; @Loc.P("search.trackCount", album.TracksCount) &middot; @(album.MaximumBitDepth)bit/@(album.MaximumSamplingRate)kHz</div>
+                                            </div>
+                                            <span class="expand-icon">@(aOpen ? "▾" : "▸")</span>
+                                            @if (Download.IsDone(aUrl))
+                                            {
+                                                <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                                            }
+                                            <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" @onclick:stopPropagation="true" disabled="@Download.IsQueued(aUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                                         </div>
-                                        @if (Download.IsDone(aUrl))
+                                        @if (aOpen)
                                         {
-                                            <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                                            <TrackList Tracks="State.TracksOf(aKey)" Loading="_loadingTracks.Contains(aKey)" Failed="_failedTracks.Contains(aKey)" />
                                         }
-                                        <button class="btn btn-primary btn-sm" @onclick="() => QueueAlbum(album)" disabled="@Download.IsQueued(aUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                                     </div>
                                 }
                             }
@@ -241,24 +259,33 @@ else if (HasNoResults)
             @foreach (var playlist in State.Playlists)
             {
                 var playlistUrl = PlaylistUrl(playlist.Id);
-                <div class="search-result-row">
-                    @if (!string.IsNullOrEmpty(playlist.Images150?.FirstOrDefault()))
-                    {
-                        <img src="@playlist.Images150![0]" alt="" />
-                    }
-                    else
-                    {
-                        <div class="artist-avatar-placeholder">&#9835;</div>
-                    }
-                    <div class="search-result-info">
-                        <div class="title">@playlist.Name</div>
-                        <div class="artist">@playlist.Owner?.Name &middot; @Loc.P("search.trackCount", playlist.TracksCount)</div>
+                var playlistKey = SearchStateService.PlaylistKey(playlist.Id);
+                var playlistOpen = State.IsExpanded(playlistKey);
+                <div class="album-block">
+                    <div class="search-result-row expandable @(playlistOpen ? "expanded" : "")" @onclick="() => TogglePlaylistTracks(playlist.Id)">
+                        @if (!string.IsNullOrEmpty(playlist.Images150?.FirstOrDefault()))
+                        {
+                            <img src="@playlist.Images150![0]" alt="" />
+                        }
+                        else
+                        {
+                            <div class="artist-avatar-placeholder">&#9835;</div>
+                        }
+                        <div class="search-result-info">
+                            <div class="title">@playlist.Name</div>
+                            <div class="artist">@playlist.Owner?.Name &middot; @Loc.P("search.trackCount", playlist.TracksCount)</div>
+                        </div>
+                        <span class="expand-icon">@(playlistOpen ? "▾" : "▸")</span>
+                        @if (Download.IsDone(playlistUrl))
+                        {
+                            <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                        }
+                        <button class="btn btn-primary btn-sm" @onclick="() => QueuePlaylist(playlist)" @onclick:stopPropagation="true" disabled="@Download.IsQueued(playlistUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                     </div>
-                    @if (Download.IsDone(playlistUrl))
+                    @if (playlistOpen)
                     {
-                        <span class="queue-done-mark" title='@Loc["queue.doneMark"]'>&#10003;</span>
+                        <TrackList Tracks="State.TracksOf(playlistKey)" Loading="_loadingTracks.Contains(playlistKey)" Failed="_failedTracks.Contains(playlistKey)" IsPlaylist="true" />
                     }
-                    <button class="btn btn-primary btn-sm" @onclick="() => QueuePlaylist(playlist)" disabled="@Download.IsQueued(playlistUrl)" title='@Loc["search.download"]'><span class="btn-label">@Loc["search.download"]</span></button>
                 </div>
             }
         </div>
@@ -293,6 +320,11 @@ else if (HasNoResults)
     private bool _loadingMore;
     private bool _searchFailed;
     private bool _loadingArtistAlbums;
+
+    // Chargement des pistes d'un album ou d'une playlist dépliés : en cours, et en échec. Propres à ce
+    // circuit ; les pistes déjà chargées, elles, vivent dans l'état de recherche de l'appareil.
+    private readonly HashSet<string> _loadingTracks = new();
+    private readonly HashSet<string> _failedTracks = new();
     private HashSet<string> _selectedAlbums = new();
     private HashSet<int> _selectedTracks = new();
     private int TotalSelected => _selectedAlbums.Count + _selectedTracks.Count;
@@ -362,6 +394,8 @@ else if (HasNoResults)
         State.Playlists = null;
         State.ExpandedArtistId = 0;
         State.ArtistAlbums = null;
+        State.ForgetTrackLists();
+        _failedTracks.Clear();
 
         try
         {
@@ -482,6 +516,40 @@ else if (HasNoResults)
         finally
         {
             _loadingArtistAlbums = false;
+        }
+    }
+
+    // ─── Pistes d'un album ou d'une playlist ───
+
+    private Task ToggleAlbumTracks(string albumId) =>
+        ToggleTracks(SearchStateService.AlbumKey(albumId), async () =>
+            (await Api.GetAlbumFullAsync(albumId)).Tracks?.Items ?? new List<QobuzTrack>());
+
+    private Task TogglePlaylistTracks(long playlistId) =>
+        ToggleTracks(SearchStateService.PlaylistKey(playlistId), async () =>
+            (await Api.GetPlaylistFullAsync(playlistId.ToString())).Tracks?.Items ?? new List<QobuzTrack>());
+
+    /// <summary>Déplie ou replie la ligne ; les pistes ne sont demandées à Qobuz qu'à la première ouverture.</summary>
+    private async Task ToggleTracks(string key, Func<Task<List<QobuzTrack>>> load)
+    {
+        if (!State.ToggleExpanded(key)) return;     // elle vient d'être repliée
+        if (State.TracksOf(key) != null) return;    // déjà chargées
+
+        _failedTracks.Remove(key);
+        _loadingTracks.Add(key);
+        StateHasChanged();
+
+        try
+        {
+            List<QobuzTrack>? tracks = null;
+            if (await TryApiAsync(async () => tracks = await load(), "tracks"))
+                State.SetTracks(key, tracks!);
+            else
+                _failedTracks.Add(key);
+        }
+        finally
+        {
+            _loadingTracks.Remove(key);
         }
     }
 

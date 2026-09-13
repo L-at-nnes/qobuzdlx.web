@@ -57,6 +57,50 @@ public class SearchStateService
 
     private static List<T> Append<T>(List<T>? current, IEnumerable<T> page) =>
         (current ?? new List<T>()).Concat(page).ToList();
+
+    // ─── Pistes dépliées (albums et playlists) ───
+    //
+    // Cet objet est partagé par les onglets d'un même appareil : les deux collections sont donc
+    // protégées, et les listes de pistes stockées ne sont jamais modifiées après coup.
+    private readonly object _trackListsLock = new();
+    private readonly HashSet<string> _expanded = new();
+    private readonly Dictionary<string, IReadOnlyList<QobuzTrack>> _trackLists = new();
+
+    public static string AlbumKey(string albumId) => "album:" + albumId;
+    public static string PlaylistKey(long playlistId) => "playlist:" + playlistId;
+
+    public bool IsExpanded(string key)
+    {
+        lock (_trackListsLock) return _expanded.Contains(key);
+    }
+
+    /// <summary>Déplie ou replie la ligne ; vrai quand elle est dépliée après l'appel.</summary>
+    public bool ToggleExpanded(string key)
+    {
+        lock (_trackListsLock) return _expanded.Remove(key) ? false : _expanded.Add(key);
+    }
+
+    /// <summary>Les pistes déjà chargées de cet album ou de cette playlist, ou null.</summary>
+    public IReadOnlyList<QobuzTrack>? TracksOf(string key)
+    {
+        lock (_trackListsLock) return _trackLists.GetValueOrDefault(key);
+    }
+
+    public void SetTracks(string key, IReadOnlyList<QobuzTrack> tracks)
+    {
+        lock (_trackListsLock) _trackLists[key] = tracks;
+    }
+
+    /// <summary>Une nouvelle recherche remplace les résultats : les lignes dépliées n'ont plus lieu d'être.</summary>
+    public void ForgetTrackLists()
+    {
+        lock (_trackListsLock)
+        {
+            _expanded.Clear();
+            _trackLists.Clear();
+        }
+    }
+
     public int ExpandedArtistId { get; set; }
     public List<QobuzAlbum>? ArtistAlbums { get; set; }
 

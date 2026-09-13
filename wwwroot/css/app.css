@@ -504,6 +504,79 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     border-radius: 4px;
 }
 
+/* Albums and playlists open onto their track list, like artists open onto their albums */
+.album-block, .artist-album-block { border-bottom: 1px solid var(--border); }
+.album-block:last-child { border-bottom: none; }
+.album-block > .search-result-row,
+.artist-album-block > .search-result-row { border-bottom: none; }
+
+.expandable { cursor: pointer; }
+.expandable.expanded { background: rgba(233,69,96,0.08); }
+
+.track-list {
+    padding: 0 10px 10px 72px;
+    animation: slideDown 0.2s ease-out;
+    font-size: 0.9em;
+}
+
+.track-disc {
+    margin: 8px 0 2px;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.track-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.track-row:last-child { border-bottom: none; }
+
+.track-num {
+    width: 28px;
+    flex-shrink: 0;
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.track-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-meta {
+    flex: 0 1 40%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.track-duration {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.track-explicit {
+    margin-left: 6px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    background: var(--border);
+    color: var(--text-secondary);
+}
+
 .artist-albums-loading {
     padding: 12px 0;
     color: var(--text-secondary);
@@ -989,6 +1062,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     .search-result-row .btn-sm { padding: 8px 10px; }
 
     .artist-albums { padding: 0 4px 10px 16px; }
+    .track-list { padding: 0 4px 10px 12px; }
+    .track-meta { display: none; }
 
     .album-info img { width: 80px; height: 80px; }
     .album-details h3 { font-size: 1.05em; }
@@ -1038,7 +1113,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     .queue-btn.danger:hover:not(:disabled) { background: var(--border); }
     .search-result-row:hover { background: transparent; }
     .search-result-row.selected:hover { background: rgba(233,69,96,0.1); }
-    .artist-row.expanded:hover { background: rgba(233,69,96,0.08); }
+    .artist-row.expanded:hover,
+    .expandable.expanded:hover { background: rgba(233,69,96,0.08); }
     .nav-link:hover { background: none; color: var(--text-secondary); }
     .nav-link.active:hover { background: rgba(233,69,96,0.2); color: var(--accent); }
     .token:hover {

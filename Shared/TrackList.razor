@@ -1,0 +1,57 @@
+@inherits LocalizedComponentBase
+
+@* Les pistes d'un album ou d'une playlist dépliés dans les résultats de recherche. Une playlist
+   numérote les pistes selon l'ordre où elle les présente et indique l'artiste et l'album de chacune ;
+   un album suit la numérotation du disque, avec un intertitre quand il en compte plusieurs. *@
+<div class="track-list">
+    @if (Loading)
+    {
+        <div class="artist-albums-loading">@Loc["search.loadingTracks"]</div>
+    }
+    else if (Tracks is { } tracks)
+    {
+        if (tracks.Count == 0)
+        {
+            <div class="artist-albums-loading">@Loc["search.noTracks"]</div>
+        }
+
+        var multiDisc = !IsPlaylist && tracks.Select(t => t.MediaNumber).Distinct().Count() > 1;
+        var lastDisc = 0;
+        var position = 0;
+
+        foreach (var track in tracks)
+        {
+            position++;
+            if (multiDisc && track.MediaNumber != lastDisc)
+            {
+                lastDisc = track.MediaNumber;
+                <div class="track-disc">@Loc.T("search.disc", track.MediaNumber)</div>
+            }
+
+            <div class="track-row">
+                <span class="track-num">@(IsPlaylist ? position : track.TrackNumber)</span>
+                <span class="track-title">@track.Title@(track.Version != null ? $" ({track.Version})" : "")@if (track.ParentalWarning) {<span class="track-explicit" title='@Loc["search.explicit"]'>E</span>}</span>
+                @if (IsPlaylist)
+                {
+                    <span class="track-meta">@track.Performer?.Name &middot; @track.Album?.Title</span>
+                }
+                <span class="track-duration">@TrackDuration.Format(track.Duration)</span>
+            </div>
+        }
+    }
+    else if (Failed)
+    {
+        <div class="artist-albums-loading">@Loc["search.tracksError"]</div>
+    }
+</div>
+
+@code {
+    /// <summary>Les pistes une fois chargées ; null tant qu'elles ne le sont pas.</summary>
+    [Parameter] public IReadOnlyList<QobuzTrack>? Tracks { get; set; }
+
+    [Parameter] public bool Loading { get; set; }
+
+    [Parameter] public bool Failed { get; set; }
+
+    [Parameter] public bool IsPlaylist { get; set; }
+}
