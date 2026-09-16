@@ -1,25 +1,19 @@
-# .NET build output and IDE files
-bin/
-obj/
-.vs/
-.idea/
-.vscode/
-*.user
-*.suo
+# Rust
+/target/
+
+# Web interface
+/web/node_modules/
+/web/build/
+/web/.svelte-kit/
 
 # Runtime data: the settings hold the Qobuz session token and app secret, never commit them
 /config/
 /downloads/
 /settings.json*
-qbdlx-temp/
+/queue.json*
 
-# Android
-android/.gradle/
-android/**/build/
-android/local.properties
-*.keystore
-*.jks
-
-# Local test material
+# Editors and local files
+.idea/
+.vscode/
 account.txt
 .playwright-mcp/
