@@ -1,0 +1,27 @@
+[package]
+name = "qobuzdlx"
+version = "2.0.0-dev"
+edition = "2024"
+rust-version = "1.85"
+description = "A self-hosted web application for downloading music from Qobuz"
+license = "MIT"
+repository = "https://gitlab.com/L-at-nnes/qobuzdlx.web"
+readme = "README.md"
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
