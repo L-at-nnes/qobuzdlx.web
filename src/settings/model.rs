@@ -168,6 +168,7 @@ impl Default for TitleMarker {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DownloadSettings {
+    /// Where the music goes. Empty until the user picks a folder: the runtime default applies then.
     pub directory: PathBuf,
     pub quality: Quality,
 }
@@ -175,7 +176,7 @@ pub struct DownloadSettings {
 impl Default for DownloadSettings {
     fn default() -> Self {
         Self {
-            directory: PathBuf::from("/downloads"),
+            directory: PathBuf::new(),
             quality: Quality::Flac24Max,
         }
     }
