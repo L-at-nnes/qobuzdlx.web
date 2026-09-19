@@ -3,6 +3,7 @@
 mod auth;
 mod catalogue;
 mod client;
+mod credentials;
 mod error;
 mod models;
 mod pagination;
