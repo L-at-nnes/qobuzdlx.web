@@ -15,7 +15,7 @@ pub enum Error {
 
     /// The request never got an answer: network down, timeout, TLS failure.
     #[error("could not reach Qobuz: {0}")]
-    Network(#[from] reqwest::Error),
+    Network(reqwest::Error),
 
     /// A call that needs a session was made without one.
     #[error("not signed in to Qobuz")]
@@ -28,6 +28,13 @@ pub enum Error {
     /// Qobuz answered 200 with something that is not what was asked for.
     #[error("unexpected answer from Qobuz: {0}")]
     Unexpected(String),
+}
+
+impl From<reqwest::Error> for Error {
+    /// The URL is removed from the error: login requests carry the password in their query.
+    fn from(error: reqwest::Error) -> Self {
+        Self::Network(error.without_url())
+    }
 }
 
 impl Error {
