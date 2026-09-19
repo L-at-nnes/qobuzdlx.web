@@ -61,8 +61,6 @@ impl Default for ClientConfig {
 /// How a request identifies itself.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Auth<'a> {
-    /// No identification at all.
-    Anonymous,
     /// The app only, as before signing in.
     App { app_id: &'a str },
     /// The app and the signed-in user.
@@ -113,14 +111,6 @@ impl Client {
     #[must_use]
     pub fn production() -> Self {
         Self::new(ClientConfig::default())
-    }
-
-    pub(super) fn config(&self) -> &ClientConfig {
-        &self.inner.config
-    }
-
-    pub(super) fn http(&self) -> &reqwest::Client {
-        &self.inner.http
     }
 
     // ─── Session ───
