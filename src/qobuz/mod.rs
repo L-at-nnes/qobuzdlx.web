@@ -3,6 +3,7 @@
 mod client;
 mod error;
 mod models;
+mod pagination;
 mod session;
 mod signing;
 
