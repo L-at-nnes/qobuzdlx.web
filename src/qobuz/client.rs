@@ -219,8 +219,34 @@ impl Client {
         params: &[(&str, String)],
         auth: Auth<'_>,
     ) -> Result<String> {
+        self.get_text_with(endpoint, params, auth, self.inner.config.retry)
+            .await
+    }
+
+    /// Like [`Client::get_text`] but never replays the request: for logins, where a second attempt
+    /// would be a second try of the same password.
+    pub(super) async fn get_text_once(
+        &self,
+        endpoint: &str,
+        params: &[(&str, String)],
+        auth: Auth<'_>,
+    ) -> Result<String> {
+        let once = RetryPolicy {
+            max_attempts: 1,
+            ..self.inner.config.retry
+        };
+        self.get_text_with(endpoint, params, auth, once).await
+    }
+
+    async fn get_text_with(
+        &self,
+        endpoint: &str,
+        params: &[(&str, String)],
+        auth: Auth<'_>,
+        policy: RetryPolicy,
+    ) -> Result<String> {
         let url = format!("{}{endpoint}", self.inner.config.api_base);
-        let response = self.send_with_retry(&url, params, auth).await?;
+        let response = self.send_with_retry(&url, params, auth, policy).await?;
         Self::successful_body(endpoint, response).await
     }
 
@@ -242,9 +268,8 @@ impl Client {
         url: &str,
         params: &[(&str, String)],
         auth: Auth<'_>,
+        policy: RetryPolicy,
     ) -> Result<Response> {
-        let policy = self.inner.config.retry;
-
         let mut attempt = 0;
         loop {
             attempt += 1;
