@@ -286,18 +286,18 @@ impl Client {
         params: &[(&str, String)],
         auth: Auth<'_>,
     ) -> reqwest::RequestBuilder {
-        let mut request = self.inner.http.get(url).query(params);
+        let request = self.inner.http.get(url).query(params);
 
         // Identification goes in the headers and in the query, as the web player does it
-        if let Auth::App { app_id } | Auth::User { app_id, .. } = auth {
-            request = request
+        match auth {
+            Auth::App { app_id } => request
                 .header("X-App-Id", app_id)
-                .query(&[("app_id", app_id)]);
+                .query(&[("app_id", app_id)]),
+            Auth::User { app_id, token } => request
+                .header("X-App-Id", app_id)
+                .header("X-User-Auth-Token", token)
+                .query(&[("app_id", app_id)]),
         }
-        if let Auth::User { token, .. } = auth {
-            request = request.header("X-User-Auth-Token", token);
-        }
-        request
     }
 
     /// Fetches a page of the web player: a plain GET with no identification.
