@@ -1,6 +1,6 @@
 //! A scriptable HTTP server standing in for Qobuz and its CDN.
 
-#![allow(dead_code)] // each test binary uses a different part of this module
+#![allow(dead_code, clippy::needless_pass_by_value)] // each test binary uses a different part of this module
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
