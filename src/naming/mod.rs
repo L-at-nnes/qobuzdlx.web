@@ -1,10 +1,12 @@
 //! Folder and file names built from templates.
 
+mod check;
 mod credits;
 mod namer;
 mod quality;
 mod sanitize;
 
+pub use check::{Issue, IssueKind, Preview, TemplateField, preview, validate};
 pub use credits::{
     album_title, format_title, is_various_artists, joined_main_artists, parental_warning,
     track_title,

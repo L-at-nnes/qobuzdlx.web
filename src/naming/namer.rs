@@ -409,7 +409,7 @@ fn rename_variable(template: &str, from: &str, to: &str) -> String {
         .into_owned()
 }
 
-fn replace_ignoring_case(text: &str, pattern: &str, replacement: &str) -> String {
+pub(super) fn replace_ignoring_case(text: &str, pattern: &str, replacement: &str) -> String {
     let lowered = text.to_lowercase();
     let pattern = pattern.to_lowercase();
 
