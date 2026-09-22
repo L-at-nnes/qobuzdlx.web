@@ -1,6 +1,7 @@
 //! `QobuzDLX`: a self-hosted web application for downloading music from Qobuz.
 
 pub mod config;
+pub mod download;
 pub mod hex;
 pub mod naming;
 pub mod qobuz;
