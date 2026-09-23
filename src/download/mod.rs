@@ -1,5 +1,6 @@
 //! Downloading: the queue, the pipeline of a track and the worker that runs them.
 
+mod chain;
 mod item;
 mod log;
 mod m3u;
@@ -8,6 +9,7 @@ mod queue;
 mod store;
 mod url;
 
+pub use chain::{describe_stream, fallback_chain, quality_label};
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
 pub use log::{Log, LogEvent, LogLine};
 pub use progress::{AlbumCard, Progress, ProgressScope, TrackProgress};
