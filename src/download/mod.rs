@@ -3,10 +3,12 @@
 mod item;
 mod log;
 mod m3u;
+mod progress;
 mod queue;
 mod url;
 
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
 pub use log::{Log, LogEvent, LogLine};
+pub use progress::{AlbumCard, Progress, ProgressScope, TrackProgress};
 pub use queue::{Enqueued, Queue};
 pub use url::{QobuzUrl, parse as parse_url};
