@@ -1,6 +1,7 @@
 //! Downloading: the queue, the pipeline of a track and the worker that runs them.
 
 mod item;
+mod m3u;
 mod queue;
 mod url;
 
