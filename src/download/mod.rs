@@ -2,6 +2,8 @@
 
 mod item;
 mod queue;
+mod url;
 
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
 pub use queue::{Enqueued, Queue};
+pub use url::{QobuzUrl, parse as parse_url};
