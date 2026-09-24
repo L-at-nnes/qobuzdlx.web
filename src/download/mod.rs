@@ -9,6 +9,7 @@ mod queue;
 mod store;
 mod transfer;
 mod url;
+mod verify;
 
 pub use chain::{describe_stream, fallback_chain, quality_label};
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
@@ -18,3 +19,4 @@ pub use queue::{Enqueued, Queue};
 pub use store::QueueStore;
 pub use transfer::{Error as TransferError, Fetcher, Transfer, Update as TransferUpdate};
 pub use url::{QobuzUrl, parse as parse_url};
+pub use verify::{Error as VerifyError, verify_flac};
