@@ -20,6 +20,7 @@ regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "gzip", "query", "stream"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+symphonia = { version = "0.6.1", default-features = false, features = ["flac"] }
 thiserror = "2.0.21"
 time = { version = "0.3.45", features = ["formatting"] }
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util"] }
@@ -47,5 +48,6 @@ strip = true
 [dev-dependencies]
 axum = "0.8.9"
 base64 = "0.23.1"
+flacenc = "0.5.1"
 tempfile = "3.27.0"
 tokio = { version = "1.53.2", features = ["test-util"] }
