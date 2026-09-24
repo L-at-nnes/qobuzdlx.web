@@ -17,8 +17,8 @@ fn fetcher() -> Fetcher {
 async fn a_file_is_written_as_received() {
     let server = FakeServer::start().await;
     let content: Vec<u8> = (0..=255u8).cycle().take(300_000).collect();
-    let served = content.clone();
-    server.on("/file", move |_| Reply::bytes(served.clone()));
+    let body = content.clone();
+    server.on("/file", move |_| Reply::bytes(body.clone()));
     let directory = TempDir::new().unwrap();
     let path = directory.path().join("track.flac");
 
