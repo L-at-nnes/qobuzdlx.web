@@ -19,4 +19,4 @@ pub use queue::{Enqueued, Queue};
 pub use store::QueueStore;
 pub use transfer::{Error as TransferError, Fetcher, Transfer, Update as TransferUpdate};
 pub use url::{QobuzUrl, parse as parse_url};
-pub use verify::{Error as VerifyError, verify_flac};
+pub use verify::{Error as VerifyError, fix_md5, verify_flac};
