@@ -2,6 +2,7 @@
 
 mod artwork;
 mod chain;
+mod goody;
 mod item;
 mod log;
 mod m3u;
@@ -14,6 +15,7 @@ mod verify;
 
 pub use artwork::{Covers, cover_url};
 pub use chain::{describe_stream, fallback_chain, quality_label};
+pub use goody::goody_file_name;
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
 pub use log::{Log, LogEvent, LogLine};
 pub use progress::{AlbumCard, Progress, ProgressScope, TrackProgress};
