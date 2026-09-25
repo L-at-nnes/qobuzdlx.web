@@ -8,6 +8,7 @@ mod log;
 mod m3u;
 mod progress;
 mod queue;
+mod report;
 mod store;
 mod transfer;
 mod url;
@@ -20,6 +21,7 @@ pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueI
 pub use log::{Log, LogEvent, LogLine};
 pub use progress::{AlbumCard, Progress, ProgressScope, TrackProgress};
 pub use queue::{Enqueued, Queue};
+pub use report::{Outcome, Reporter, StepTrack};
 pub use store::QueueStore;
 pub use transfer::{Error as TransferError, Fetcher, Transfer, Update as TransferUpdate};
 pub use url::{QobuzUrl, parse as parse_url};
