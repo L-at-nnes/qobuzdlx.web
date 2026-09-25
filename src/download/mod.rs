@@ -1,5 +1,6 @@
 //! Downloading: the queue, the pipeline of a track and the worker that runs them.
 
+mod artwork;
 mod chain;
 mod item;
 mod log;
@@ -11,6 +12,7 @@ mod transfer;
 mod url;
 mod verify;
 
+pub use artwork::{Covers, cover_url};
 pub use chain::{describe_stream, fallback_chain, quality_label};
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};
 pub use log::{Log, LogEvent, LogLine};
