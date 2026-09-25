@@ -200,3 +200,87 @@ async fn respond(State(shared): State<Arc<Shared>>, request: Request) -> Respons
         None => Reply::error(404, "No result matching given argument").into_response(),
     }
 }
+
+// ─── Qobuz session ───
+
+/// A session as the one a sign-in gives.
+pub fn session() -> qobuzdlx::qobuz::Session {
+    use qobuzdlx::qobuz::{Account, AppCredentials, Session};
+    Session {
+        app: AppCredentials {
+            app_id: "1234".into(),
+            app_secret: "the-secret".into(),
+        },
+        user_auth_token: "user-token".into(),
+        account: Account::default(),
+    }
+}
+
+/// A server and a client of it that is signed in.
+pub async fn signed_in() -> (FakeServer, Client) {
+    let server = FakeServer::start().await;
+    let client = server.client();
+    client.start_session(session());
+    (server, client)
+}
+
+// ─── Audio ───
+
+/// A short FLAC file: a stereo sine wave in ten full blocks.
+#[allow(clippy::cast_possible_truncation)] // Samples are well within 16 bits
+pub fn flac_bytes() -> Vec<u8> {
+    use flacenc::component::BitRepr;
+    use flacenc::error::Verify;
+
+    let samples: Vec<i32> = (0..40_960)
+        .flat_map(|index| {
+            let value = (f64::from(index) * 0.05).sin() * 12_000.0;
+            [value as i32, (value * 0.5) as i32]
+        })
+        .collect();
+    let config = flacenc::config::Encoder::default().into_verified().unwrap();
+    let source = flacenc::source::MemSource::from_samples(&samples, 2, 16, 44_100);
+    let stream = flacenc::encode_with_fixed_block_size(&config, source, config.block_size).unwrap();
+    let mut sink = flacenc::bitsink::ByteSink::new();
+    stream.write(&mut sink).unwrap();
+    sink.as_slice().to_vec()
+}
+
+// ─── What a download reports ───
+
+/// Keeps what a download reports, to be checked afterwards.
+#[derive(Default)]
+pub struct Recorder {
+    events: Mutex<Vec<qobuzdlx::download::LogEvent>>,
+    transfers: Mutex<usize>,
+}
+
+impl Recorder {
+    pub fn events(&self) -> Vec<qobuzdlx::download::LogEvent> {
+        self.events.lock().unwrap().clone()
+    }
+
+    pub fn has(&self, wanted: impl Fn(&qobuzdlx::download::LogEvent) -> bool) -> bool {
+        self.events().iter().any(wanted)
+    }
+
+    pub fn count(&self, wanted: impl Fn(&qobuzdlx::download::LogEvent) -> bool) -> usize {
+        self.events().iter().filter(|event| wanted(event)).count()
+    }
+}
+
+impl qobuzdlx::download::Reporter for Recorder {
+    fn log(&self, event: qobuzdlx::download::LogEvent) {
+        self.events.lock().unwrap().push(event);
+    }
+
+    fn album(&self, _album: Option<&qobuzdlx::qobuz::Album>) {}
+
+    fn step(&self, _percent: u8, _track: Option<qobuzdlx::download::StepTrack>) {}
+
+    fn transfer(&self, _update: qobuzdlx::download::TransferUpdate) {
+        *self.transfers.lock().unwrap() += 1;
+    }
+
+    fn outcome(&self, _outcome: &qobuzdlx::download::Outcome) {}
+}
