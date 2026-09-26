@@ -1,6 +1,7 @@
 //! Processing one queue item: what to download for an address, album by album and track by track.
 
 mod album;
+mod playlist;
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
