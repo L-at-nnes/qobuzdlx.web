@@ -97,6 +97,8 @@ pub enum LogEvent {
     PreviewOnly,
     FavoritesEmpty,
     LabelNotFound,
+    TrackNotFound,
+    AlbumInfoUnavailable,
     PlaylistFileWritten {
         name: String,
     },
@@ -130,6 +132,8 @@ impl LogEvent {
             | Self::AlbumFailed { .. }
             | Self::ArtistFailed { .. }
             | Self::PreviewOnly
+            | Self::TrackNotFound
+            | Self::AlbumInfoUnavailable
             | Self::PlaylistFileFailed { .. }
             | Self::GoodyFailed { .. }
             | Self::Md5FixFailed { .. }
@@ -236,6 +240,10 @@ impl fmt::Display for LogEvent {
             ),
             Self::FavoritesEmpty => write!(formatter, "No favorites to download."),
             Self::LabelNotFound => write!(formatter, "Label not found."),
+            Self::TrackNotFound => write!(formatter, "Track not found."),
+            Self::AlbumInfoUnavailable => {
+                write!(formatter, "The album of this track could not be found.")
+            }
             Self::PlaylistFileWritten { name } => {
                 write!(formatter, "Playlist file written: {name}")
             }
