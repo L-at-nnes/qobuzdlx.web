@@ -252,7 +252,8 @@ pub fn flac_bytes() -> Vec<u8> {
 #[derive(Default)]
 pub struct Recorder {
     events: Mutex<Vec<qobuzdlx::download::LogEvent>>,
-    transfers: Mutex<usize>,
+    steps: Mutex<Vec<u8>>,
+    albums: Mutex<Vec<String>>,
 }
 
 impl Recorder {
@@ -267,6 +268,16 @@ impl Recorder {
     pub fn count(&self, wanted: impl Fn(&qobuzdlx::download::LogEvent) -> bool) -> usize {
         self.events().iter().filter(|event| wanted(event)).count()
     }
+
+    /// The overall percentages reported, in order.
+    pub fn steps(&self) -> Vec<u8> {
+        self.steps.lock().unwrap().clone()
+    }
+
+    /// The titles of the albums reported as being processed.
+    pub fn albums(&self) -> Vec<String> {
+        self.albums.lock().unwrap().clone()
+    }
 }
 
 impl qobuzdlx::download::Reporter for Recorder {
@@ -274,13 +285,17 @@ impl qobuzdlx::download::Reporter for Recorder {
         self.events.lock().unwrap().push(event);
     }
 
-    fn album(&self, _album: Option<&qobuzdlx::qobuz::Album>) {}
-
-    fn step(&self, _percent: u8, _track: Option<qobuzdlx::download::StepTrack>) {}
-
-    fn transfer(&self, _update: qobuzdlx::download::TransferUpdate) {
-        *self.transfers.lock().unwrap() += 1;
+    fn album(&self, album: Option<&qobuzdlx::qobuz::Album>) {
+        if let Some(album) = album {
+            self.albums.lock().unwrap().push(album.title.clone());
+        }
     }
+
+    fn step(&self, percent: u8, _track: Option<qobuzdlx::download::StepTrack>) {
+        self.steps.lock().unwrap().push(percent);
+    }
+
+    fn transfer(&self, _update: qobuzdlx::download::TransferUpdate) {}
 
     fn outcome(&self, _outcome: &qobuzdlx::download::Outcome) {}
 }
