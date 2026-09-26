@@ -4,7 +4,7 @@ use super::{Job, JobError};
 use crate::download::goody::goody_file_name;
 use crate::download::log::LogEvent;
 use crate::download::report::StepTrack;
-use crate::download::track::{TrackError, TrackRequest};
+use crate::download::track::TrackRequest;
 use crate::naming::{DownloadKind, track_title};
 use crate::qobuz::{Album, Goody, Track};
 
@@ -55,7 +55,9 @@ impl Job {
                 .await
             {
                 Ok(()) => {}
-                Err(JobError::Track(error)) => self.track_failed(listed.id, &title, &error),
+                Err(JobError::Track(error)) => {
+                    self.track_failed(listed.id, &title, &error.to_string())
+                }
                 Err(other) => return Err(other),
             }
         }
@@ -179,12 +181,12 @@ impl Job {
     }
 
     /// Notes a track that could not be downloaded, and goes on with the next one.
-    pub(super) fn track_failed(&mut self, track_id: u64, title: &str, error: &TrackError) {
+    pub(super) fn track_failed(&mut self, track_id: u64, title: &str, error: &str) {
         self.log(LogEvent::TrackFailed {
             track_id,
-            error: error.to_string(),
+            error: error.to_owned(),
         });
-        self.outcome.failed(track_id, title, error.to_string());
+        self.outcome.failed(track_id, title, error);
         self.outcome_changed();
     }
 

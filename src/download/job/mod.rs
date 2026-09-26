@@ -1,6 +1,7 @@
 //! Processing one queue item: what to download for an address, album by album and track by track.
 
 mod album;
+mod collections;
 mod playlist;
 
 use std::collections::{BTreeSet, HashMap};
@@ -33,6 +34,9 @@ pub enum JobError {
     SessionExpired,
     #[error("{0}")]
     Api(qobuz::Error),
+    /// An address whose identifier is not what its kind needs.
+    #[error("not a valid Qobuz address")]
+    InvalidAddress,
     /// A track that was asked for on its own could not be downloaded.
     #[error("{0}")]
     Track(TrackError),
