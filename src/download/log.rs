@@ -328,6 +328,7 @@ impl Log {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use LogDetail::{Detailed, Errors, Normal};
 
     fn failure() -> LogEvent {
         LogEvent::TrackFailed {
@@ -372,7 +373,6 @@ mod tests {
             .iter()
             .map(|line| line.level)
             .collect::<Vec<_>>();
-        use LogDetail::{Detailed, Errors, Normal};
         // errors: failure | normal: failure, narration | detailed: all three
         assert_eq!(kept, [Errors, Errors, Normal, Errors, Normal, Detailed]);
     }

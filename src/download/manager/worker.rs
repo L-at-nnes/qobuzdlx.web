@@ -88,11 +88,11 @@ impl Inner {
         let outcome = job.into_outcome();
 
         *locked(&self.current) = None;
-        self.finish(&item.id, outcome, result, detail);
+        self.finish(&item.id, &outcome, result, detail);
     }
 
     /// Records how an item ended.
-    fn finish(&self, id: &str, outcome: Outcome, result: Result<(), JobError>, detail: LogDetail) {
+    fn finish(&self, id: &str, outcome: &Outcome, result: Result<(), JobError>, detail: LogDetail) {
         if let Some(item) = locked(&self.state).queue.get_mut(id) {
             outcome.write_to(item);
         }

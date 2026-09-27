@@ -56,7 +56,7 @@ impl Job {
             {
                 Ok(()) => {}
                 Err(JobError::Track(error)) => {
-                    self.track_failed(listed.id, &title, &error.to_string())
+                    self.track_failed(listed.id, &title, &error.to_string());
                 }
                 Err(other) => return Err(other),
             }

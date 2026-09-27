@@ -170,7 +170,7 @@ impl Job {
 
     /// Moves the progress to the `index`-th of `total` things, and names the track in progress.
     fn step(&self, index: usize, total: usize, track: Option<StepTrack>) {
-        let percent = if total == 0 { 0 } else { index * 100 / total };
+        let percent = (index * 100).checked_div(total).unwrap_or(0);
         let percent = u8::try_from(percent.min(100)).unwrap_or(100);
         self.reporter.step(self.scope.map(percent), track);
     }
@@ -237,7 +237,7 @@ impl Job {
                     saved = Some(picture);
                 }
                 Err(error) => {
-                    tracing::warn!(%error, "cover could not be downloaded")
+                    tracing::warn!(%error, "cover could not be downloaded");
                 }
             }
         }
