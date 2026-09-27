@@ -184,12 +184,8 @@ impl Context<'_> {
             request.album,
             request.track,
         );
-        let cover = request
-            .cover
-            .filter(|_| settings.tags.cover)
-            .map(<[u8]>::to_vec);
-        let tagged = temp.to_path_buf();
-        blocking(move || tagging::write(&tagged, &values, cover.as_deref())).await??;
+        let cover = request.cover.filter(|_| settings.tags.cover);
+        self.tag(temp, values, cover).await?;
 
         let target = place(temp, wanted, settings.advanced.duplicates).await?;
 
@@ -318,6 +314,33 @@ impl Context<'_> {
             quality: describe_stream(&stream, quality),
             transfer,
         }))
+    }
+
+    /// Writes the tags. A picture that cannot be embedded (an error page served as a cover) is no
+    /// reason to lose the track: it goes without.
+    async fn tag(
+        &self,
+        path: &Path,
+        values: tagging::TagValues,
+        cover: Option<&[u8]>,
+    ) -> Result<(), TrackError> {
+        let target = path.to_path_buf();
+        let picture = cover.map(<[u8]>::to_vec);
+        let fallback = values.clone();
+        let result = blocking({
+            let target = target.clone();
+            move || tagging::write(&target, &values, picture.as_deref())
+        })
+        .await?;
+
+        match result {
+            Err(error) if cover.is_some() => {
+                tracing::warn!(%error, "cover could not be embedded, tagging without it");
+                blocking(move || tagging::write(&target, &fallback, None)).await??;
+                Ok(())
+            }
+            other => Ok(other?),
+        }
     }
 
     /// A failure is not fatal: the track stays playable, so it is reported and the download goes on.

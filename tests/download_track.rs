@@ -83,6 +83,10 @@ impl Rig {
     }
 
     async fn download(&self) -> Result<TrackResult, TrackError> {
+        self.download_with(None).await
+    }
+
+    async fn download_with(&self, cover: Option<&[u8]>) -> Result<TrackResult, TrackError> {
         let env = Environment {
             client: self.client.clone(),
             fetcher: Fetcher::new(reqwest::Client::new(), Duration::from_secs(5)),
@@ -106,7 +110,7 @@ impl Rig {
                 folder: self.music.path(),
                 playlist: None,
                 suffix: "",
-                cover: None,
+                cover,
             })
             .await
     }
@@ -404,4 +408,18 @@ async fn an_mp3_download_is_not_checked_as_flac() {
         .map(|call| call.param("format_id").to_owned())
         .collect();
     assert!(formats.iter().all(|format| format == "5"), "{formats:?}");
+}
+
+#[tokio::test]
+async fn a_cover_that_is_not_a_picture_does_not_cost_the_track() {
+    let rig = Rig::new().await;
+    rig.serve(flac_bytes());
+
+    // Too short to be a picture: the tagger refuses it
+    let result = rig.download_with(Some(b"jpeg")).await.unwrap();
+
+    let tagged = Probe::open(&result.path).unwrap().read().unwrap();
+    let tag = tagged.primary_tag().expect("the file is tagged");
+    assert_eq!(tag.title().as_deref(), Some("So What"));
+    assert_eq!(tag.picture_count(), 0);
 }
