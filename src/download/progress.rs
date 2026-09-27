@@ -1,5 +1,8 @@
 use serde::Serialize;
 
+use crate::naming::album_title;
+use crate::qobuz::Album;
+
 /// The part of the overall progress bar that what is being processed takes up.
 ///
 /// An artist or a label goes through albums that each report their own progress from 0 to 100 %:
@@ -52,6 +55,29 @@ pub struct AlbumCard {
     /// `24bit / 96kHz`
     pub quality: String,
     pub cover: String,
+}
+
+impl From<&Album> for AlbumCard {
+    fn from(album: &Album) -> Self {
+        let quality = if album.maximum_bit_depth > 0 && album.maximum_sampling_rate > 0.0 {
+            format!(
+                "{}bit / {}kHz",
+                album.maximum_bit_depth, album.maximum_sampling_rate
+            )
+        } else {
+            String::new()
+        };
+        Self {
+            title: album_title(album),
+            artist: album.artist.name.clone().unwrap_or_default(),
+            release_date: album.release_date_original.clone(),
+            tracks_count: album.tracks_count,
+            genre: album.genre.name.clone(),
+            label: album.label.name.clone(),
+            quality,
+            cover: album.image.large.clone(),
+        }
+    }
 }
 
 /// The track being downloaded.
@@ -115,5 +141,39 @@ mod tests {
     #[test]
     fn a_percentage_beyond_a_hundred_stays_in_the_bar() {
         assert_eq!(ProgressScope::FULL.map(250), 100);
+    }
+
+    #[test]
+    fn the_card_of_an_album_says_what_it_is() {
+        let album: Album = serde_json::from_str(
+            r#"{
+                "id": "a", "title": "Kind of Blue", "version": "Mono",
+                "artist": { "id": 1, "name": "Miles Davis" },
+                "tracks_count": 5, "maximum_bit_depth": 24, "maximum_sampling_rate": 96.0,
+                "genre": { "name": "Jazz" }, "label": { "id": 2, "name": "Columbia" },
+                "release_date_original": "1959-08-17",
+                "image": { "large": "https://static.example/c_600.jpg" }
+            }"#,
+        )
+        .unwrap();
+
+        let card = AlbumCard::from(&album);
+
+        assert_eq!(card.title, "Kind of Blue (Mono)");
+        assert_eq!(card.artist, "Miles Davis");
+        assert_eq!(card.quality, "24bit / 96kHz");
+        assert_eq!(card.release_date.as_deref(), Some("1959-08-17"));
+        assert_eq!(
+            (card.genre.as_str(), card.label.as_str()),
+            ("Jazz", "Columbia")
+        );
+    }
+
+    #[test]
+    fn an_album_without_a_known_quality_has_an_empty_one() {
+        let album: Album =
+            serde_json::from_str(r#"{"id": "a", "title": "T", "artist": {"id": 1}}"#).unwrap();
+
+        assert_eq!(AlbumCard::from(&album).quality, "");
     }
 }
