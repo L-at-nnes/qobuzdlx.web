@@ -4,6 +4,22 @@ use crate::settings::ArtworkSize;
 /// The size Qobuz serves for every release, and the one used when another is refused.
 const DEFAULT_WIDTH: u16 = 600;
 
+#[derive(Debug, thiserror::Error)]
+pub enum CoverError {
+    #[error("could not download the cover: {0}")]
+    Http(reqwest::Error),
+    /// Qobuz answered with something else than a picture, an error page for instance.
+    #[error("the cover is not a picture")]
+    NotAnImage,
+}
+
+impl From<reqwest::Error> for CoverError {
+    /// The address is removed from the error, as it is everywhere else.
+    fn from(error: reqwest::Error) -> Self {
+        Self::Http(error.without_url())
+    }
+}
+
 /// The address of a cover at a given size.
 ///
 /// Qobuz serves the same picture as `…_50.jpg` up to `…_600.jpg`, and `…_org.jpg` for the file as
@@ -15,6 +31,13 @@ pub fn cover_url(album: &Album, size: ArtworkSize) -> String {
         ArtworkSize::Pixels(width) => width.to_string(),
     };
     album.image.large.replace("_600", &format!("_{suffix}"))
+}
+
+/// Whether the bytes start like a JPEG, a PNG or a WebP file.
+fn is_image(bytes: &[u8]) -> bool {
+    bytes.starts_with(&[0xFF, 0xD8, 0xFF])
+        || bytes.starts_with(&[0x89, b'P', b'N', b'G'])
+        || (bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"))
 }
 
 /// Downloads covers.
@@ -33,13 +56,13 @@ impl Covers {
     ///
     /// The original is not available for every release: when Qobuz refuses a size, the 600 pixel
     /// version is used rather than going without a cover.
-    pub async fn fetch(&self, album: &Album, size: ArtworkSize) -> Result<Vec<u8>, reqwest::Error> {
+    pub async fn fetch(&self, album: &Album, size: ArtworkSize) -> Result<Vec<u8>, CoverError> {
         match self.get(&cover_url(album, size)).await {
             Err(error) if size != ArtworkSize::Pixels(DEFAULT_WIDTH) => {
                 tracing::warn!(
                     album = %album.id,
                     ?size,
-                    error = %error.without_url(),
+                    %error,
                     "cover size unavailable, using 600 pixels"
                 );
                 self.get(&cover_url(album, ArtworkSize::Pixels(DEFAULT_WIDTH)))
@@ -49,9 +72,14 @@ impl Covers {
         }
     }
 
-    async fn get(&self, url: &str) -> Result<Vec<u8>, reqwest::Error> {
+    async fn get(&self, url: &str) -> Result<Vec<u8>, CoverError> {
         let response = self.http.get(url).send().await?.error_for_status()?;
-        Ok(response.bytes().await?.to_vec())
+        let bytes = response.bytes().await?;
+        if is_image(&bytes) {
+            Ok(bytes.to_vec())
+        } else {
+            Err(CoverError::NotAnImage)
+        }
     }
 }
 

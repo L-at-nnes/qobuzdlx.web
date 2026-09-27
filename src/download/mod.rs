@@ -16,7 +16,7 @@ mod transfer;
 mod url;
 mod verify;
 
-pub use artwork::{Covers, cover_url};
+pub use artwork::{CoverError, Covers, cover_url};
 pub use chain::{describe_stream, fallback_chain, quality_label};
 pub use goody::goody_file_name;
 pub use item::{Display, FailedTrack, ItemKind, ItemStatus, PlaylistEntry, QueueItem};

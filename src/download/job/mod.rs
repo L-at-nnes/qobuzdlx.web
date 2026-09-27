@@ -237,7 +237,7 @@ impl Job {
                     saved = Some(picture);
                 }
                 Err(error) => {
-                    tracing::warn!(error = %error.without_url(), "cover could not be downloaded")
+                    tracing::warn!(%error, "cover could not be downloaded")
                 }
             }
         }
@@ -254,7 +254,7 @@ impl Job {
             match self.covers.fetch(album, artwork.embedded_size).await {
                 Ok(picture) => Some(picture),
                 Err(error) => {
-                    tracing::warn!(error = %error.without_url(), "cover could not be downloaded");
+                    tracing::warn!(%error, "cover could not be downloaded");
                     None
                 }
             }
