@@ -72,6 +72,20 @@ async fn a_refused_token_is_announced_to_the_listeners_of_the_session() {
 }
 
 #[tokio::test]
+async fn a_refused_token_on_a_file_url_is_announced_too() {
+    let (server, client) = signed_in().await;
+    server.on("/api/track/getFileUrl", |_| {
+        Reply::error(401, "Invalid or expired user_auth_token")
+    });
+    let mut events = client.subscribe();
+
+    let error = client.stream_url(7, 6).await.unwrap_err();
+
+    assert!(error.is_unauthorized());
+    assert_eq!(events.recv().await.unwrap(), SessionEvent::Rejected);
+}
+
+#[tokio::test]
 async fn starting_and_ending_a_session_is_announced() {
     let server = FakeServer::start().await;
     let client = server.client();
