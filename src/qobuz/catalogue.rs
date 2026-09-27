@@ -95,7 +95,8 @@ impl Client {
             app_id: &session.app.app_id,
             token: &session.user_auth_token,
         };
-        self.get_json("track/getFileUrl", &params, auth).await
+        let result = self.get_json("track/getFileUrl", &params, auth).await;
+        self.announce_rejection(result)
     }
 
     // ─── Playlist ───

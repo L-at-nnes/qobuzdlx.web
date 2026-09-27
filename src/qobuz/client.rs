@@ -182,13 +182,18 @@ impl Client {
             token: &session.user_auth_token,
         };
 
-        match self.get_json(endpoint, params, auth).await {
-            Err(error) if error.is_unauthorized() => {
-                self.notify(SessionEvent::Rejected);
-                Err(error)
-            }
-            other => other,
+        let result = self.get_json(endpoint, params, auth).await;
+        self.announce_rejection(result)
+    }
+
+    /// A 401 means the token is no longer valid: it is announced before the error goes on.
+    pub(super) fn announce_rejection<T>(&self, result: Result<T>) -> Result<T> {
+        if let Err(error) = &result
+            && error.is_unauthorized()
+        {
+            self.notify(SessionEvent::Rejected);
         }
+        result
     }
 
     pub(super) async fn get_json<T: DeserializeOwned>(
