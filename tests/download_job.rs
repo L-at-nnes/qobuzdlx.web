@@ -1,159 +1,56 @@
 mod common;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
+use std::ops::Deref;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common::{FakeServer, Recorder, Reply, TINY_JPEG, flac_bytes, signed_in};
+use common::catalogue::{Catalogue, page};
+use common::{Recorder, Reply, TINY_JPEG};
 use qobuzdlx::download::{
     Covers, Display, Environment, Fetcher, ItemKind, Job, JobError, JobSetup, LogEvent, Outcome,
     QueueItem, Tuning,
 };
-use qobuzdlx::qobuz::Client;
 use qobuzdlx::settings::{Quality, Settings};
-use serde_json::{Value, json};
+use serde_json::json;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 
-type Table<K> = Arc<Mutex<HashMap<K, Value>>>;
-
-/// A small Qobuz: albums, tracks, playlists and the rest, answered from tables.
+/// A small Qobuz and everything a job needs around it.
 struct Rig {
-    server: FakeServer,
-    client: Client,
+    catalogue: Catalogue,
     music: TempDir,
     partial: TempDir,
     recorder: Arc<Recorder>,
     cancel: CancellationToken,
     skip: Arc<AtomicBool>,
     settings: Settings,
-    albums: Table<String>,
-    tracks: Table<u64>,
-    playlists: Table<u64>,
-    artists: Table<u64>,
-    labels: Table<u64>,
-    favorites: Table<String>,
 }
 
-fn by<K: std::hash::Hash + Eq + std::str::FromStr + Send + 'static>(
-    server: &FakeServer,
-    path: &str,
-    param: &'static str,
-    table: &Table<K>,
-) where
-    K::Err: std::fmt::Debug,
-{
-    let table = Arc::clone(table);
-    server.on(path, move |call| {
-        let key: K = call.param(param).parse().unwrap();
-        match table.lock().unwrap().get(&key) {
-            Some(value) => Reply::json(value.clone()),
-            None => Reply::error(404, "No result matching given argument"),
-        }
-    });
-}
+impl Deref for Rig {
+    type Target = Catalogue;
 
-fn page(items: impl AsRef<[Value]>) -> Value {
-    let items = items.as_ref();
-    json!({ "offset": 0, "limit": 500, "total": items.len(), "items": items })
+    fn deref(&self) -> &Catalogue {
+        &self.catalogue
+    }
 }
 
 impl Rig {
     async fn new() -> Self {
-        let (server, client) = signed_in().await;
-        let rig = Self {
+        Self {
+            catalogue: Catalogue::new().await,
             music: TempDir::new().unwrap(),
             partial: TempDir::new().unwrap(),
             recorder: Arc::new(Recorder::default()),
             cancel: CancellationToken::new(),
             skip: Arc::new(AtomicBool::new(false)),
             settings: Settings::default(),
-            albums: Table::default(),
-            tracks: Table::default(),
-            playlists: Table::default(),
-            artists: Table::default(),
-            labels: Table::default(),
-            favorites: Table::default(),
-            server,
-            client,
-        };
-        by(&rig.server, "/api/album/get", "album_id", &rig.albums);
-        by(&rig.server, "/api/track/get", "track_id", &rig.tracks);
-        by(
-            &rig.server,
-            "/api/playlist/get",
-            "playlist_id",
-            &rig.playlists,
-        );
-        by(&rig.server, "/api/artist/get", "artist_id", &rig.artists);
-        by(&rig.server, "/api/label/get", "label_id", &rig.labels);
-        by(
-            &rig.server,
-            "/api/favorite/getUserFavorites",
-            "type",
-            &rig.favorites,
-        );
-
-        let audio = flac_bytes();
-        rig.server
-            .on("/cdn/audio", move |_| Reply::bytes(audio.clone()));
-        rig.server
-            .on("/cdn/cover", |_| Reply::bytes(TINY_JPEG.to_vec()));
-        let url = format!("{}/cdn/audio", rig.server.url());
-        rig.server.on("/api/track/getFileUrl", move |call| {
-            Reply::json(json!({
-                "url": url,
-                "format_id": call.param("format_id").parse::<u32>().unwrap(),
-                "bit_depth": 16,
-                "sampling_rate": 44.1,
-            }))
-        });
-        rig
+        }
     }
 
     fn music_path(&self) -> std::path::PathBuf {
         self.music.path().to_path_buf()
-    }
-
-    fn cover_url(&self, album_id: &str) -> String {
-        format!("{}/cdn/cover?{album_id}_600.jpg", self.server.url())
-    }
-
-    /// An album of the given tracks (id, number, title), by an artist.
-    fn add_album(&self, id: &str, title: &str, artist: &str, tracks: &[(u64, u32, &str)]) {
-        let items: Vec<Value> = tracks
-            .iter()
-            .map(|(track_id, number, name)| {
-                json!({
-                    "id": track_id, "title": name, "track_number": number, "media_number": 1,
-                    "duration": 100, "performer": { "id": 1, "name": artist },
-                })
-            })
-            .collect();
-        self.albums.lock().unwrap().insert(
-            id.to_owned(),
-            json!({
-                "id": id, "title": title, "artist": { "id": 1, "name": artist },
-                "tracks_count": tracks.len(), "media_count": 1, "streamable": true,
-                "image": { "large": self.cover_url(id) },
-                "tracks": page(&items),
-            }),
-        );
-        for (track_id, number, name) in tracks {
-            self.tracks.lock().unwrap().insert(
-                *track_id,
-                json!({
-                    "id": track_id, "title": name, "track_number": number, "media_number": 1,
-                    "duration": 100, "performer": { "id": 1, "name": artist },
-                    "album": { "id": id, "title": title, "artist": { "id": 1, "name": artist } },
-                }),
-            );
-        }
-    }
-
-    fn change_album(&self, id: &str, change: impl FnOnce(&mut Value)) {
-        change(self.albums.lock().unwrap().get_mut(id).unwrap());
     }
 
     fn item(kind: ItemKind, ref_id: &str) -> QueueItem {
@@ -489,23 +386,6 @@ async fn a_track_that_cannot_be_downloaded_fails_the_item_with_the_reason() {
 
 // ─── Playlist ───
 
-fn add_playlist(rig: &Rig, id: u64, name: &str, entries: &[(u64, u32)]) {
-    let items: Vec<Value> = entries
-        .iter()
-        .map(|(track_id, position)| {
-            let track = rig.tracks.lock().unwrap().get(track_id).cloned().unwrap();
-            let mut track = track;
-            track["position"] = json!(position);
-            track["playlist_track_id"] = json!(5_000_000_000u64 + track_id);
-            track
-        })
-        .collect();
-    rig.playlists.lock().unwrap().insert(
-        id,
-        json!({ "id": id, "name": name, "tracks_count": entries.len(), "tracks": page(&items) }),
-    );
-}
-
 #[tokio::test]
 async fn a_playlist_gathers_tracks_of_several_albums_with_an_m3u8_in_order() {
     let rig = Rig::new().await;
@@ -516,7 +396,7 @@ async fn a_playlist_gathers_tracks_of_several_albums_with_an_m3u8_in_order() {
         "John Coltrane",
         &[(21, 1, "Acknowledgement")],
     );
-    add_playlist(&rig, 7, "Evening", &[(21, 1), (12, 2)]);
+    rig.add_playlist(7, "Evening", &[(21, 1), (12, 2)]);
 
     let (result, outcome) = rig.run(ItemKind::Playlist, "7").await;
 
@@ -538,7 +418,7 @@ async fn two_tracks_with_the_same_name_in_a_playlist_do_not_overwrite_each_other
     let rig = Rig::new().await;
     rig.add_album("a1", "First", "Artist", &[(31, 1, "Intro")]);
     rig.add_album("a2", "Second", "Artist", &[(32, 1, "Intro")]);
-    add_playlist(&rig, 8, "Mix", &[(31, 1), (32, 2)]);
+    rig.add_playlist(8, "Mix", &[(31, 1), (32, 2)]);
     // Both are numbered by their position in the playlist, so both are called "1 - Intro"
     rig.tracks.lock().unwrap().get_mut(&32).unwrap()["position"] = json!(1);
 
@@ -558,7 +438,7 @@ async fn the_playlist_file_can_be_turned_off() {
     let mut rig = Rig::new().await;
     rig.settings.advanced.playlist_file = false;
     rig.add_album("a1", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
-    add_playlist(&rig, 7, "Evening", &[(12, 1)]);
+    rig.add_playlist(7, "Evening", &[(12, 1)]);
 
     rig.run(ItemKind::Playlist, "7").await.0.unwrap();
 
@@ -569,7 +449,7 @@ async fn the_playlist_file_can_be_turned_off() {
 async fn a_retry_adds_the_recovered_track_to_the_playlist_file() {
     let rig = Rig::new().await;
     rig.add_album("a1", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
-    add_playlist(&rig, 7, "Evening", &[(11, 1), (12, 2)]);
+    rig.add_playlist(7, "Evening", &[(11, 1), (12, 2)]);
     let mut item = Rig::item(ItemKind::Playlist, "7");
     item.downloaded = 1;
     item.playlist_entries = vec![qobuzdlx::download::PlaylistEntry {
