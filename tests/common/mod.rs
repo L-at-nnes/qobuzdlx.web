@@ -201,6 +201,8 @@ async fn respond(State(shared): State<Arc<Shared>>, request: Request) -> Respons
     }
 }
 
+pub mod catalogue;
+
 // ─── Qobuz session ───
 
 /// A session as the one a sign-in gives.
