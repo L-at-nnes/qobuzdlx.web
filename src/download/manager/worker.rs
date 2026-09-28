@@ -109,6 +109,8 @@ impl Inner {
                 (ItemStatus::Cancelled, None)
             }
             Err(JobError::SessionExpired) => {
+                // Before the next item is picked: it would meet the same refusal
+                self.session_expired();
                 self.log_at(LogEvent::SessionExpired, detail);
                 (
                     ItemStatus::Failed,

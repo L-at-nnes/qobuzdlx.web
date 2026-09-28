@@ -93,6 +93,8 @@ pub(super) struct Inner {
     pub(super) current: Mutex<Option<CancellationToken>>,
     /// "Skip": the album in progress is dropped.
     pub(super) skip: Arc<AtomicBool>,
+    /// The interface was told the session expired, and has not been given a new one since.
+    expiry_announced: AtomicBool,
 }
 
 /// The download queue. Cloning gives another handle on the same queue.
@@ -147,6 +149,7 @@ impl Manager {
                 shutdown: CancellationToken::new(),
                 current: Mutex::new(None),
                 skip: Arc::new(AtomicBool::new(false)),
+                expiry_announced: AtomicBool::new(false),
             }),
         };
 
@@ -303,6 +306,15 @@ impl Inner {
         let _ = self.events.send(event);
     }
 
+    /// Qobuz refused the session: forget it so that nothing presents the token again, and tell the
+    /// interface once. Called by whoever notices first, the job or the listener of the session.
+    pub(super) fn session_expired(&self) {
+        self.client.end_session();
+        if !self.expiry_announced.swap(true, Ordering::SeqCst) {
+            self.emit(Event::SessionExpired);
+        }
+    }
+
     /// Persists the queue, and tells the interface.
     pub(super) fn queue_changed(&self) {
         {
@@ -368,11 +380,11 @@ async fn watch_session(inner: Arc<Inner>) {
             event = events.recv() => event,
         };
         match event {
-            Ok(SessionEvent::Started) => inner.wake.notify_one(),
-            Ok(SessionEvent::Rejected) => {
-                inner.client.end_session();
-                inner.emit(Event::SessionExpired);
+            Ok(SessionEvent::Started) => {
+                inner.expiry_announced.store(false, Ordering::SeqCst);
+                inner.wake.notify_one();
             }
+            Ok(SessionEvent::Rejected) => inner.session_expired(),
             Ok(SessionEvent::Ended) | Err(broadcast::error::RecvError::Lagged(_)) => {}
             Err(broadcast::error::RecvError::Closed) => return,
         }
