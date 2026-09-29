@@ -61,6 +61,7 @@ impl ApiError {
     }
 
     /// The gate is closed: try again in `seconds`.
+    #[must_use]
     pub fn throttled(seconds: u64) -> Self {
         Self {
             retry_after: Some(seconds),
