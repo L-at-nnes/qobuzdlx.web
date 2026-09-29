@@ -9,3 +9,4 @@ pub mod qobuz;
 pub mod settings;
 pub mod storage;
 pub mod tagging;
+pub mod web;
