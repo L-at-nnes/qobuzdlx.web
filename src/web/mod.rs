@@ -4,6 +4,7 @@ mod access;
 mod cookie;
 mod error;
 mod guard;
+mod session;
 mod state;
 
 use axum::extract::State;
@@ -19,6 +20,7 @@ pub use state::{AppState, Shared};
 pub fn router(state: AppState) -> Router {
     let guarded = Router::new()
         .merge(access::guarded())
+        .merge(session::routes())
         .layer(from_fn_with_state(state.clone(), guard::require_unlock));
     let api = Router::new().merge(access::open()).merge(guarded);
 
