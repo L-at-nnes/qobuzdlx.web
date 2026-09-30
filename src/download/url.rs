@@ -42,6 +42,12 @@ impl QobuzUrl {
     }
 }
 
+/// The canonical address of something, as the queue knows it by.
+#[must_use]
+pub fn canonical(kind: ItemKind, ref_id: &str) -> String {
+    QobuzUrl::new(kind, ref_id).canonical
+}
+
 /// Reads an address of the web player or of the store.
 ///
 /// A query and a fragment are ignored (`?utm_source=share`), a trailing `/releases` too, and store
@@ -270,6 +276,27 @@ mod tests {
             "https://play.qobuz.com/user/library/favorites/labels",
         ] {
             assert_eq!(parse(input), None, "{input}");
+        }
+    }
+
+    #[test]
+    fn the_canonical_address_of_something_parses_back_to_it() {
+        for (kind, id) in [
+            (ItemKind::Album, "0886444350747"),
+            (ItemKind::Track, "26803097"),
+            (ItemKind::Playlist, "71588272"),
+            (ItemKind::Artist, "25046"),
+            (ItemKind::Label, "9582352"),
+        ] {
+            let address = super::canonical(kind, id);
+
+            let parsed = parse(&address).unwrap();
+
+            assert_eq!(
+                (parsed.kind, parsed.ref_id.as_str()),
+                (kind, id),
+                "{address}"
+            );
         }
     }
 
