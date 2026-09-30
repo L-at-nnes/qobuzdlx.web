@@ -62,7 +62,7 @@ impl TestApp {
             access: AccessStore::open(config.path(), access_password).unwrap(),
             gate: Gate::default(),
             tokens: Tokens::open(config.path()),
-            sessions: Sessions::new(client.clone(), config.path()),
+            sessions: Sessions::new(client.clone(), config.path()).with_credentials(session().app),
             client,
             settings,
             downloads,
