@@ -201,6 +201,7 @@ async fn respond(State(shared): State<Arc<Shared>>, request: Request) -> Respons
     }
 }
 
+pub mod app;
 pub mod catalogue;
 
 // ─── Qobuz session ───
