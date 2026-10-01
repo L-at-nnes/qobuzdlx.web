@@ -1,7 +1,9 @@
 //! The HTTP side: the API the interface talks to, and the interface itself.
 
 mod access;
+mod catalogue;
 mod cookie;
+mod dto;
 mod error;
 mod guard;
 mod session;
@@ -21,6 +23,7 @@ pub fn router(state: AppState) -> Router {
     let guarded = Router::new()
         .merge(access::guarded())
         .merge(session::routes())
+        .merge(catalogue::routes())
         .layer(from_fn_with_state(state.clone(), guard::require_unlock));
     let api = Router::new().merge(access::open()).merge(guarded);
 
