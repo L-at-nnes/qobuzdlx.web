@@ -3,6 +3,7 @@
 mod access;
 mod catalogue;
 mod cookie;
+mod downloads;
 mod dto;
 mod error;
 mod guard;
@@ -24,6 +25,7 @@ pub fn router(state: AppState) -> Router {
         .merge(access::guarded())
         .merge(session::routes())
         .merge(catalogue::routes())
+        .merge(downloads::routes())
         .layer(from_fn_with_state(state.clone(), guard::require_unlock));
     let api = Router::new().merge(access::open()).merge(guarded);
 
