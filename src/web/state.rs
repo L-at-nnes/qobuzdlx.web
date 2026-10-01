@@ -13,6 +13,8 @@ pub struct AppState(Arc<Shared>);
 #[derive(Debug)]
 pub struct Shared {
     pub version: &'static str,
+    /// Where the application keeps its files (`CONFIG_PATH`).
+    pub config_dir: std::path::PathBuf,
     /// Whether the unlock cookie is marked `Secure` (`COOKIE_SECURE`).
     pub cookie_secure: bool,
     pub access: AccessStore,

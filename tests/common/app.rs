@@ -58,6 +58,7 @@ impl TestApp {
         });
         let state = AppState::new(Shared {
             version: "test",
+            config_dir: config.path().to_path_buf(),
             cookie_secure: false,
             access: AccessStore::open(config.path(), access_password).unwrap(),
             gate: Gate::default(),

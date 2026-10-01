@@ -8,6 +8,7 @@ mod dto;
 mod error;
 mod guard;
 mod session;
+mod settings;
 mod state;
 
 use axum::extract::State;
@@ -26,6 +27,7 @@ pub fn router(state: AppState) -> Router {
         .merge(session::routes())
         .merge(catalogue::routes())
         .merge(downloads::routes())
+        .merge(settings::routes())
         .layer(from_fn_with_state(state.clone(), guard::require_unlock));
     let api = Router::new().merge(access::open()).merge(guarded);
 
