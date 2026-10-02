@@ -114,19 +114,24 @@ async fn a_cut_connection_is_an_error_and_the_partial_file_is_removed() {
 }
 
 #[tokio::test]
-async fn a_connection_that_goes_silent_is_given_up() {
+async fn a_server_that_stays_silent_is_given_up_on() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        let (mut socket, _) = listener.accept().await.unwrap();
-        let mut request = [0u8; 1024];
-        let _ = tokio::io::AsyncReadExt::read(&mut socket, &mut request).await;
-        socket
-            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 5000\r\n\r\nstart")
-            .await
-            .unwrap();
-        // Holds the connection open without sending anything more
-        tokio::time::sleep(Duration::from_secs(30)).await;
+        // Every connection gets the start of an answer and then nothing
+        loop {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                let mut request = [0u8; 1024];
+                let _ = tokio::io::AsyncReadExt::read(&mut socket, &mut request).await;
+                let _ = socket
+                    .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 5000\r\n\r\nstart")
+                    .await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            });
+        }
     });
     let directory = TempDir::new().unwrap();
     let path = directory.path().join("track.flac");
