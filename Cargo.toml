@@ -19,9 +19,11 @@ hmac = "0.13.0"
 html-escape = "0.2.15"
 lofty = "0.24.0"
 md-5 = "0.11.0"
+mime_guess = "2.0.5"
 rand = "0.10.3"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "gzip", "query", "stream"] }
+rust-embed = "8.13.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.0"
