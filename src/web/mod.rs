@@ -1,6 +1,7 @@
 //! The HTTP side: the API the interface talks to, and the interface itself.
 
 mod access;
+mod assets;
 mod catalogue;
 mod cookie;
 mod downloads;
@@ -34,6 +35,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(health))
         .nest("/api", api)
+        .fallback(assets::serve)
         .layer(from_fn(guard::same_origin))
         .layer(from_fn(guard::security_headers))
         .with_state(state)
