@@ -1,9 +1,11 @@
-use std::io;
+use std::io::{self, SeekFrom};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
-use tokio::io::AsyncWriteExt;
+use reqwest::StatusCode;
+use reqwest::header;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
 /// How often the progress is reported while a file comes in.
@@ -40,7 +42,7 @@ pub struct Update {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("download failed: {0}")]
-    Http(reqwest::Error),
+    Http(String),
     #[error("the server answered {0}")]
     Status(reqwest::StatusCode),
     #[error("no data received for {} seconds", .0.as_secs())]
@@ -49,6 +51,9 @@ pub enum Error {
     Incomplete { received: u64, expected: u64 },
     #[error("could not write the file: {0}")]
     Io(#[from] io::Error),
+    /// The answer to a request for the rest of the file starts elsewhere than asked.
+    #[error("the server sent another part of the file than the one asked for")]
+    UnexpectedRange,
     #[error("cancelled")]
     Cancelled,
 }
@@ -56,15 +61,40 @@ pub enum Error {
 impl From<reqwest::Error> for Error {
     /// The address is removed: a signed stream link is not for the log.
     fn from(error: reqwest::Error) -> Self {
-        Self::Http(error.without_url())
+        Self::Http(crate::cause::describe(&error.without_url()))
     }
 }
 
+/// Connections in a row that bring nothing new before the transfer is given up.
+const MAX_BARREN_CONNECTIONS: u32 = 3;
+
+/// How a connection ended.
+enum Ended {
+    /// Everything has been received.
+    Complete,
+    /// The connection stopped before the end. What was received is kept; the rest can be asked for.
+    Cut(Error),
+}
+
+/// The file being received, across the connections it takes.
+struct Receiving {
+    file: tokio::fs::File,
+    received: u64,
+    total: Option<u64>,
+    started: Instant,
+    last_report: Instant,
+}
+
 /// Downloads files from the CDN.
+///
+/// The CDN cuts a connection after a few seconds and a few megabytes, whatever the client: a
+/// 24-bit album track takes a dozen connections. A cut is therefore not a failure. The transfer
+/// goes on from where it stopped (`Range`), with the same address, and only gives up when
+/// connections stop bringing anything.
 #[derive(Debug, Clone)]
 pub struct Fetcher {
     http: reqwest::Client,
-    /// How long the connection may stay silent before the transfer is given up.
+    /// How long the connection may stay silent before it is given up.
     stall_timeout: Duration,
 }
 
@@ -77,8 +107,8 @@ impl Fetcher {
         }
     }
 
-    /// Writes the content of `url` to `path`, starting from scratch: a signed link is not worth
-    /// resuming. The partial file is removed when the transfer fails.
+    /// Writes the content of `url` to `path`, starting from scratch. The partial file is removed
+    /// when the transfer fails.
     pub async fn to_file(
         &self,
         url: &str,
@@ -100,52 +130,162 @@ impl Fetcher {
         cancel: &CancellationToken,
         report: &mut (impl FnMut(Update) + Send),
     ) -> Result<Transfer, Error> {
-        let response = tokio::select! {
-            () = cancel.cancelled() => return Err(Error::Cancelled),
-            response = self.http.get(url).send() => response?,
+        let now = Instant::now();
+        let mut receiving = Receiving {
+            file: tokio::fs::File::create(path).await?,
+            received: 0,
+            total: None,
+            started: now,
+            last_report: now,
         };
-        if !response.status().is_success() {
-            return Err(Error::Status(response.status()));
+
+        let mut barren = 0;
+        loop {
+            let before = receiving.received;
+            match self.connection(url, &mut receiving, cancel, report).await? {
+                Ended::Complete => break,
+                Ended::Cut(error) => {
+                    barren = if receiving.received > before {
+                        0
+                    } else {
+                        barren + 1
+                    };
+                    // Without a length there is no telling where to go on from, or whether it is over
+                    if barren >= MAX_BARREN_CONNECTIONS || receiving.total.is_none() {
+                        return Err(error);
+                    }
+                    tracing::debug!(
+                        received = receiving.received,
+                        total = ?receiving.total,
+                        %error,
+                        "connection cut, going on from where it stopped"
+                    );
+                }
+            }
         }
-        let expected = response.content_length().filter(|length| *length > 0);
 
-        let mut file = tokio::fs::File::create(path).await?;
+        receiving.file.flush().await?;
+        Ok(Transfer {
+            bytes: receiving.received,
+            elapsed: receiving.started.elapsed(),
+        })
+    }
+
+    /// One connection: asks for the file from the first byte missing, and keeps what comes.
+    async fn connection(
+        &self,
+        url: &str,
+        receiving: &mut Receiving,
+        cancel: &CancellationToken,
+        report: &mut (impl FnMut(Update) + Send),
+    ) -> Result<Ended, Error> {
+        let resuming = receiving.received > 0;
+        let mut request = self.http.get(url);
+        if resuming {
+            request = request.header(header::RANGE, format!("bytes={}-", receiving.received));
+        }
+        let sent = tokio::select! {
+            () = cancel.cancelled() => return Err(Error::Cancelled),
+            sent = request.send() => sent,
+        };
+        let response = match sent {
+            Ok(response) => response,
+            Err(error) if resuming => return Ok(Ended::Cut(error.into())),
+            Err(error) => return Err(error.into()),
+        };
+
+        let status = response.status();
+        if !status.is_success() {
+            // A first request refused is the end of it; a later one is one more connection lost
+            return if resuming {
+                Ok(Ended::Cut(Error::Status(status)))
+            } else {
+                Err(Error::Status(status))
+            };
+        }
+        if status == StatusCode::PARTIAL_CONTENT {
+            let range = content_range(&response);
+            if range.map(|range| range.start) != Some(receiving.received) {
+                return Err(Error::UnexpectedRange);
+            }
+            receiving.total = range.and_then(|range| range.total);
+        } else {
+            // The whole file, from the start: either the first request, or a server that does not
+            // do ranges and starts over
+            if resuming {
+                receiving.file.set_len(0).await?;
+                receiving.file.seek(SeekFrom::Start(0)).await?;
+                receiving.received = 0;
+            }
+            receiving.total = response.content_length().filter(|length| *length > 0);
+        }
+        tracing::debug!(
+            status = status.as_u16(),
+            from = receiving.received,
+            total = ?receiving.total,
+            "receiving a file"
+        );
+
         let mut stream = response.bytes_stream();
-        let started = Instant::now();
-        let mut last_report = started;
-        let mut received: u64 = 0;
-
         loop {
             let chunk = tokio::select! {
                 () = cancel.cancelled() => return Err(Error::Cancelled),
                 chunk = tokio::time::timeout(self.stall_timeout, stream.next()) => chunk,
             };
-            let Some(chunk) = chunk.map_err(|_| Error::Stalled(self.stall_timeout))? else {
-                break;
-            };
-            let chunk = chunk?;
-            file.write_all(&chunk).await?;
-            received += chunk.len() as u64;
-
-            if let Some(expected) = expected
-                && last_report.elapsed() >= REPORT_EVERY
-            {
-                last_report = Instant::now();
-                report(update(received, expected, started.elapsed()));
+            match chunk {
+                Err(_) => return Ok(Ended::Cut(Error::Stalled(self.stall_timeout))),
+                Ok(Some(Err(error))) => return Ok(Ended::Cut(error.into())),
+                Ok(Some(Ok(bytes))) => {
+                    receiving.file.write_all(&bytes).await?;
+                    receiving.received += bytes.len() as u64;
+                    receiving.report(report);
+                }
+                Ok(None) => break,
             }
         }
-        file.flush().await?;
 
-        if let Some(expected) = expected
-            && received < expected
-        {
-            return Err(Error::Incomplete { received, expected });
+        match receiving.total {
+            Some(total) if receiving.received < total => Ok(Ended::Cut(Error::Incomplete {
+                received: receiving.received,
+                expected: total,
+            })),
+            _ => Ok(Ended::Complete),
         }
-        Ok(Transfer {
-            bytes: received,
-            elapsed: started.elapsed(),
-        })
     }
+}
+
+impl Receiving {
+    /// Tells how far it has got, a few times a second.
+    fn report(&mut self, report: &mut impl FnMut(Update)) {
+        if let Some(total) = self.total
+            && self.last_report.elapsed() >= REPORT_EVERY
+        {
+            self.last_report = Instant::now();
+            report(update(self.received, total, self.started.elapsed()));
+        }
+    }
+}
+
+/// What a `Content-Range: bytes 100-199/1000` header says.
+#[derive(Debug, Clone, Copy)]
+struct ContentRange {
+    start: u64,
+    total: Option<u64>,
+}
+
+fn content_range(response: &reqwest::Response) -> Option<ContentRange> {
+    let value = response
+        .headers()
+        .get(header::CONTENT_RANGE)?
+        .to_str()
+        .ok()?
+        .strip_prefix("bytes ")?;
+    let (span, total) = value.split_once('/')?;
+    let (start, _end) = span.split_once('-')?;
+    Some(ContentRange {
+        start: start.trim().parse().ok()?,
+        total: total.trim().parse().ok(),
+    })
 }
 
 #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
