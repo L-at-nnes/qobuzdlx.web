@@ -7,7 +7,7 @@ const DEFAULT_WIDTH: u16 = 600;
 #[derive(Debug, thiserror::Error)]
 pub enum CoverError {
     #[error("could not download the cover: {0}")]
-    Http(reqwest::Error),
+    Http(String),
     /// Qobuz answered with something else than a picture, an error page for instance.
     #[error("the cover is not a picture")]
     NotAnImage,
@@ -16,7 +16,7 @@ pub enum CoverError {
 impl From<reqwest::Error> for CoverError {
     /// The address is removed from the error, as it is everywhere else.
     fn from(error: reqwest::Error) -> Self {
-        Self::Http(error.without_url())
+        Self::Http(crate::cause::describe(&error.without_url()))
     }
 }
 

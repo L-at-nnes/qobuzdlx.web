@@ -14,7 +14,7 @@ pub enum Error {
     Api { status: StatusCode, message: String },
 
     /// The request never got an answer: network down, timeout, TLS failure.
-    #[error("could not reach Qobuz: {0}")]
+    #[error("could not reach Qobuz: {}", crate::cause::describe(.0))]
     Network(reqwest::Error),
 
     /// A call that needs a session was made without one.
