@@ -1,0 +1,263 @@
+@import '@fontsource-variable/hanken-grotesk';
+@import '@fontsource-variable/newsreader';
+
+/*
+ * The visual system of QobuzDLX (see DESIGN.md at the root of the repository).
+ * Two themes from one set of roles: the night room (dark) and paper (light).
+ * Every neutral leans warm; nothing is pure black or white.
+ */
+
+:root {
+	/* Roles that do not change with the theme */
+	--font-ui: 'Hanken Grotesk Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-content: 'Newsreader Variable', Georgia, 'Times New Roman', serif;
+
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 40px;
+	--space-7: 64px;
+
+	--text-xs: 0.75rem;
+	--text-sm: 0.8125rem;
+	--text-base: 0.9375rem;
+	--text-md: 1.0625rem;
+	--text-lg: 1.375rem;
+	--text-xl: 1.75rem;
+
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--duration-fast: 150ms;
+	--duration-base: 220ms;
+
+	--control-height: 40px;
+	--content-width: 62rem;
+	--bar-height: 56px;
+}
+
+/* The night room, the default */
+:root,
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--bg: oklch(0.19 0.012 65);
+	--surface: oklch(0.225 0.013 65);
+	--raised: oklch(0.26 0.014 65);
+	--sunken: oklch(0.17 0.012 65);
+	--line: oklch(0.34 0.014 65);
+	--line-soft: oklch(0.29 0.013 65);
+	--text: oklch(0.93 0.01 75);
+	--text-muted: oklch(0.74 0.014 70);
+	--text-faint: oklch(0.63 0.014 70);
+	--accent: oklch(0.74 0.115 62);
+	--accent-strong: oklch(0.8 0.115 62);
+	--accent-ink: oklch(0.2 0.02 60);
+	--accent-wash: oklch(0.3 0.045 62);
+	--success: oklch(0.72 0.12 155);
+	--warning: oklch(0.8 0.13 85);
+	--danger: oklch(0.7 0.16 28);
+	--danger-wash: oklch(0.3 0.06 28);
+	--success-wash: oklch(0.29 0.045 155);
+	--float-shadow: 0 8px 24px oklch(0.1 0.01 65 / 0.4);
+}
+
+/* Paper, when the system asks for light and nothing was chosen by hand */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) {
+		color-scheme: light;
+		--bg: oklch(0.975 0.008 80);
+		--surface: oklch(0.992 0.005 80);
+		--raised: oklch(0.952 0.01 78);
+		--sunken: oklch(0.95 0.01 78);
+		--line: oklch(0.86 0.012 75);
+		--line-soft: oklch(0.91 0.01 75);
+		--text: oklch(0.24 0.015 60);
+		--text-muted: oklch(0.44 0.016 65);
+		--text-faint: oklch(0.52 0.015 65);
+		--accent: oklch(0.52 0.125 52);
+		--accent-strong: oklch(0.45 0.125 52);
+		--accent-ink: oklch(0.98 0.01 80);
+		--accent-wash: oklch(0.93 0.035 70);
+		--success: oklch(0.5 0.11 155);
+		--warning: oklch(0.52 0.12 75);
+		--danger: oklch(0.5 0.16 28);
+		--danger-wash: oklch(0.94 0.035 28);
+		--success-wash: oklch(0.94 0.035 155);
+		--float-shadow: 0 8px 24px oklch(0.3 0.02 65 / 0.18);
+	}
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: oklch(0.975 0.008 80);
+	--surface: oklch(0.992 0.005 80);
+	--raised: oklch(0.952 0.01 78);
+	--sunken: oklch(0.95 0.01 78);
+	--line: oklch(0.86 0.012 75);
+	--line-soft: oklch(0.91 0.01 75);
+	--text: oklch(0.24 0.015 60);
+	--text-muted: oklch(0.44 0.016 65);
+	--text-faint: oklch(0.52 0.015 65);
+	--accent: oklch(0.52 0.125 52);
+	--accent-strong: oklch(0.45 0.125 52);
+	--accent-ink: oklch(0.98 0.01 80);
+	--accent-wash: oklch(0.93 0.035 70);
+	--success: oklch(0.5 0.11 155);
+	--warning: oklch(0.52 0.12 75);
+	--danger: oklch(0.5 0.16 28);
+	--danger-wash: oklch(0.94 0.035 28);
+	--success-wash: oklch(0.94 0.035 155);
+	--float-shadow: 0 8px 24px oklch(0.3 0.02 65 / 0.18);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	min-height: 100dvh;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-ui);
+	font-size: var(--text-base);
+	line-height: 1.5;
+	font-feature-settings: 'tnum' 0;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+	margin: 0;
+}
+
+h1,
+h2 {
+	font-family: var(--font-content);
+	font-weight: 500;
+	line-height: 1.25;
+	letter-spacing: -0.005em;
+	text-wrap: balance;
+}
+
+h1 {
+	font-size: var(--text-lg);
+}
+
+h2 {
+	font-size: var(--text-md);
+}
+
+h3 {
+	font-size: var(--text-base);
+	font-weight: 600;
+}
+
+a {
+	color: var(--accent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 3px;
+}
+
+a:hover {
+	color: var(--accent-strong);
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+ul,
+ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+img {
+	display: block;
+	max-width: 100%;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+::selection {
+	background: var(--accent-wash);
+	color: var(--text);
+}
+
+/* Figures that line up in columns and move without jumping */
+.figures {
+	font-variant-numeric: tabular-nums;
+}
+
+.muted {
+	color: var(--text-muted);
+}
+
+.faint {
+	color: var(--text-faint);
+}
+
+/* Present for assistive technology, absent for the eye */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* The title of a piece of music, a record, a work: the one place the serif is used */
+.work-title {
+	font-family: var(--font-content);
+	font-size: var(--text-md);
+	font-weight: 500;
+	line-height: 1.3;
+	overflow-wrap: anywhere;
+	text-wrap: pretty;
+}
+
+.meta {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
