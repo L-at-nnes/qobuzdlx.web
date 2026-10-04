@@ -1,4 +1,4 @@
-import type { Language, LogLine } from '$lib/types';
+import type { Language, LogLine } from '#lib/types.ts';
 import { en, type Key } from './en';
 import { fr } from './fr';
 
