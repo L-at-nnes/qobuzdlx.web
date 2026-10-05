@@ -7,7 +7,8 @@
 		label,
 		hint,
 		hideLabel = false,
-		compact = false
+		compact = false,
+		onchange
 	}: {
 		value: T;
 		options: { value: T; label: string }[];
@@ -16,6 +17,7 @@
 		hideLabel?: boolean;
 		/** Sized to its content, for a toolbar. */
 		compact?: boolean;
+		onchange?: (value: T) => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -24,7 +26,12 @@
 <div class="field" class:compact>
 	<label for="select-{uid}" class:visually-hidden={hideLabel}>{label}</label>
 	<div class="control">
-		<select id="select-{uid}" bind:value aria-describedby={hint ? `select-${uid}-hint` : undefined}>
+		<select
+			id="select-{uid}"
+			bind:value
+			onchange={() => queueMicrotask(() => onchange?.(value))}
+			aria-describedby={hint ? `select-${uid}-hint` : undefined}
+		>
 			{#each options as option (option.value)}
 				<option value={option.value}>{option.label}</option>
 			{/each}
