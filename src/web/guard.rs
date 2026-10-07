@@ -17,7 +17,7 @@ use crate::access::{Validity, stamp_for};
 /// covers, which come from Qobuz's image servers. `frame-ancestors` forbids framing the interface in
 /// someone else's page to trick a click.
 const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; img-src 'self' data: https:; \
-    style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; \
+    style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline'; connect-src 'self'; \
     base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 pub fn unix_now() -> u64 {
