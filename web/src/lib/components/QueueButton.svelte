@@ -29,7 +29,7 @@
 		</span>
 	{/if}
 	<Button
-		variant="primary"
+		variant="quiet"
 		size="sm"
 		icon={state === 'queued' ? 'clock' : 'download'}
 		disabled={state === 'queued'}

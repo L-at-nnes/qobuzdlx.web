@@ -193,6 +193,11 @@ ol {
 	list-style: none;
 }
 
+input[type='search']::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+}
+
 img {
 	display: block;
 	max-width: 100%;
