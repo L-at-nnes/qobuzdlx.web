@@ -11,6 +11,8 @@
 		loading?: boolean;
 		/** A button that holds only an icon: the label then goes in `label`, for assistive technology. */
 		label?: string;
+		/** Makes it a link that looks like a button (a file to download, a page). */
+		href?: string;
 		children?: Snippet;
 	}
 
@@ -20,6 +22,7 @@
 		icon,
 		loading = false,
 		label,
+		href,
 		children,
 		disabled,
 		type = 'button',
@@ -27,29 +30,33 @@
 	}: Props = $props();
 </script>
 
-<button
-	{type}
-	class="button {variant} {size}"
+<svelte:element
+	this={href ? 'a' : 'button'}
+	type={href ? undefined : type}
+	{href}
+	download={href ? '' : undefined}
+	class='button {variant} {size}'
 	class:icon-only={!children}
 	class:loading
-	disabled={disabled || loading}
+	disabled={href ? undefined : disabled || loading}
 	aria-label={label}
 	aria-busy={loading || undefined}
 	title={label}
 	{...rest}
 >
 	{#if loading}
-		<Icon name="loader" size={size === 'sm' ? 15 : 17} />
+		<Icon name='loader' size={size === 'sm' ? 15 : 17} />
 	{:else if icon}
 		<Icon name={icon} size={size === 'sm' ? 15 : 17} />
 	{/if}
 	{#if children}
-		<span class="text">{@render children()}</span>
+		<span class='text'>{@render children()}</span>
 	{/if}
-</button>
+</svelte:element>
 
 <style>
 	.button {
+		text-decoration: none;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
