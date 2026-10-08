@@ -1,0 +1,11 @@
+{
+  "name": "QobuzDLX",
+  "short_name": "QobuzDLX",
+  "description": "Search Qobuz and download it into a tidy, tagged library.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2a2420",
+  "theme_color": "#2a2420",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
