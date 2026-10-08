@@ -22,6 +22,10 @@ const RESTORE_DELAY: Duration = Duration::from_secs(30);
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if std::env::args().nth(1).as_deref() == Some("--healthcheck") {
+        return healthcheck();
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("qobuzdlx=info")),
@@ -34,6 +38,15 @@ async fn main() -> ExitCode {
             tracing::error!("{error:#}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// What the container runtime runs to know whether the server is alive.
+fn healthcheck() -> ExitCode {
+    let bind = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
+    match qobuzdlx::healthcheck::target(&bind) {
+        Some(address) if qobuzdlx::healthcheck::is_alive(address) => ExitCode::SUCCESS,
+        _ => ExitCode::FAILURE,
     }
 }
 
