@@ -1,0 +1,9 @@
+target
+web/node_modules
+web/build
+web/.svelte-kit
+.git
+account.txt
+.playwright-mcp
+*.md
+!README.md
