@@ -38,6 +38,10 @@ files are not read, so settings have to be entered again and the Qobuz account s
 - **Settings page** with the naming templates tried live on an invented release, a list of variables to
   insert, the problems of each template pointed out, and a configuration check.
 - **`--healthcheck`** for the container, and a `Dockerfile` that builds the interface and the server.
+- **Tracks can be picked inside an opened album or playlist** and downloaded on their own, with a
+  "select all" for the list. Shift-click selects a range, ctrl-click adds or removes a row, in every list.
+- **`docker-compose.yml`**: `git clone` then `docker compose up -d --build` builds and starts everything;
+  `.env.example` lists the settings.
 - Quality chips, "downloaded" marks and greyed buttons for what is already in the queue.
 
 ### Changed
@@ -69,5 +73,5 @@ files are not read, so settings have to be entered again and the Qobuz account s
 - Partial files live in a folder of their own and are removed after a failure, a cancel and at start-up.
 
 ### Removed
-- The Android application, `docker-compose.yml` (the image is built by hand for now), the dependency on
+- The Android application, the published image (Compose builds it from the repository), the dependency on
   the `flac` program, and the per-device search state kept on the server.
