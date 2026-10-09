@@ -1,0 +1,32 @@
+# git clone <this repository> && cd qobuzdlx.web
+# docker compose up -d --build
+#
+# Then open http://<this machine>:8080. Settings go in a file named .env next to this one
+# (copy .env.example); every one of them is optional.
+services:
+  qobuzdlx:
+    build: .
+    image: qobuzdlx:latest
+    container_name: qobuzdlx
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # Password of the interface, 8 characters at least. Leave it empty to choose one in the settings.
+      ACCESS_PASSWORD: ${ACCESS_PASSWORD:-}
+      # Set to true only behind a reverse proxy that serves the interface over HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - config:/config
+      # A name keeps the music in a Docker volume. A path (/srv/music) puts it in that folder of the
+      # host, which then has to belong to uid 65532: chown -R 65532 /srv/music
+      - ${DOWNLOADS_DIR:-downloads}:/downloads
+    restart: unless-stopped
+    # The application needs no privilege: it runs as an unprivileged user and listens on a high port.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  config:
+  downloads:
