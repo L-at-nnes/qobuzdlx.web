@@ -68,7 +68,7 @@
 		}}
 	>
 		{#if child?.status === 'ready'}
-			<TrackList tracks={child.tracks} />
+			<TrackList tracks={child.tracks} list={key} thumbnail={album.thumbnail} />
 		{/if}
 	</ChildPanel>
 </ResultRow>

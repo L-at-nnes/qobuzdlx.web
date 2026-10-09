@@ -50,7 +50,7 @@
 		}}
 	>
 		{#if child?.status === 'ready'}
-			<TrackList tracks={child.tracks} showAlbum />
+			<TrackList tracks={child.tracks} showAlbum list={key} />
 		{/if}
 	</ChildPanel>
 </ResultRow>
