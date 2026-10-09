@@ -1,423 +1,107 @@
-# QobuzDLX.Web
+# QobuzDLX
 
-A self-hosted web application for downloading high-quality music from Qobuz. Built with Blazor Server (.NET 8) and designed to run in Docker.
+A self-hosted web application that searches Qobuz and downloads what your subscription gives you into a tidy, tagged library. One small Rust executable with its interface inside, made to run in a container on a NAS or a home server.
 
-![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
----
+<p align="center">
+  <img src="docs/screenshots/search-light.png" alt="Searching Beethoven symphonies, results as rows with their quality" width="880">
+</p>
+
+> Qobuz is a trademark of its owner. This project is not affiliated with Qobuz. It downloads what an active subscription is entitled to: use it for your own library and respect the terms of the service.
+
+## Where it comes from
+
+QobuzDLX started as a fork of [thimble9057's `qobuzdlx.web`](https://gitlab.com/thimble9057/qobuzdlx.web), a Blazor Server application, and this is a rewrite of it in Rust with a new interface. The behaviour, the naming variables and many of the lessons learned (how the Qobuz API really answers, what the CDN does to a download) come from that project and from the desktop program it was itself inspired by, and the rewrite follows them closely. It is an adaptation, not an independent invention: thimble9057 is credited in the [license](LICENSE) next to my own name, and the .NET version stays available at the `legacy-dotnet` tag.
+
+I rewrote it because I was not happy with the interface or with the language it was written in for a tool like this one, and I wanted something lighter, more powerful and nicer to use.
 
 ## Features
 
-- **Web-based UI** — Dark theme, responsive, accessible from any browser
-- **Android app** — A WebView shell that points at your own server ([android/](android/)), plus an
-  installable PWA if you prefer the browser
-- **Multiple download types** — Albums, tracks, playlists, artists, labels, favorites
-- **Bilingual UI** — French and English, one-click switch, browser language detected on first run
-- **Search** — Search Qobuz by albums, tracks, artists or playlists directly from the UI, with sorting by
-  title, artist, release date, quality or track count, a Hi-Res only filter, and a "Show more"
-  button to go past the first 50 results. Click an album or a playlist to unfold its track list
-  (numbers, titles, durations; discs and artists where relevant) before downloading it. With an access password set, each device keeps its own
-  search (query, results, sorting); without one, all visitors share a single search
-- **Batch downloads** — Paste multiple URLs and download them all at once
-- **Persistent queue** — The download queue is saved in `/config/queue.json`: after a restart of the
-  container the unfinished items resume on their own (the saved Qobuz session is restored at startup,
-  tracks already on disk are skipped) and what was already downloaded keeps its check mark in the search
-- **4 quality levels** — MP3 320, FLAC 16-bit, FLAC 24-bit (up to 96kHz), FLAC 24-bit (up to 192kHz)
-- **Full metadata tagging** — ID3v2.4 (MP3) and Vorbis Comments (FLAC) with 25+ configurable tags
-- **Customizable file/folder naming** — 60+ template variables for artist, album, track naming
-- **Artwork** — Embedded cover art + saved to disk, configurable sizes
-- **Goodies** — Downloads bonus materials (booklets, etc.) when available
-- **FLAC MD5 fix** — Optional automatic MD5 checksum repair
-- **Real-time progress** — Live progress bar, download speed, and a log with an adjustable level of
-  detail that can be exported
-- **Download report** — Each queue entry shows how many tracks were downloaded, skipped or failed,
-  lists the failures with their reason, and can retry just those tracks
-- **Persistent settings** — All configuration saved to JSON, survives restarts
-- **Configuration test** — One button in Settings checks that the download and config folders are
-  writable, that `flac` is installed, and that the Qobuz session and app credentials are accepted
-- **Optional access password** — Protects the whole app; unlocking lasts 30 days per device and
-  survives container restarts
-- **Docker-ready** — Multi-stage Alpine image, lightweight and portable
+- **Search** albums, tracks, artists and playlists; sort by title, artist, date, quality, track count, label or duration; keep only Hi-Res; open a release to read its tracks (discs, durations, artists) before downloading it; select several releases and queue them together.
+- **Download** albums, single tracks, playlists, whole discographies, labels and the favourites of the account, in MP3 320, FLAC 16-bit, FLAC up to 24-bit 96 kHz or FLAC up to 24-bit 192 kHz. FLAC never falls back to MP3, and the log tells the quality that was really served.
+- **A queue that runs unattended.** It survives a restart: what was waiting resumes, files already on disk are recognised, and the saved Qobuz session is opened again. Reorder, skip an album, cancel an item, retry only the tracks that failed.
+- **Resilient transfers.** The Qobuz CDN cuts connections after a few megabytes; a download goes on from where it stopped. Every FLAC file is decoded after the transfer to be sure it is whole, and a damaged file is fetched again.
+- **Tags and covers.** Vorbis comments and ID3v2.4 with every tag switchable, embedded and saved covers at a size you choose, parental advisory markers, optional repair of the missing FLAC checksum.
+- **Naming you control.** Templates with more than thirty variables for artist, album, track, compilation, playlist and disc folders, tried live on an invented release, with the problems of each template pointed out. A template can never leave the download folder.
+- **Playlists** keep their order: tracks numbered by position if you wish, one `.m3u8` per playlist with relative paths, and tracks of the same name from different albums never overwrite each other.
+- **Bonus files** (booklets) are downloaded next to the music.
+- **A live view** of the album in progress, the speed, and a log you can filter, export and clear.
+- **French and English**, two themes (dark and light, following the system or chosen by hand), usable on a phone and installable from the browser.
+- **Protected access.** An optional password (Argon2id, with a progressive lock after wrong attempts and cookies signed by a key kept on disk) keeps the interface, and the Qobuz account behind it, to those who know it.
 
----
+<p align="center">
+  <img src="docs/screenshots/downloads-dark.png" alt="The downloads page with an album in progress" width="880">
+</p>
 
-## Screenshots
+<p align="center">
+  <img src="docs/screenshots/album-tracks-dark.png" alt="An album opened onto its movements" width="430">
+  <img src="docs/screenshots/settings-light.png" alt="Naming templates with a live preview" width="430">
+</p>
+<p align="center">
+  <img src="docs/screenshots/search-phone.png" alt="The search on a phone" width="240">
+</p>
 
-| Downloads | Search | Settings |
-|:---:|:---:|:---:|
-| ![Downloads](screenshots/downloader.png) | ![Search](screenshots/search.png) | ![Settings](screenshots/settings.png) |
+## Running it
 
----
+### In a container
 
-## Quick Start (Docker)
-
-### Using Docker Run
+No image is published yet; build it from this repository.
 
 ```bash
-docker run -d \
-  --name qobuzdlx \
+docker build -t qobuzdlx .
+docker run -d --name qobuzdlx \
   -p 8080:8080 \
-  -v /path/to/downloads:/downloads \
-  -v /path/to/config:/config \
-  -e ACCESS_PASSWORD=change-me-please \
-  --restart unless-stopped \
-  thimble9057/qobuzdlx.web
+  -v qobuzdlx-config:/config \
+  -v /path/to/your/music:/downloads \
+  -e ACCESS_PASSWORD='a long password' \
+  qobuzdlx
 ```
 
-`ACCESS_PASSWORD` is optional (see [Security](#security)).
+The application runs as an unprivileged user (uid 65532). If you mount folders from the host, give that user access to them (`chown -R 65532 /path/to/your/music`) or run the container with `--user` set to the owner of the folders.
 
-### Using Docker Compose
+Then open `http://localhost:8080`, enter the access password, and sign in to Qobuz.
 
-Create a `docker-compose.yml`:
+| Variable | Default | Meaning |
+|---|---|---|
+| `BIND` | `127.0.0.1:8080` (`0.0.0.0:8080` in the image) | Address the server listens on |
+| `CONFIG_PATH` | `/config` | Where settings, session, queue and keys are kept |
+| `DOWNLOADS_PATH` | `/downloads` | Download folder used until you choose another in the settings |
+| `ACCESS_PASSWORD` | none | Password of the interface, at least 8 characters. When set, it cannot be changed from the interface |
+| `COOKIE_SECURE` | `false` | Set to `true` when the interface is served over HTTPS, to mark the cookie `Secure` |
 
-```yaml
-services:
-  qobuzdlx:
-    image: thimble9057/qobuzdlx.web
-    container_name: qobuzdlx
-    ports:
-      - "8080:8080"
-    volumes:
-      - /path/to/downloads:/downloads
-      - /path/to/config:/config
-    # Optional: protect the UI with a password (8 characters minimum)
-    # environment:
-    #   - ACCESS_PASSWORD=change-me-please
-    #   - COOKIE_SECURE=true   # only behind an HTTPS reverse proxy, see Security
-    restart: unless-stopped
-    # The app needs no privileges: it runs as an unprivileged user and listens on a high port
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-```
+Without a password, anyone who can reach the server can use the Qobuz account linked to it. Set one if the server is reachable from anywhere but your own machine. Behind a reverse proxy, forward the `Host` header (or `X-Forwarded-Host`) so that the check of cross-site requests recognises your address.
 
-The image above is the published one. To run the code of this repository instead, uncomment
-`build: .` in the compose file (it is in the repository root) and start it with
-`docker compose up -d --build`.
+### From source
 
-Then run:
+You need Rust (1.85 or newer) and Node.js (22 or newer).
 
 ```bash
-docker-compose up -d
+cd web && npm ci && npm run build && cd ..
+cargo run --release
 ```
 
-Open your browser at **http://localhost:8080**
+The interface is built into `web/build` and carried inside the executable; build it before `cargo build --release`. For work on the interface, `cd web && npm run dev` serves it with hot reload and proxies the API to a server on `127.0.0.1:8080`.
 
-`docker ps` shows the container as `healthy` once the app answers on `/healthz`.
-
----
-
-## Volumes
-
-| Path | Description |
-|------|-------------|
-| `/downloads` | Where downloaded music files are saved |
-| `/config` | Persistent configuration: `settings.json` (plus its `.bak` backup) and `queue.json`, the download queue |
-
-### File permissions
-
-The container runs as a non-root user `qbdlx` with **UID 1000** and **GID 1000**. You must set the correct ownership on your mounted volumes so the container can read and write to them:
+Checks:
 
 ```bash
-chown -R 1000:1000 /path/to/downloads /path/to/config
+cargo fmt --check && cargo clippy --all-targets && cargo test
+cd web && npm run check && npm test
 ```
 
----
-
-## Security
-
-> **QobuzDLX.Web has no access control until you set a password.** By default anyone who can reach
-> the port uses *your* Qobuz account, can read the settings and can start downloads. Do not expose
-> it to the internet in that state.
-
-- **Set an access password** as soon as the app is reachable by anyone but you, from another device
-  on your network or from the internet. Either set the `ACCESS_PASSWORD` environment variable
-  (8 characters minimum), or choose one in *Settings*. A warning banner stays visible until you do,
-  and the server logs a warning at startup.
-
-  ```yaml
-  environment:
-    - ACCESS_PASSWORD=change-me-please
-  ```
-
-  While the variable is set it is the password: it is applied at every start, and the *Settings*
-  page no longer offers to change or remove it. Remove the variable to manage the password from
-  *Settings* again; the last value stays in force until you do. A value shorter than 8 characters
-  stops the container at startup rather than leaving the app open.
-- **Put it behind a reverse proxy with HTTPS** if it is reachable from outside your network. The
-  password and the unlock cookie otherwise travel in clear text.
-- **Behind an HTTPS reverse proxy, set `COOKIE_SECURE=true`.** The container only sees plain HTTP,
-  so it cannot tell on its own that the unlock cookie should carry the `Secure` flag. Do not set it
-  if you also reach the app over plain `http://` (directly on your LAN, or from the Android app):
-  browsers refuse `Secure` cookies over HTTP and the unlock would never stick.
-
-  ```yaml
-  environment:
-    - COOKIE_SECURE=true
-  ```
-- `settings.json` holds your Qobuz session token and app secret in clear text: keep `/config`
-  readable by the container user only.
-
----
-
-## Configuration
-
-### Login
-
-On first launch, you'll be redirected to the login page. You can authenticate with:
-
-- **Email + Password** — Your Qobuz account credentials
-- **Token** — Use an existing user auth token
-
-The app automatically retrieves the required `app_id` and `app_secret` from Qobuz. You can also provide custom values if needed.
-
-### Quality
-
-Select your preferred audio quality from the settings page:
-
-| Option | Format | Quality ID |
-|--------|--------|------------|
-| MP3 320 | `.mp3` | 5 |
-| FLAC 16-bit | `.flac` | 6 |
-| FLAC 24-bit ≤96kHz | `.flac` | 7 |
-| FLAC 24-bit 192kHz | `.flac` | 27 |
-
-If a track is not available in the chosen FLAC quality, lower FLAC qualities are tried in turn.
-MP3 is never used as a fallback for FLAC, so a `.flac` file always contains FLAC audio.
-
-### Templates
-
-Customize your folder and file structure using template variables. Default structure:
-
-```
-/downloads/{ArtistName}/{AlbumTitle}/{TrackNumber} - {TrackTitle}.flac
-```
-
-Available templates:
-
-| Template | Default | Description |
-|----------|---------|-------------|
-| Artist | `%ArtistName%` | Artist folder name |
-| Album | `%AlbumTitle%` | Album folder name |
-| Track | `%TrackNumber% - %TrackTitle%` | Track filename |
-| VA Track | `%TrackNumber% - %TrackArtist% - %TrackTitle%` | Track filename for compilations |
-| Playlist | `%PlaylistTitle%` | Playlist folder name |
-| CD | `CD %DiscNumber%` | Multi-disc subfolder |
-
-The Settings page previews the resulting path for an album track, a compilation track and a
-playlist track as you edit the templates, and warns about an empty track template, unknown or
-misplaced `%tags%`, templates starting with `/` or containing `..`, and characters that will be
-replaced in names (`\ : * ? " < > |`; only `/` separates folders).
-
-<details>
-<summary><strong>All template variables</strong></summary>
-
-**Release-specific:**
-`%AlbumID%`, `%AlbumURL%`, `%AlbumTitle%`, `%AlbumGenre%`, `%AlbumComposer%`, `%Label%`, `%Copyright%`, `%UPC%`, `%ReleaseDate%`, `%Year%`, `%ReleaseType%`, `%ArtistName%`, `%Format%`, `%FormatWithQuality%`, `%FormatWithHiResQuality%`, `%BitDepth%`, `%SampleRate%`
-
-**Track-specific:**
-`%TrackID%`, `%TrackNumber%`, `%TrackTitle%`, `%TrackArtist%`, `%TrackComposer%`, `%ISRC%`, `%TrackFormat%`, `%TrackFormatWithQuality%`, `%TrackFormatWithHiResQuality%`, `%TrackBitDepth%`, `%TrackSampleRate%`
-
-**Playlist-specific:**
-`%PlaylistID%`, `%PlaylistTitle%`
-
-The quality variables (`%BitDepth%`, `%SampleRate%` and the `%…WithQuality%` ones) describe the file
-that is downloaded: the chosen quality, capped by what the release offers.
-
-**Disc-specific:**
-`%DiscNumber%` *(multi-disc folder and track templates; empty in album and playlist folder templates)*
-
-**Parental advisory:**
-`%TrackPA%`, `%TrackPAShort%`, `%TrackPAifEx%`, `%TrackPAEnclosed%`, `%AlbumPA%`, `%AlbumPAShort%`, `%AlbumPAifEx%`, `%AlbumPAEnclosed%` *(and more variants)*
-
-</details>
-
-### Tagging
-
-Toggle individual metadata tags from the Settings page:
-
-Album, Album Artist, Artist, Title, Track Number, Total Tracks, Disc Number, Total Discs, Genre, Year, Release Date, Composer, Copyright, Label, ISRC, UPC, Type, Explicit, Cover Art, URL, Custom Comment
-
-Additional tagging options:
-- Merge multiple artist names (the album artist tag reads "A & B" instead of the release's main artist; "Merge in folder names" does the same for the artist folder)
-- Add Explicit/Clean tags to track titles
-- Custom comment text with `%description%` placeholder
-
-### Artwork
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Embedded art size | 600px | Size of cover art embedded in audio files (50 to 600 px, or the original) |
-| Saved art size | 600px | Size of `cover.jpg` saved to disk (50 to 600 px, or the original) |
-| Save to disk | Enabled | Save a separate `cover.jpg` file |
-
-### Advanced
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Streamable check | Enabled | Skip non-streamable tracks |
-| Fix MD5s | Disabled | Repair FLAC MD5 checksums (requires `flac` CLI) |
-| Playlist file | Enabled | Write a `.m3u8` playlist (relative paths, playlist order) next to the downloaded tracks of a playlist. Two tracks that the templates name alike get their Qobuz id appended (`1 - Intro (123456).flac`) so neither is lost |
-| Verify integrity | Enabled | Decode every downloaded FLAC with `flac -t`; a damaged file is downloaded again (requires `flac` CLI, about a second per track, skipped when `flac` is missing) |
-| Download goodies | Enabled | Download booklets and bonus materials |
-| Duplicate handling | Skip | `skip`, `rename`, or `overwrite` existing files |
-| Log detail | Normal | How much the download log keeps: failures only, normal, or detailed (quality, size and speed of every track, failed attempts). Chosen above the log on the Download page, where it can also be exported or copied |
-
----
-
-## Supported URL Types
-
-| Type | URL Pattern | Action |
-|------|-------------|--------|
-| Album | `https://play.qobuz.com/album/{id}` | Downloads all tracks |
-| Track | `https://play.qobuz.com/track/{id}` | Downloads single track |
-| Playlist | `https://play.qobuz.com/playlist/{id}` | Downloads all playlist tracks |
-| Artist | `https://play.qobuz.com/artist/{id}` | Downloads full discography |
-| Label | `https://play.qobuz.com/label/{id}` | Downloads all label releases |
-| Favorites | `https://play.qobuz.com/user/{id}/albums` | Downloads favorite albums |
-| Favorites | `https://play.qobuz.com/user/{id}/tracks` | Downloads favorite tracks |
-| Favorites | `https://play.qobuz.com/user/{id}/artists` | Downloads favorite artists |
-
-Qobuz store links (e.g. `https://www.qobuz.com/fr-fr/album/...`) are also supported and automatically converted.
-
----
-
-## Android
-
-Two ways to get the app on your phone, both pointing at your own server.
-
-**Install from the browser.** Open your instance in Chrome and pick *Add to home screen*. You get
-the icon and a window without an address bar. Nothing to build.
-
-**Or build the APK.** [`android/`](android/) holds a small Kotlin project — a WebView shell around
-the same interface, so there is no second UI to maintain. It adds what a browser tab cannot do:
-the server address is remembered, rotating the phone no longer reloads the page, and the app
-recovers on its own after a spell in the background.
-
-The setup screen accepts `192.168.1.42`, `qobuz.mydomain.com` or a full URL, tries HTTPS then HTTP
-(with and without port 8080), and only saves an address once `/healthz` has answered. Build
-instructions and release signing are in [android/README.md](android/README.md).
-
-> **Reverse proxy:** make sure WebSockets are proxied. Without them SignalR silently falls back to
-> long polling — the app still works, but every click gains 300–800 ms and the battery drains.
-> Check for a `101 Switching Protocols` on `/_blazor` in DevTools › Network.
-
----
-
-## Build from Source
-
-### Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-
-### Run locally
-
-```bash
-cd qobuzdlx.web
-dotnet run
-```
-
-The app will be available at `http://localhost:8080`, on this machine only: outside Docker it listens
-on `localhost`. To reach it from another device, set `Kestrel__Endpoints__Http__Url=http://0.0.0.0:8080`
-and set an access password first (see [Security](#security)).
-
-Two defaults are meant for the container and need adjusting on a workstation:
-
-| Setting | Container default | Locally |
-|---------|-------------------|---------|
-| Configuration folder | `/config` | Set the `CONFIG_PATH` environment variable (on Windows `/config` would mean `C:\config`) |
-| Download folder | `/downloads` | Change it in *Settings*, first field |
-
-### Run the tests
-
-```bash
-cd qobuzdlx.web
-dotnet test QobuzDLX.Web.sln
-```
-
-The solution holds the web application and `QobuzDLX.Web.Tests` (xUnit). The tests need no network and
-no Qobuz account: Qobuz and its CDN are replaced by a local fake, and everything they write goes to a
-temporary folder removed at the end of the run. A full run takes about a minute, most of it spent waiting
-for the download retries. Because the folder now contains a solution next to the project, name the
-project when you build it by hand (`dotnet build QobuzDLX.Web.csproj`).
-
-### Build Docker image
-
-```bash
-cd qobuzdlx.web
-docker build -t thimble9057/qobuzdlx.web .
-```
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Framework | Blazor Server (.NET 8) |
-| Runtime | ASP.NET Core Kestrel |
-| Audio tagging | TagLibSharp 2.3.0 |
-| JSON | Newtonsoft.Json 13.0.3 |
-| Container | Alpine Linux (multi-stage build) |
-| FLAC tools | `flac` CLI (installed in container) |
-| Tests | xUnit |
-
----
-
-## Project Structure
-
-```
-QobuzDLX.Web/
-├── Pages/
-│   ├── Login.razor          # Authentication page
-│   ├── Downloader.razor     # Main download page (index)
-│   ├── Search.razor         # Search albums, tracks, artists
-│   └── Settings.razor       # All configuration options
-├── Shared/
-│   └── MainLayout.razor     # Sidebar + layout shell
-├── Models/
-│   ├── AppSettings.cs       # Settings model (60+ properties)
-│   └── QobuzModels.cs       # Qobuz API response models
-├── Services/
-│   ├── QobuzApiService.cs   # Qobuz API client
-│   ├── DownloadService.cs   # Core download engine
-│   ├── SettingsService.cs   # Persistent JSON settings
-│   ├── TemplateService.cs   # Path/filename templating
-│   ├── TaggingService.cs    # ID3v2 & Vorbis tagging
-│   ├── AppGuardService.cs   # Access password hashing & unlock state
-│   └── AppAccessGate.cs     # App-wide unlock throttling
-├── wwwroot/css/app.css      # Dark theme styles
-├── QobuzDLX.Web.Tests/      # xUnit tests (fake Qobuz, no network needed)
-├── android/                 # Android app (Kotlin, WebView shell)
-├── Program.cs               # App entry point
-├── Dockerfile               # Multi-stage Docker build
-└── docker-compose.yml       # Compose configuration
-```
-
----
-
-## Requirements
-
-- A valid **Qobuz account** (subscription required for Hi-Res streaming). Without an active
-  subscription, or for restricted tracks, Qobuz only provides a 30-second preview: it is detected
-  and the track is skipped with an explanatory message instead of being saved as a full track.
-- Docker (recommended) or .NET 8 runtime
-
----
-
-## License
-
-Released under the [MIT License](LICENSE).
-
-QobuzDLX.Web is a web edition derived from the desktop application QobuzDownloaderX. The original
-web project was created by [thimble9057](https://gitlab.com/thimble9057/qobuzdlx.web); this fork,
-maintained by [L-at-nnes](https://gitlab.com/L-at-nnes/qobuzdlx.web), adds improvements on top of it.
-
----
-
-## Disclaimer
-
-This project is for personal and educational use only. Respect the terms of service of Qobuz and the copyright of artists. Support artists by purchasing their music.
+## How it is organised
+
+| Path | What it holds |
+|---|---|
+| `src/qobuz/` | The Qobuz client: sign-in, app identifiers found in the web player, signed requests, retries, pagination |
+| `src/download/` | The queue, the track pipeline (quality fallback, resuming, integrity check), jobs per kind of item, the manager |
+| `src/naming/`, `src/tagging/` | Folder and file names from templates; tags and covers written with `lofty` |
+| `src/access/` | The password, the lock after wrong attempts, the signed cookie |
+| `src/web/` | The HTTP API, the live events, and the interface served from the executable |
+| `web/` | The interface (SvelteKit, built to static files) |
+| `tests/` | Integration tests against a scripted fake of Qobuz and its CDN: no network, no account |
+
+## Credits and license
+
+Released under the [MIT license](LICENSE). Original project: [thimble9057/qobuzdlx.web](https://gitlab.com/thimble9057/qobuzdlx.web). The covers shown in the screenshots belong to their labels.
