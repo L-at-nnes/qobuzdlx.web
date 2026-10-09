@@ -22,7 +22,7 @@
 	thumbnail={track.album?.thumbnail}
 	explicit={track.parental_warning}
 	selected={search.selectedTracks.has(track.id)}
-	onselect={() => search.selectedTracks.toggle('tracks', rows, track.id)}
+	onselect={(range) => search.selectedTracks.toggle('tracks', rows, track.id, range)}
 >
 	{#snippet badges()}
 		<QualityChip bitDepth={track.bit_depth} samplingRate={track.sampling_rate} />

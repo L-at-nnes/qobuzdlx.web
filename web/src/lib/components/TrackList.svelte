@@ -40,7 +40,7 @@
 			<li
 				class="track"
 				class:picked={search.selectedTracks.has(track.id)}
-				onclick={() => search.selectedTracks.toggle(list, rows, track.id)}
+				onclick={(event) => search.selectedTracks.toggle(list, rows, track.id, event.shiftKey)}
 			>
 				<input
 					class="check"
@@ -48,7 +48,7 @@
 					checked={search.selectedTracks.has(track.id)}
 					onclick={(event) => {
 						event.stopPropagation();
-						search.selectedTracks.toggle(list, rows, track.id);
+						search.selectedTracks.toggle(list, rows, track.id, event.shiftKey);
 					}}
 					aria-label={t('row.select', { title: withVersion(track.title, track.version) })}
 				/>
@@ -97,6 +97,7 @@
 		padding: var(--space-2) 0;
 		border-bottom: 1px solid var(--line-soft);
 		cursor: pointer;
+		user-select: none;
 	}
 
 	.track.picked {

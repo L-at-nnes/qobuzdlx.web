@@ -17,7 +17,8 @@
 		closeLabel?: string;
 		/** Present when the row can be selected. */
 		selected?: boolean;
-		onselect?: () => void;
+		/** `range` is true on a shift-click: every row since the last click is picked with this one. */
+		onselect?: (range: boolean) => void;
 		badges?: Snippet;
 		actions?: Snippet;
 		children?: Snippet;
@@ -42,6 +43,15 @@
 
 	const uid = $props.id();
 	const expandable = $derived(ontoggle !== undefined);
+
+	/** Ctrl-click or shift-click on a row picks it, as in a file explorer; a plain click opens it. */
+	function openOrPick(event: MouseEvent) {
+		if (onselect && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+			onselect(event.shiftKey);
+		} else {
+			ontoggle?.();
+		}
+	}
 </script>
 
 <li class="row" class:open class:selected={selected}>
@@ -51,7 +61,7 @@
 				class="check"
 				type="checkbox"
 				checked={selected}
-				onchange={onselect}
+				onclick={(event) => onselect(event.shiftKey)}
 				aria-label={t('row.select', { title })}
 			/>
 		{/if}
@@ -63,7 +73,7 @@
 				aria-expanded={open}
 				aria-controls="panel-{uid}"
 				title={open ? closeLabel : openLabel}
-				onclick={ontoggle}
+				onclick={openOrPick}
 			>
 				<Cover src={thumbnail} {round} />
 				<span class="text">
@@ -138,6 +148,7 @@
 
 	button.main {
 		cursor: pointer;
+		user-select: none;
 		border-radius: var(--radius-sm);
 	}
 

@@ -51,7 +51,7 @@
 	openLabel={t('row.open')}
 	closeLabel={t('row.close')}
 	selected={search.selectedAlbums.has(album.id)}
-	onselect={() => search.selectedAlbums.toggle(list, rows, album.id)}
+	onselect={(range) => search.selectedAlbums.toggle(list, rows, album.id, range)}
 >
 	{#snippet badges()}
 		<QualityChip bitDepth={album.bit_depth} samplingRate={album.sampling_rate} />
