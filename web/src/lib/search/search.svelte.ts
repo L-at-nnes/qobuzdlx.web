@@ -8,9 +8,9 @@ import type {
 	SearchKind,
 	TrackItem
 } from '#lib/types.ts';
-import { SvelteSet } from 'svelte/reactivity';
 import type { Wanted } from '#lib/state/enqueue.ts';
 import type { Sort } from './ordering.ts';
+import { Selection } from './selection.svelte.ts';
 
 /** How many results a page holds. */
 const PAGE_SIZE = 50;
@@ -69,8 +69,8 @@ class SearchState {
 	open = $state<Record<string, boolean>>({});
 	children = $state<Record<string, Child>>({});
 
-	selectedAlbums = new SvelteSet<string>();
-	selectedTracks = new SvelteSet<number>();
+	selectedAlbums = new Selection<string>();
+	selectedTracks = new Selection<number>();
 	selectionCount = $derived(this.selectedAlbums.size + this.selectedTracks.size);
 
 	/** Whether a search was ever made: the page shows a welcome until one is. */
@@ -172,56 +172,14 @@ class SearchState {
 
 	// ─── Selection ───
 
-	toggleAlbumSelection(id: string) {
-		if (!this.selectedAlbums.delete(id)) this.selectedAlbums.add(id);
-	}
-
-	toggleTrackSelection(id: number) {
-		if (!this.selectedTracks.delete(id)) this.selectedTracks.add(id);
-	}
-
 	clearSelection() {
 		this.selectedAlbums.clear();
 		this.selectedTracks.clear();
 	}
 
-	// ─── What the selection stands for ───
-
-	/** Every album known on the page, wherever it was found: in the results or under an artist. */
-	private knownAlbums(): AlbumItem[] {
-		const under = Object.values(this.children).flatMap((child) =>
-			child.status === 'ready-albums' ? child.albums : []
-		);
-		return [...(this.results.albums?.items ?? []), ...under];
-	}
-
 	/** The selection as things to put in the queue. */
 	selectedWanted(): Wanted[] {
-		const albums = this.knownAlbums();
-		const wanted: Wanted[] = [];
-		for (const id of this.selectedAlbums) {
-			const album = albums.find((candidate) => candidate.id === id);
-			if (album) {
-				wanted.push({
-					url: album.url,
-					label: album.title,
-					sub_label: album.artist,
-					thumbnail: album.thumbnail
-				});
-			}
-		}
-		for (const id of this.selectedTracks) {
-			const track = this.results.tracks?.items.find((candidate) => candidate.id === id);
-			if (track) {
-				wanted.push({
-					url: track.url,
-					label: track.title,
-					sub_label: track.artist,
-					thumbnail: track.album?.thumbnail
-				});
-			}
-		}
-		return wanted;
+		return [...this.selectedAlbums.wanted(), ...this.selectedTracks.wanted()];
 	}
 
 	// ─── Keeping it for the tab ───

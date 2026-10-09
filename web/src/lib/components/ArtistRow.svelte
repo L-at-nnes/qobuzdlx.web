@@ -3,6 +3,7 @@
 	import { isHiRes, sortAlbums, type Sort } from '#lib/search/ordering.ts';
 	import { artistKey, search } from '#lib/search/search.svelte.ts';
 	import { enqueue } from '#lib/state/enqueue.ts';
+	import { albumRow } from '#lib/search/selection.svelte.ts';
 	import type { ArtistItem } from '#lib/types.ts';
 	import AlbumRow from './AlbumRow.svelte';
 	import ChildPanel from './ChildPanel.svelte';
@@ -26,6 +27,8 @@
 				)
 			: []
 	);
+
+	const albumRows = $derived(albums.map(albumRow));
 
 	const albumSorts: Sort[] = ['relevance', 'dateDesc', 'dateAsc', 'titleAsc', 'titleDesc', 'qualityDesc', 'tracksDesc', 'tracksAsc', 'labelAsc'];
 </script>
@@ -78,7 +81,7 @@
 		{:else}
 			<ul class="albums">
 				{#each albums as album (album.id)}
-					<AlbumRow {album} showArtist={false} />
+					<AlbumRow {album} showArtist={false} rows={albumRows} list={key} />
 				{/each}
 			</ul>
 		{/if}

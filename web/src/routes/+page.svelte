@@ -22,6 +22,7 @@
 		type Sort
 	} from '#lib/search/ordering.ts';
 	import { search } from '#lib/search/search.svelte.ts';
+	import { albumRow, trackRow } from '#lib/search/selection.svelte.ts';
 	import type { SearchKind } from '#lib/types.ts';
 
 	const kinds: SearchKind[] = ['albums', 'tracks', 'artists', 'playlists'];
@@ -69,6 +70,8 @@
 		]
 	);
 	const hasMore = $derived(found !== null && found.items.length < found.total);
+	const albumRows = $derived(albums.map(albumRow));
+	const trackRows = $derived(tracks.map((track) => trackRow(track)));
 	const selectable = $derived(search.kind === 'albums' || search.kind === 'tracks');
 	const allSelected = $derived(
 		search.kind === 'albums'
@@ -92,17 +95,8 @@
 	}
 
 	function toggleAll() {
-		if (search.kind === 'albums') {
-			for (const album of albums) {
-				if (allSelected) search.selectedAlbums.delete(album.id);
-				else search.selectedAlbums.add(album.id);
-			}
-		} else {
-			for (const track of tracks) {
-				if (allSelected) search.selectedTracks.delete(track.id);
-				else search.selectedTracks.add(track.id);
-			}
-		}
+		if (search.kind === 'albums') search.selectedAlbums.setAll(albumRows, !allSelected);
+		else search.selectedTracks.setAll(trackRows, !allSelected);
 	}
 </script>
 
@@ -202,10 +196,10 @@
 			{:else}
 				<ul class="results" class:busy={search.searching}>
 					{#each albums as album (album.id)}
-						<AlbumRow {album} />
+						<AlbumRow {album} rows={albumRows} list="albums" />
 					{/each}
 					{#each tracks as track (track.id)}
-						<TrackRow {track} />
+						<TrackRow {track} rows={trackRows} />
 					{/each}
 					{#each artists as artist (artist.id)}
 						<ArtistRow {artist} />

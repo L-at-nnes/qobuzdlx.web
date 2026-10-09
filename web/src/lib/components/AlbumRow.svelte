@@ -3,6 +3,7 @@
 	import { releaseYear, withVersion } from '#lib/search/ordering.ts';
 	import { albumKey, search } from '#lib/search/search.svelte.ts';
 	import { enqueue } from '#lib/state/enqueue.ts';
+	import type { Row } from '#lib/search/selection.svelte.ts';
 	import type { AlbumItem } from '#lib/types.ts';
 	import ChildPanel from './ChildPanel.svelte';
 	import QualityChip from './QualityChip.svelte';
@@ -14,8 +15,10 @@
 		album,
 		/** Inside an artist the artist is known: it is not said again. */
 		showArtist = true,
-		selectable = true
-	}: { album: AlbumItem; showArtist?: boolean; selectable?: boolean } = $props();
+		/** The albums of the list this one is shown in, in the order shown, and the name of that list. */
+		rows,
+		list
+	}: { album: AlbumItem; showArtist?: boolean; rows: readonly Row<string>[]; list: string } = $props();
 
 	const key = $derived(albumKey(album.id));
 	const child = $derived(search.children[key]);
@@ -47,8 +50,8 @@
 	ontoggle={() => search.toggleAlbum(album.id)}
 	openLabel={t('row.open')}
 	closeLabel={t('row.close')}
-	selected={selectable ? search.selectedAlbums.has(album.id) : undefined}
-	onselect={selectable ? () => search.toggleAlbumSelection(album.id) : undefined}
+	selected={search.selectedAlbums.has(album.id)}
+	onselect={() => search.selectedAlbums.toggle(list, rows, album.id)}
 >
 	{#snippet badges()}
 		<QualityChip bitDepth={album.bit_depth} samplingRate={album.sampling_rate} />

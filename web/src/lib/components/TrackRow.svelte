@@ -2,12 +2,13 @@
 	import { formatDuration, withVersion } from '#lib/search/ordering.ts';
 	import { search } from '#lib/search/search.svelte.ts';
 	import { enqueue } from '#lib/state/enqueue.ts';
+	import type { Row } from '#lib/search/selection.svelte.ts';
 	import type { TrackItem } from '#lib/types.ts';
 	import QualityChip from './QualityChip.svelte';
 	import QueueButton from './QueueButton.svelte';
 	import ResultRow from './ResultRow.svelte';
 
-	let { track }: { track: TrackItem } = $props();
+	let { track, rows }: { track: TrackItem; rows: readonly Row<number>[] } = $props();
 
 	const title = $derived(withVersion(track.title, track.version));
 	const meta = $derived(
@@ -21,7 +22,7 @@
 	thumbnail={track.album?.thumbnail}
 	explicit={track.parental_warning}
 	selected={search.selectedTracks.has(track.id)}
-	onselect={() => search.toggleTrackSelection(track.id)}
+	onselect={() => search.selectedTracks.toggle('tracks', rows, track.id)}
 >
 	{#snippet badges()}
 		<QualityChip bitDepth={track.bit_depth} samplingRate={track.sampling_rate} />
