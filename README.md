@@ -18,7 +18,8 @@ I rewrote it because I was not happy with the interface or with the language it 
 
 ## Features
 
-- **Search** albums, tracks, artists and playlists; sort by title, artist, date, quality, track count, label or duration; keep only Hi-Res; open a release to read its tracks (discs, durations, artists) before downloading it; select several releases and queue them together.
+- **Search** albums, tracks, artists and playlists; sort by title, artist, date, quality, track count, label or duration; keep only Hi-Res; open an album or a playlist to read its tracks (discs, durations, artists), tick only the ones you want and download just those.
+- **Select like in a file explorer**: shift-click takes every row from the last click to this one, ctrl-click adds or removes a row, in the results as well as in the tracks of an album or a playlist.
 - **Download** albums, single tracks, playlists, whole discographies, labels and the favourites of the account, in MP3 320, FLAC 16-bit, FLAC up to 24-bit 96 kHz or FLAC up to 24-bit 192 kHz. FLAC never falls back to MP3, and the log tells the quality that was really served.
 - **A queue that runs unattended.** It survives a restart: what was waiting resumes, files already on disk are recognised, and the saved Qobuz session is opened again. Reorder, skip an album, cancel an item, retry only the tracks that failed.
 - **Resilient transfers.** The Qobuz CDN cuts connections after a few megabytes; a download goes on from where it stopped. Every FLAC file is decoded after the transfer to be sure it is whole, and a damaged file is fetched again.
@@ -44,23 +45,42 @@ I rewrote it because I was not happy with the interface or with the language it 
 
 ## Running it
 
-### In a container
+### With Docker Compose
 
-No image is published yet; build it from this repository.
+No image is published: Compose builds it from this repository, interface and server included.
+
+```bash
+git clone https://gitlab.com/L-at-nnes/qobuzdlx.web.git
+cd qobuzdlx.web
+sudo docker compose up -d --build
+```
+
+Then open `http://<your server>:8080` and sign in to Qobuz. The settings, the session and the queue live in a Docker volume and survive a rebuild; to update, `git pull` and run the same `docker compose up -d --build`.
+
+To change anything, copy `.env.example` to `.env` and edit it (all of it is optional):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PORT` | `8080` | Port of the interface on the host |
+| `ACCESS_PASSWORD` | none | Password of the interface, at least 8 characters |
+| `DOWNLOADS_DIR` | `downloads` | A name keeps the music in a Docker volume; a path (`/srv/music`) puts it in that folder of the host |
+| `COOKIE_SECURE` | `false` | `true` behind a reverse proxy that serves the interface over HTTPS |
+
+The application runs as an unprivileged user (uid 65532): a folder of the host given as `DOWNLOADS_DIR` has to belong to it (`sudo chown -R 65532 /srv/music`).
+
+### With plain Docker
 
 ```bash
 docker build -t qobuzdlx .
 docker run -d --name qobuzdlx \
   -p 8080:8080 \
   -v qobuzdlx-config:/config \
-  -v /path/to/your/music:/downloads \
+  -v /srv/music:/downloads \
   -e ACCESS_PASSWORD='a long password' \
   qobuzdlx
 ```
 
-The application runs as an unprivileged user (uid 65532). If you mount folders from the host, give that user access to them (`chown -R 65532 /path/to/your/music`) or run the container with `--user` set to the owner of the folders.
-
-Then open `http://localhost:8080`, enter the access password, and sign in to Qobuz.
+The variables of the application, which Compose fills in for you:
 
 | Variable | Default | Meaning |
 |---|---|---|
