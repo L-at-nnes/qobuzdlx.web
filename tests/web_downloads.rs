@@ -461,9 +461,10 @@ async fn a_list_of_only_foreign_links_says_so_instead_of_being_refused() {
 async fn a_big_list_is_queued_at_once() {
     let app = TestApp::start().await;
     let browser = app.browser();
-    let list: String = (0..5000)
-        .map(|number| format!("{}\n", album_url(&format!("a{number}"))))
-        .collect();
+    let list = (0..5000)
+        .map(|number| album_url(&format!("a{number}")))
+        .collect::<Vec<_>>()
+        .join("\n");
 
     let answer = browser.post_text("/api/downloads/import", &list).await;
 
