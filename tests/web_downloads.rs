@@ -402,3 +402,71 @@ async fn a_locked_application_gives_no_live_view() {
 
     assert_eq!(response.status(), 401);
 }
+
+// ─── Importing a list ───
+
+#[tokio::test]
+async fn a_text_list_is_queued_in_order_and_what_is_not_qobuz_is_ignored() {
+    let app = TestApp::start().await;
+    let browser = app.browser();
+    let list = format!(
+        "# my list\n\n{}\nwww.youtube.com\n{} # note\nhello\n{}\n",
+        album_url("first"),
+        album_url("second"),
+        album_url("first")
+    );
+
+    let answer = browser.post_text("/api/downloads/import", &list).await;
+
+    assert_eq!(answer.status, 200);
+    assert_eq!(
+        answer.json(),
+        json!({ "added": 2, "requeued": 0, "duplicates": 1, "invalid": 2 })
+    );
+    let urls: Vec<String> = queue_of(&browser)
+        .await
+        .iter()
+        .map(|item| item["url"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(urls, [album_url("first"), album_url("second")]);
+}
+
+#[tokio::test]
+async fn a_list_without_any_line_is_refused() {
+    let app = TestApp::start().await;
+
+    let answer = app
+        .browser()
+        .post_text("/api/downloads/import", "# only a comment\n\n")
+        .await;
+
+    assert_eq!(answer.status, 400);
+}
+
+#[tokio::test]
+async fn a_list_of_only_foreign_links_says_so_instead_of_being_refused() {
+    let app = TestApp::start().await;
+
+    let answer = app
+        .browser()
+        .post_text("/api/downloads/import", "www.youtube.com\n")
+        .await;
+
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["invalid"], 1);
+    assert_eq!(answer.json()["added"], 0);
+}
+
+#[tokio::test]
+async fn a_big_list_is_queued_at_once() {
+    let app = TestApp::start().await;
+    let browser = app.browser();
+    let list: String = (0..5000)
+        .map(|number| format!("{}\n", album_url(&format!("a{number}"))))
+        .collect();
+
+    let answer = browser.post_text("/api/downloads/import", &list).await;
+
+    assert_eq!(answer.json()["added"], 5000);
+    assert_eq!(queue_of(&browser).await.len(), 5000);
+}

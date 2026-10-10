@@ -3,7 +3,8 @@
 use std::convert::Infallible;
 use std::time::Duration;
 
-use axum::extract::{Path, State};
+use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::sse::{Event as Sse, KeepAlive};
 use axum::response::{IntoResponse, Response};
@@ -16,11 +17,18 @@ use tokio::sync::broadcast::error::RecvError;
 
 use super::error::{ApiError, ApiResult};
 use super::state::AppState;
-use crate::download::{Display, EnqueuedCounts, Event, Snapshot};
+use crate::download::{Display, EnqueuedCounts, Event, Snapshot, parse_list};
+
+/// The largest list that is read: some 100 000 lines.
+const IMPORT_LIMIT: usize = 16 * 1024 * 1024;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/downloads", get(snapshot).post(enqueue))
+        .route(
+            "/downloads/import",
+            post(import).layer(DefaultBodyLimit::max(IMPORT_LIMIT)),
+        )
         .route("/downloads/events", get(events))
         .route("/downloads/cancel", post(cancel))
         .route("/downloads/skip", post(skip))
@@ -91,6 +99,26 @@ async fn enqueue(
             (wanted.url, display)
         }));
     Ok(Json(Counts::from_queue(counts, invalid)))
+}
+
+/// A text file with one address per line, queued in the order of the file. What is not a Qobuz
+/// address counts as `invalid`; comments and blank lines are not counted.
+async fn import(State(state): State<AppState>, body: Bytes) -> ApiResult<Json<Counts>> {
+    let list = parse_list(&String::from_utf8_lossy(&body));
+    if list.addresses.is_empty() && list.ignored == 0 {
+        return Err(ApiError::bad_request(
+            "nothing_to_add",
+            "the list holds no address",
+        ));
+    }
+
+    let counts = state.downloads.enqueue_parsed(
+        list.addresses
+            .into_iter()
+            .map(|address| (address, Display::default()))
+            .collect(),
+    );
+    Ok(Json(Counts::from_queue(counts, list.ignored)))
 }
 
 async fn cancel(State(state): State<AppState>) -> StatusCode {

@@ -144,7 +144,11 @@ impl Browser {
         if let Some(body) = body {
             request = request.json(&body);
         }
+        self.deliver(request).await
+    }
 
+    /// Sends a request and keeps the unlock cookie the answer sets.
+    async fn deliver(&self, request: reqwest::RequestBuilder) -> Answer {
         let response = request.send().await.unwrap();
         let status = response.status().as_u16();
         let headers = response.headers().clone();
@@ -170,6 +174,19 @@ impl Browser {
     pub async fn post(&self, path: &str, body: Value) -> Answer {
         self.send(reqwest::Method::POST, path, Some(body), &[])
             .await
+    }
+
+    /// Posts a text, as a file chosen in the page is.
+    pub async fn post_text(&self, path: &str, text: &str) -> Answer {
+        let mut request = self
+            .http
+            .post(format!("{}{path}", self.base))
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(text.to_owned());
+        if let Some(token) = self.token() {
+            request = request.header("cookie", format!("qbdlx_access={token}"));
+        }
+        self.deliver(request).await
     }
 
     pub async fn put(&self, path: &str, body: Value) -> Answer {
