@@ -16,7 +16,7 @@ use tokio::sync::broadcast::error::RecvError;
 
 use super::error::{ApiError, ApiResult};
 use super::state::AppState;
-use crate::download::{Display, Enqueued, Event, Snapshot};
+use crate::download::{Display, EnqueuedCounts, Event, Snapshot};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -61,6 +61,17 @@ struct Counts {
     invalid: u32,
 }
 
+impl Counts {
+    fn from_queue(counts: EnqueuedCounts, invalid: usize) -> Self {
+        Self {
+            added: counts.added,
+            requeued: counts.requeued,
+            duplicates: counts.already_queued,
+            invalid: u32::try_from(invalid).unwrap_or(u32::MAX),
+        }
+    }
+}
+
 async fn enqueue(
     State(state): State<AppState>,
     Json(request): Json<Request>,
@@ -69,21 +80,17 @@ async fn enqueue(
         return Err(ApiError::bad_request("nothing_to_add", "no address given"));
     }
 
-    let mut added = Counts::default();
-    for wanted in request.items {
-        let display = Display {
-            label: wanted.label,
-            sub_label: wanted.sub_label,
-            thumbnail: wanted.thumbnail,
-        };
-        match state.downloads.enqueue(&wanted.url, display) {
-            Ok(Enqueued::Added) => added.added += 1,
-            Ok(Enqueued::Requeued) => added.requeued += 1,
-            Ok(Enqueued::AlreadyQueued) => added.duplicates += 1,
-            Err(_) => added.invalid += 1,
-        }
-    }
-    Ok(Json(added))
+    let (counts, invalid) = state
+        .downloads
+        .enqueue_all(request.items.into_iter().map(|wanted| {
+            let display = Display {
+                label: wanted.label,
+                sub_label: wanted.sub_label,
+                thumbnail: wanted.thumbnail,
+            };
+            (wanted.url, display)
+        }));
+    Ok(Json(Counts::from_queue(counts, invalid)))
 }
 
 async fn cancel(State(state): State<AppState>) -> StatusCode {

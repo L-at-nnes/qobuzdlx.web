@@ -1,4 +1,7 @@
+use std::collections::HashSet;
+
 use super::item::{Display, ItemKind, ItemStatus, QueueItem, now};
+use super::url::QobuzUrl;
 
 /// What queuing an address did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,6 +12,14 @@ pub enum Enqueued {
     Requeued,
     /// The address is waiting or running: nothing was done.
     AlreadyQueued,
+}
+
+/// What queuing several addresses at once did, counted by outcome.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EnqueuedCounts {
+    pub added: u32,
+    pub requeued: u32,
+    pub already_queued: u32,
 }
 
 /// The download queue and the rules that govern it. Pure data: the worker and the locking live in
@@ -82,6 +93,39 @@ impl Queue {
         }
         self.items.push(item);
         Enqueued::Requeued
+    }
+
+    /// Adds several addresses, in order. The same as calling `enqueue` for each, without looking
+    /// through the whole queue for each: a list of thousands of addresses is added at once.
+    pub fn enqueue_many(
+        &mut self,
+        wanted: impl IntoIterator<Item = (QobuzUrl, Display)>,
+    ) -> EnqueuedCounts {
+        let mut known: HashSet<String> = self
+            .items
+            .iter()
+            .map(|item| item.url.to_ascii_lowercase())
+            .collect();
+        let mut counts = EnqueuedCounts::default();
+        for (address, display) in wanted {
+            // An address that is not in the queue yet is added at the end: no need to look for it
+            if known.insert(address.canonical.to_ascii_lowercase()) {
+                self.items.push(QueueItem::new(
+                    address.canonical,
+                    address.kind,
+                    address.ref_id,
+                    display,
+                ));
+                counts.added += 1;
+                continue;
+            }
+            match self.enqueue(&address.canonical, address.kind, &address.ref_id, display) {
+                Enqueued::Added => counts.added += 1,
+                Enqueued::Requeued => counts.requeued += 1,
+                Enqueued::AlreadyQueued => counts.already_queued += 1,
+            }
+        }
+        counts
     }
 
     /// Takes the first waiting item and marks it as running.
@@ -271,6 +315,77 @@ mod tests {
         let id = id_of(queue, url);
         queue.finish(&id, status, None);
         id
+    }
+
+    fn address(url: &str, kind: ItemKind, id: &str) -> QobuzUrl {
+        QobuzUrl {
+            canonical: url.to_owned(),
+            kind,
+            ref_id: id.to_owned(),
+        }
+    }
+
+    #[test]
+    fn many_addresses_are_added_in_order_and_counted() {
+        let mut queue = queue_with(&["https://play.qobuz.com/album/old"]);
+        let counts = queue.enqueue_many([
+            (
+                address("https://play.qobuz.com/album/a", ItemKind::Album, "a"),
+                Display::default(),
+            ),
+            (
+                address("https://play.qobuz.com/album/OLD", ItemKind::Album, "old"),
+                Display::default(),
+            ),
+            (
+                address("https://play.qobuz.com/album/b", ItemKind::Album, "b"),
+                Display::default(),
+            ),
+            (
+                address("https://play.qobuz.com/album/a", ItemKind::Album, "a"),
+                Display::default(),
+            ),
+        ]);
+
+        assert_eq!(
+            counts,
+            EnqueuedCounts {
+                added: 2,
+                requeued: 0,
+                already_queued: 2
+            }
+        );
+        let urls: Vec<_> = queue.items().iter().map(|item| item.url.as_str()).collect();
+        assert_eq!(
+            urls,
+            [
+                "https://play.qobuz.com/album/old",
+                "https://play.qobuz.com/album/a",
+                "https://play.qobuz.com/album/b"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_finished_address_in_a_batch_goes_back_to_the_end() {
+        let mut queue = queue_with(&[
+            "https://play.qobuz.com/album/done",
+            "https://play.qobuz.com/album/other",
+        ]);
+        let id = id_of(&queue, "https://play.qobuz.com/album/done");
+        queue.finish(&id, ItemStatus::Completed, None);
+
+        let counts = queue.enqueue_many([(
+            address("https://play.qobuz.com/album/done", ItemKind::Album, "done"),
+            Display::default(),
+        )]);
+
+        assert_eq!(counts.requeued, 1);
+        assert_eq!(
+            queue.items().last().unwrap().url,
+            "https://play.qobuz.com/album/done"
+        );
+        assert_eq!(queue.items().last().unwrap().status, ItemStatus::Pending);
     }
 
     #[test]

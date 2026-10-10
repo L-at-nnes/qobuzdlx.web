@@ -17,11 +17,11 @@ use super::artwork::Covers;
 use super::item::{Display, QueueItem};
 use super::log::{Log, LogEvent, LogLine};
 use super::progress::Progress;
-use super::queue::{Enqueued, Queue};
+use super::queue::{Enqueued, EnqueuedCounts, Queue};
 use super::store::QueueStore;
 use super::track::{Environment, TEMP_PREFIX, Tuning};
 use super::transfer::Fetcher;
-use super::url::parse;
+use super::url::{QobuzUrl, parse};
 use crate::qobuz::{Client, SessionEvent};
 use crate::settings::SettingsStore;
 
@@ -244,6 +244,40 @@ impl Manager {
             self.inner.queue_changed();
         }
         Ok(result)
+    }
+
+    /// Adds several addresses with a single save of the queue and a single announcement, however
+    /// many there are. Returns what became of them, and how many were not addresses that can be
+    /// downloaded.
+    #[must_use]
+    pub fn enqueue_all(
+        &self,
+        wanted: impl IntoIterator<Item = (String, Display)>,
+    ) -> (EnqueuedCounts, usize) {
+        let mut invalid = 0;
+        let mut parsed = Vec::new();
+        for (address, display) in wanted {
+            if let Some(address) = parse(&address) {
+                parsed.push((address, display));
+            } else {
+                invalid += 1;
+                self.inner.log(LogEvent::InvalidUrl {
+                    url: address.chars().take(200).collect(),
+                });
+            }
+        }
+        (self.enqueue_parsed(parsed), invalid)
+    }
+
+    /// Adds addresses that were already read, with a single save and a single announcement.
+    #[must_use]
+    pub fn enqueue_parsed(&self, wanted: Vec<(QobuzUrl, Display)>) -> EnqueuedCounts {
+        let counts = locked(&self.inner.state).queue.enqueue_many(wanted);
+        if counts.added + counts.requeued > 0 {
+            self.inner.wake.notify_one();
+            self.inner.queue_changed();
+        }
+        counts
     }
 
     /// "Skip": drops the album in progress, an artist has dozens. The item goes on.
