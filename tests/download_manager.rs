@@ -539,7 +539,13 @@ async fn the_queue_survives_on_disk_in_the_order_it_has() {
         .enqueue(&album_url("b"), Display::default())
         .unwrap();
 
-    let saved: Vec<QueueItem> = QueueStore::new(rig.config.path()).load().items().to_vec();
+    // The queue is written a moment after it changes, once for a burst of changes
+    let store = QueueStore::new(rig.config.path());
+    eventually("the queue to be written", || {
+        store.load().items().len() == 2
+    })
+    .await;
+    let saved: Vec<QueueItem> = store.load().items().to_vec();
 
     assert_eq!(
         saved

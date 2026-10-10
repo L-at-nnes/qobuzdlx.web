@@ -25,6 +25,10 @@ use super::url::{QobuzUrl, parse};
 use crate::qobuz::{Client, SessionEvent};
 use crate::settings::SettingsStore;
 
+/// How long a change waits for others before the queue is written to disk: a burst of changes (a
+/// long list added, many short items in a row) is one write, not one each.
+const SAVE_AFTER: Duration = Duration::from_millis(500);
+
 /// How often the progress of a file in transfer is announced at most.
 const PROGRESS_EVERY: Duration = Duration::from_millis(200);
 
@@ -86,6 +90,8 @@ pub(super) struct Inner {
     /// Serialises the writes of `queue.json`: a slow writer must not replace a recent version with an
     /// older one.
     persist: Mutex<()>,
+    /// The queue changed since it was written.
+    unsaved: Notify,
     events: broadcast::Sender<Event>,
     pub(super) wake: Notify,
     pub(super) shutdown: CancellationToken,
@@ -144,6 +150,7 @@ impl Manager {
                     last_progress: Instant::now(),
                 }),
                 persist: Mutex::new(()),
+                unsaved: Notify::new(),
                 events,
                 wake: Notify::new(),
                 shutdown: CancellationToken::new(),
@@ -165,6 +172,7 @@ impl Manager {
         }
 
         tokio::spawn(worker::run(Arc::clone(&manager.inner)));
+        tokio::spawn(keep_saved(Arc::clone(&manager.inner)));
         tokio::spawn(watch_session(Arc::clone(&manager.inner)));
         manager
     }
@@ -349,16 +357,19 @@ impl Inner {
         }
     }
 
-    /// Persists the queue, and tells the interface.
+    /// Has the queue written soon, and tells the interface.
     pub(super) fn queue_changed(&self) {
-        {
-            let _writing = locked(&self.persist);
-            let snapshot = locked(&self.state).queue.clone();
-            if let Err(error) = self.store.save(&snapshot) {
-                tracing::warn!(%error, "the download queue could not be saved");
-            }
-        }
+        self.unsaved.notify_one();
         self.emit(Event::Queue);
+    }
+
+    /// Writes the queue to disk now.
+    fn save_queue(&self) {
+        let _writing = locked(&self.persist);
+        let snapshot = locked(&self.state).queue.clone();
+        if let Err(error) = self.store.save(&snapshot) {
+            tracing::warn!(%error, "the download queue could not be saved");
+        }
     }
 
     fn changed_if(&self, changed: bool) {
@@ -402,6 +413,23 @@ fn purge_partial_files(directory: &std::path::Path) {
             let _ = std::fs::remove_file(entry.path());
         }
     }
+}
+
+/// Writes the queue to disk after it changed, at most twice a second, and a last time when the
+/// application stops.
+async fn keep_saved(inner: Arc<Inner>) {
+    loop {
+        tokio::select! {
+            () = inner.shutdown.cancelled() => break,
+            () = inner.unsaved.notified() => {}
+        }
+        tokio::select! {
+            () = inner.shutdown.cancelled() => break,
+            () = tokio::time::sleep(SAVE_AFTER) => {}
+        }
+        inner.save_queue();
+    }
+    inner.save_queue();
 }
 
 /// Follows the session: a new one wakes the worker (what was restored waited for it), a refused one
