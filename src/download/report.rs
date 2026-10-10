@@ -24,6 +24,11 @@ pub trait Reporter: Send + Sync {
     /// progress.
     fn step(&self, percent: u8, track: Option<StepTrack>);
 
+    /// What the thing being downloaded is called, for an item that was queued with nothing but its
+    /// address (an imported list). Playlists, artists, labels and single tracks say it; an album
+    /// says it through `album`.
+    fn named(&self, _name: &str, _detail: Option<&str>, _thumbnail: Option<&str>) {}
+
     /// How far the file being received has got.
     fn transfer(&self, update: Update);
 

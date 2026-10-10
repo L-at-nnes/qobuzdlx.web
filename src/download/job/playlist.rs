@@ -16,6 +16,19 @@ impl Job {
     /// Downloads a playlist: its tracks, from whichever albums they come from, then a `.m3u8` file.
     pub(super) async fn playlist(&mut self, playlist_id: u64) -> Result<(), JobError> {
         let playlist = self.env.client.playlist(playlist_id).await?;
+        self.reporter.named(
+            &playlist.name,
+            playlist
+                .owner
+                .as_ref()
+                .and_then(|owner| owner.name.as_deref()),
+            playlist
+                .images150
+                .iter()
+                .flatten()
+                .next()
+                .map(String::as_str),
+        );
         let tracks = playlist
             .tracks
             .as_ref()

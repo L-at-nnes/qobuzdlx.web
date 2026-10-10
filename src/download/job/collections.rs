@@ -39,6 +39,14 @@ impl Job {
     /// Every album of an artist.
     async fn artist(&mut self, artist_id: u64) -> Result<(), JobError> {
         let artist = self.env.client.artist(artist_id).await?;
+        self.reporter.named(
+            &artist.name,
+            None,
+            artist
+                .picture
+                .as_deref()
+                .filter(|picture| !picture.is_empty()),
+        );
         let albums = artist
             .albums
             .map(|page| page.items.into_iter().map(|album| album.id).collect())
@@ -49,6 +57,7 @@ impl Job {
     /// Every album of a label.
     async fn label(&mut self, label_id: u64) -> Result<(), JobError> {
         let label = self.env.client.label(label_id).await?;
+        self.reporter.named(&label.name, None, None);
         let Some(page) = label.albums else {
             self.log(LogEvent::LabelNotFound);
             return Ok(());

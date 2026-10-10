@@ -555,3 +555,72 @@ async fn the_queue_survives_on_disk_in_the_order_it_has() {
         [album_url("a"), album_url("b")]
     );
 }
+
+// ─── Items queued with nothing but their address ───
+
+fn item_of(manager: &Manager, url: &str) -> QueueItem {
+    manager
+        .snapshot()
+        .queue
+        .into_iter()
+        .find(|item| item.url == url)
+        .unwrap()
+}
+
+#[tokio::test]
+async fn an_album_queued_by_its_address_takes_its_name_when_it_starts() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("alb"), Display::default())
+        .unwrap();
+    finished(&manager, &album_url("alb")).await;
+
+    let item = item_of(&manager, &album_url("alb"));
+    assert_eq!(item.label, "Kind of Blue");
+    assert_eq!(item.sub_label.as_deref(), Some("Miles Davis"));
+}
+
+#[tokio::test]
+async fn a_playlist_and_a_track_queued_by_their_address_take_their_name_too() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    rig.catalogue
+        .add_playlist(77, "Evening Concert", &[(11, 1), (12, 2)]);
+    let manager = rig.start();
+    let playlist = "https://play.qobuz.com/playlist/77";
+    let track = "https://play.qobuz.com/track/13";
+
+    manager.enqueue(playlist, Display::default()).unwrap();
+    manager.enqueue(track, Display::default()).unwrap();
+    finished(&manager, playlist).await;
+    finished(&manager, track).await;
+
+    assert_eq!(item_of(&manager, playlist).label, "Evening Concert");
+    assert_eq!(item_of(&manager, track).label, "Blue in Green");
+}
+
+#[tokio::test]
+async fn a_name_the_interface_gave_is_kept() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let manager = rig.start();
+
+    manager
+        .enqueue(
+            &album_url("alb"),
+            Display {
+                label: Some("My choice".into()),
+                ..Display::default()
+            },
+        )
+        .unwrap();
+    finished(&manager, &album_url("alb")).await;
+
+    assert_eq!(item_of(&manager, &album_url("alb")).label, "My choice");
+}

@@ -141,6 +141,14 @@ impl Job {
         };
         let album = self.cached_album(&listed.id).await?;
         self.reporter.album(Some(&album));
+        self.reporter.named(
+            &title,
+            track
+                .performer
+                .as_ref()
+                .and_then(|performer| performer.name.as_deref()),
+            Some(album.image.thumbnail.as_str()),
+        );
 
         let folder = self.folder(Some(&album), Some(&track), None).await?;
         let cover = self.cover(&folder, &album).await;

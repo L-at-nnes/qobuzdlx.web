@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use super::{Event, Inner, locked};
+use crate::download::item::ItemKind;
 use crate::download::log::LogEvent;
 use crate::download::progress::{AlbumCard, TrackProgress};
 use crate::download::report::{Outcome, Reporter, StepTrack};
@@ -16,15 +17,72 @@ pub(super) struct ItemReporter {
     pub(super) detail: LogDetail,
 }
 
+impl ItemReporter {
+    /// Gives the item the name of what it turned out to be, when it only had its address to show
+    /// and is of a kind that this thing names. A name the interface gave is never replaced.
+    fn name_item(
+        &self,
+        kinds: &[ItemKind],
+        name: &str,
+        detail: Option<&str>,
+        thumbnail: Option<&str>,
+    ) {
+        let named = {
+            let mut state = locked(&self.inner.state);
+            let Some(item) = state.queue.get_mut(&self.item_id) else {
+                return;
+            };
+            if !kinds.contains(&item.kind) || item.label != item.url || name.trim().is_empty() {
+                return;
+            }
+            name.clone_into(&mut item.label);
+            if item.sub_label.is_none() {
+                item.sub_label = detail.map(str::to_owned);
+            }
+            if item.thumbnail.is_none() {
+                item.thumbnail = thumbnail.map(str::to_owned);
+            }
+            true
+        };
+        if named {
+            self.inner.queue_changed();
+        }
+    }
+}
+
 impl Reporter for ItemReporter {
     fn log(&self, event: LogEvent) {
         self.inner.log_at(event, self.detail);
     }
 
     fn album(&self, album: Option<&Album>) {
-        let mut state = locked(&self.inner.state);
-        state.progress.album = album.map(AlbumCard::from);
-        self.inner.progress_changed(&mut state, true);
+        {
+            let mut state = locked(&self.inner.state);
+            state.progress.album = album.map(AlbumCard::from);
+            self.inner.progress_changed(&mut state, true);
+        }
+        if let Some(card) = album.map(AlbumCard::from) {
+            self.name_item(
+                &[ItemKind::Album],
+                &card.title,
+                Some(&card.artist),
+                album.map(|album| album.image.thumbnail.as_str()),
+            );
+        }
+    }
+
+    fn named(&self, name: &str, detail: Option<&str>, thumbnail: Option<&str>) {
+        self.name_item(
+            &[
+                ItemKind::Playlist,
+                ItemKind::Artist,
+                ItemKind::Label,
+                ItemKind::Track,
+            ],
+            name,
+            detail,
+            thumbnail,
+        );
     }
 
     fn step(&self, percent: u8, track: Option<StepTrack>) {
