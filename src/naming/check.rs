@@ -76,28 +76,28 @@ pub struct Issue {
 fn sample_album() -> Album {
     Album {
         id: "0123456789012".into(),
-        title: "Blue Hour".into(),
+        title: "The Well-Tempered Clavier, Book 1".into(),
         artist: Person {
             id: 1,
-            name: Some("Nina Alvarez".into()),
+            name: Some("Glenn Gould".into()),
         },
         artists: vec![ArtistRole {
             id: 1,
-            name: "Nina Alvarez".into(),
+            name: "Glenn Gould".into(),
             roles: vec!["main-artist".into()],
         }],
         genre: Genre {
-            name: "Jazz".into(),
+            name: "Classical".into(),
         },
         label: Label {
             id: 1,
-            name: "Northern Lights".into(),
+            name: "Sony Classical".into(),
             ..Label::default()
         },
-        release_date_original: Some("2013-05-17".into()),
+        release_date_original: Some("1965-05-17".into()),
         upc: Some("0123456789012".into()),
-        copyright: Some("(P) 2013 Northern Lights".into()),
-        tracks_count: 14,
+        copyright: Some("(P) 1965 Sony Classical".into()),
+        tracks_count: 48,
         media_count: 2,
         maximum_bit_depth: 24,
         maximum_sampling_rate: 96.0,
@@ -108,17 +108,17 @@ fn sample_album() -> Album {
 fn sample_compilation() -> Album {
     Album {
         id: "0123456789999".into(),
-        title: "Summer Mix".into(),
+        title: "The Classical Adagio Collection".into(),
         artist: Person {
             id: 2,
             name: Some("Various Artists".into()),
         },
         genre: Genre {
-            name: "Jazz".into(),
+            name: "Classical".into(),
         },
         label: Label {
             id: 1,
-            name: "Northern Lights".into(),
+            name: "Sony Classical".into(),
             ..Label::default()
         },
         release_date_original: Some("2020-06-01".into()),
@@ -133,7 +133,7 @@ fn sample_compilation() -> Album {
 fn sample_playlist() -> Playlist {
     Playlist {
         id: 99,
-        name: "Morning Playlist".into(),
+        name: "Evening Concert".into(),
         tracks_count: 30,
         ..Playlist::default()
     }
@@ -142,18 +142,18 @@ fn sample_playlist() -> Playlist {
 fn sample_track(track_number: u32, media_number: u32) -> Track {
     Track {
         id: 4242,
-        title: "Midnight Garden".into(),
-        version: Some("Live".into()),
+        title: "Prelude and Fugue No. 17 in A-Flat Major, BWV 862".into(),
+        version: Some("Remastered".into()),
         track_number,
         media_number,
         position: 3,
         performer: Some(Person {
             id: 1,
-            name: Some("Nina Alvarez".into()),
+            name: Some("Glenn Gould".into()),
         }),
         composer: Some(Person {
             id: 2,
-            name: Some("R. Castillo".into()),
+            name: Some("Johann Sebastian Bach".into()),
         }),
         isrc: Some("XX0000000001".into()),
         maximum_bit_depth: 24,
@@ -383,15 +383,15 @@ mod tests {
 
         assert_eq!(
             preview.album,
-            "/downloads/Nina Alvarez/Blue Hour/CD 2/05 - Midnight Garden (Live).flac"
+            "/downloads/Glenn Gould/The Well-Tempered Clavier, Book 1/CD 2/05 - Prelude and Fugue No. 17 in A-Flat Major, BWV 862 (Remastered).flac"
         );
         assert_eq!(
             preview.compilation,
-            "/downloads/Various Artists/Summer Mix/07 - Nina Alvarez - Midnight Garden (Live).flac"
+            "/downloads/Various Artists/The Classical Adagio Collection/07 - Glenn Gould - Prelude and Fugue No. 17 in A-Flat Major, BWV 862 (Remastered).flac"
         );
         assert_eq!(
             preview.playlist,
-            "/downloads/Morning Playlist/05 - Midnight Garden (Live).flac"
+            "/downloads/Evening Concert/05 - Prelude and Fugue No. 17 in A-Flat Major, BWV 862 (Remastered).flac"
         );
     }
 
@@ -403,7 +403,7 @@ mod tests {
 
         assert_eq!(
             preview(&changed).album,
-            "/downloads/Nina Alvarez/2013 - Blue Hour [FLAC (24bit-96kHz)]/CD 2/Midnight Garden (Live).flac"
+            "/downloads/Glenn Gould/1965 - The Well-Tempered Clavier, Book 1 [FLAC (24bit-96kHz)]/CD 2/Prelude and Fugue No. 17 in A-Flat Major, BWV 862 (Remastered).flac"
         );
     }
 
@@ -414,7 +414,7 @@ mod tests {
 
         assert_eq!(
             preview(&by_position).playlist,
-            "/downloads/Morning Playlist/03 - Midnight Garden (Live).flac"
+            "/downloads/Evening Concert/03 - Prelude and Fugue No. 17 in A-Flat Major, BWV 862 (Remastered).flac"
         );
         assert_eq!(
             preview(&by_position).album,

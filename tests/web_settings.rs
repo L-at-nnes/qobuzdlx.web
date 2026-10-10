@@ -137,20 +137,20 @@ async fn the_templates_are_tried_on_an_invented_release_without_being_saved() {
         tried["preview"]["album"]
             .as_str()
             .unwrap()
-            .contains("Nina Alvarez/2013 - Blue Hour/"),
+            .contains("Glenn Gould/1965 - The Well-Tempered Clavier, Book 1/"),
         "{tried}"
     );
     assert!(
         tried["preview"]["album"]
             .as_str()
             .unwrap()
-            .contains("2013 - Blue Hour")
+            .contains("1965 - The Well-Tempered Clavier, Book 1")
     );
     assert!(
         tried["preview"]["compilation"]
             .as_str()
             .unwrap()
-            .contains("Summer Mix")
+            .contains("The Classical Adagio Collection")
     );
     assert!(tried["issues"].as_array().unwrap().is_empty());
     assert_eq!(current(&app).await["naming"]["album"], "%AlbumTitle%");
