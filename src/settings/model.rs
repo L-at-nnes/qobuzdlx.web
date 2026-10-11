@@ -314,8 +314,25 @@ pub struct Advanced {
     pub playlist_positions: bool,
     /// Write an `.m3u8` file next to the tracks of a playlist.
     pub playlist_file: bool,
+    /// How many tracks of an album are downloaded at the same time. Qobuz serves a file at a modest
+    /// speed per connection: several at once is what makes a large library finish in days, not weeks.
+    pub parallel_tracks: u8,
     pub log_detail: LogDetail,
     pub duplicates: DuplicateMode,
+}
+
+impl Advanced {
+    /// What `parallel_tracks` may be set to.
+    pub const PARALLEL_TRACKS: std::ops::RangeInclusive<u8> = 1..=6;
+
+    /// `parallel_tracks` held to its range: a file edited by hand cannot ask for a hundred.
+    #[must_use]
+    pub fn parallel(&self) -> usize {
+        usize::from(
+            self.parallel_tracks
+                .clamp(*Self::PARALLEL_TRACKS.start(), *Self::PARALLEL_TRACKS.end()),
+        )
+    }
 }
 
 impl Default for Advanced {
@@ -327,6 +344,7 @@ impl Default for Advanced {
             download_goodies: true,
             playlist_positions: false,
             playlist_file: true,
+            parallel_tracks: 3,
             log_detail: LogDetail::Normal,
             duplicates: DuplicateMode::Skip,
         }
@@ -348,6 +366,17 @@ pub struct Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tracks_at_once_are_held_to_their_range() {
+        let mut advanced = Advanced::default();
+        assert_eq!(advanced.parallel(), 3);
+
+        advanced.parallel_tracks = 0;
+        assert_eq!(advanced.parallel(), 1);
+        advanced.parallel_tracks = 200;
+        assert_eq!(advanced.parallel(), 6);
+    }
 
     #[test]
     fn an_empty_file_gives_the_defaults() {

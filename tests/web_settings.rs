@@ -75,6 +75,25 @@ async fn a_cover_size_out_of_range_is_refused() {
 }
 
 #[tokio::test]
+async fn the_number_of_tracks_at_once_stays_within_its_range() {
+    let app = TestApp::start().await;
+    let mut settings = current(&app).await;
+
+    settings["advanced"]["parallel_tracks"] = json!(0);
+    let none = app.browser().put("/api/settings", settings.clone()).await;
+    settings["advanced"]["parallel_tracks"] = json!(100);
+    let many = app.browser().put("/api/settings", settings.clone()).await;
+    settings["advanced"]["parallel_tracks"] = json!(4);
+    let fine = app.browser().put("/api/settings", settings).await;
+
+    assert_eq!(none.status, 400);
+    assert_eq!(none.json()["error"], "invalid_parallel_tracks");
+    assert_eq!(many.status, 400);
+    assert_eq!(fine.status, 200);
+    assert_eq!(current(&app).await["advanced"]["parallel_tracks"], 4);
+}
+
+#[tokio::test]
 async fn the_download_folder_must_be_given_and_absolute() {
     let app = TestApp::start().await;
     let mut settings = current(&app).await;

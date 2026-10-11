@@ -11,7 +11,7 @@ use super::error::{ApiError, ApiResult};
 use super::state::AppState;
 use crate::naming::{Issue, IssueKind, Preview, preview, validate};
 use crate::qobuz::SessionCheck;
-use crate::settings::Settings;
+use crate::settings::{Advanced, Settings};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -55,6 +55,12 @@ async fn save(
         return Err(ApiError::bad_request(
             "invalid_artwork_size",
             "a cover is 50 to 600 pixels wide, or the original",
+        ));
+    }
+    if !Advanced::PARALLEL_TRACKS.contains(&settings.advanced.parallel_tracks) {
+        return Err(ApiError::bad_request(
+            "invalid_parallel_tracks",
+            "between 1 and 6 tracks can download at the same time",
         ));
     }
     let directory = &settings.download.directory;
