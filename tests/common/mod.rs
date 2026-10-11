@@ -37,6 +37,8 @@ pub struct Reply {
     status: StatusCode,
     headers: Vec<(&'static str, String)>,
     body: Vec<u8>,
+    /// How long the server takes to answer.
+    delay: Duration,
 }
 
 impl Reply {
@@ -45,6 +47,7 @@ impl Reply {
             status: StatusCode::OK,
             headers: vec![("content-type", "application/json".into())],
             body: value.to_string().into_bytes(),
+            delay: Duration::ZERO,
         }
     }
 
@@ -53,6 +56,7 @@ impl Reply {
             status: StatusCode::OK,
             headers: Vec::new(),
             body: body.into().into_bytes(),
+            delay: Duration::ZERO,
         }
     }
 
@@ -61,6 +65,7 @@ impl Reply {
             status: StatusCode::OK,
             headers: Vec::new(),
             body,
+            delay: Duration::ZERO,
         }
     }
 
@@ -69,6 +74,7 @@ impl Reply {
             status: StatusCode::from_u16(code).unwrap(),
             headers: Vec::new(),
             body: Vec::new(),
+            delay: Duration::ZERO,
         }
     }
 
@@ -77,6 +83,12 @@ impl Reply {
             status: StatusCode::from_u16(code).unwrap(),
             ..Self::json(serde_json::json!({ "status": "error", "message": message }))
         }
+    }
+
+    /// Makes the server take this long to answer.
+    pub fn after(mut self, delay: Duration) -> Self {
+        self.delay = delay;
+        self
     }
 
     pub fn with_header(mut self, name: &'static str, value: impl Into<String>) -> Self {
@@ -194,11 +206,15 @@ async fn respond(State(shared): State<Arc<Shared>>, request: Request) -> Respons
 
     shared.calls.lock().unwrap().push(call.clone());
 
-    let handlers = shared.handlers.lock().unwrap();
-    match handlers.get(&path) {
-        Some(handler) => handler(&call).into_response(),
-        None => Reply::error(404, "No result matching given argument").into_response(),
-    }
+    let reply = {
+        let handlers = shared.handlers.lock().unwrap();
+        match handlers.get(&path) {
+            Some(handler) => handler(&call),
+            None => Reply::error(404, "No result matching given argument"),
+        }
+    };
+    tokio::time::sleep(reply.delay).await;
+    reply.into_response()
 }
 
 pub mod app;
@@ -295,6 +311,10 @@ impl qobuzdlx::download::Reporter for Recorder {
     }
 
     fn step(&self, percent: u8, _track: Option<qobuzdlx::download::StepTrack>) {
+        self.steps.lock().unwrap().push(percent);
+    }
+
+    fn overall(&self, percent: u8) {
         self.steps.lock().unwrap().push(percent);
     }
 

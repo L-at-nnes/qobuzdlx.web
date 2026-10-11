@@ -66,6 +66,35 @@ impl From<TrackError> for JobError {
     }
 }
 
+/// The reporter of one track among several downloading at the same time: what it says about its
+/// file is told as the file of that position.
+struct TrackReporter<'a> {
+    base: &'a dyn Reporter,
+    index: usize,
+}
+
+impl Reporter for TrackReporter<'_> {
+    fn log(&self, event: LogEvent) {
+        self.base.log(event);
+    }
+
+    fn album(&self, album: Option<&Album>) {
+        self.base.album(album);
+    }
+
+    fn step(&self, percent: u8, track: Option<StepTrack>) {
+        self.base.step(percent, track);
+    }
+
+    fn transfer(&self, update: super::transfer::Update) {
+        self.base.track_transfer(self.index, update);
+    }
+
+    fn outcome(&self, outcome: &Outcome) {
+        self.base.outcome(outcome);
+    }
+}
+
 /// What a job is given to work with.
 pub struct JobSetup {
     pub env: Environment,
@@ -144,11 +173,21 @@ impl Job {
     }
 
     fn context(&self) -> Context<'_> {
+        self.context_for(self.reporter.as_ref(), &self.cancel)
+    }
+
+    /// The same, reporting to `reporter` and stopped by `cancel`: what a track that downloads beside
+    /// others needs.
+    fn context_for<'a>(
+        &'a self,
+        reporter: &'a dyn Reporter,
+        cancel: &'a CancellationToken,
+    ) -> Context<'a> {
         Context {
             env: &self.env,
             settings: &self.settings,
-            reporter: self.reporter.as_ref(),
-            cancel: &self.cancel,
+            reporter,
+            cancel,
         }
     }
 

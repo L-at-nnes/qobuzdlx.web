@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use common::catalogue::{Catalogue, page};
-use common::{Recorder, Reply, TINY_JPEG};
+use common::{Recorder, Reply, TINY_JPEG, flac_bytes};
 use qobuzdlx::download::{
     Covers, Display, Environment, Fetcher, ItemKind, Job, JobError, JobSetup, LogEvent, Outcome,
     QueueItem, Tuning,
@@ -174,6 +174,88 @@ async fn an_album_that_is_not_streamable_is_left_out() {
     assert_eq!(rig.server.count("/api/track/getFileUrl"), 0);
 }
 
+const SIX_TRACKS: [(u64, u32, &str); 6] = [
+    (11, 1, "One"),
+    (12, 2, "Two"),
+    (13, 3, "Three"),
+    (14, 4, "Four"),
+    (15, 5, "Five"),
+    (16, 6, "Six"),
+];
+
+/// An album whose files take 300 ms each to arrive.
+fn slow_album(rig: &Rig) {
+    rig.add_album("alb", "Six Pieces", "Anna", &SIX_TRACKS);
+    let audio = flac_bytes();
+    rig.server.on("/cdn/audio", move |_| {
+        Reply::bytes(audio.clone()).after(Duration::from_millis(300))
+    });
+}
+
+#[tokio::test]
+async fn several_tracks_of_an_album_download_at_the_same_time() {
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 3;
+    slow_album(&rig);
+
+    let started = std::time::Instant::now();
+    let (result, outcome) = rig.run(ItemKind::Album, "alb").await;
+    let took = started.elapsed();
+
+    result.unwrap();
+    assert_eq!(outcome.downloaded, 6);
+    for name in ["1 - One", "4 - Four", "6 - Six"] {
+        assert!(rig.file(&format!("Anna/Six Pieces/{name}.flac")).exists());
+    }
+    // Two rounds of three files; one after the other it would take at least six
+    assert!(took < Duration::from_millis(1500), "{took:?}");
+}
+
+#[tokio::test]
+async fn tracks_are_started_in_the_order_of_the_album() {
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 3;
+    rig.add_album("alb", "Six Pieces", "Anna", &SIX_TRACKS);
+
+    let (result, _) = rig.run(ItemKind::Album, "alb").await;
+
+    result.unwrap();
+    let asked: Vec<String> = rig
+        .server
+        .calls_to("/api/track/get")
+        .iter()
+        .map(|call| call.param("track_id").to_owned())
+        .collect();
+    assert_eq!(asked, ["11", "12", "13", "14", "15", "16"]);
+}
+
+#[tokio::test]
+async fn one_at_a_time_is_one_at_a_time() {
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 1;
+    slow_album(&rig);
+
+    let started = std::time::Instant::now();
+    let (result, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    result.unwrap();
+    assert_eq!(outcome.downloaded, 6);
+    assert!(started.elapsed() >= Duration::from_millis(1800));
+}
+
+#[tokio::test]
+async fn the_progress_of_an_album_counts_the_tracks_in_place() {
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 2;
+    rig.add_album("alb", "Six Pieces", "Anna", &SIX_TRACKS);
+
+    let (result, _) = rig.run(ItemKind::Album, "alb").await;
+
+    result.unwrap();
+    let steps = rig.recorder.steps();
+    assert_eq!(steps, [16, 33, 50, 66, 83, 100]);
+}
+
 #[tokio::test]
 async fn a_track_that_fails_is_recorded_and_the_others_go_on() {
     let rig = Rig::new().await;
@@ -307,7 +389,8 @@ async fn a_failed_bonus_file_does_not_fail_the_album() {
 
 #[tokio::test]
 async fn a_rejected_session_ends_the_item_instead_of_failing_every_track() {
-    let rig = Rig::new().await;
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 1;
     rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
     rig.server.on("/api/track/get", |_| {
         Reply::error(401, "Invalid or expired user_auth_token")
@@ -321,6 +404,28 @@ async fn a_rejected_session_ends_the_item_instead_of_failing_every_track() {
     );
     assert!(outcome.failures.is_empty());
     assert_eq!(rig.server.count("/api/track/get"), 1);
+}
+
+#[tokio::test]
+async fn a_rejected_session_ends_an_album_downloading_several_tracks_at_once() {
+    let mut rig = Rig::new().await;
+    rig.settings.advanced.parallel_tracks = 3;
+    rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    rig.server.on("/api/track/get", |_| {
+        Reply::error(401, "Invalid or expired user_auth_token")
+    });
+
+    let (result, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    assert!(
+        matches!(result, Err(JobError::SessionExpired)),
+        "{result:?}"
+    );
+    assert!(
+        outcome.failures.is_empty(),
+        "the others stopping are not failures"
+    );
+    assert!(rig.server.count("/api/track/get") <= 3);
 }
 
 #[tokio::test]
