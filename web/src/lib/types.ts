@@ -212,6 +212,7 @@ export interface Settings {
 		download_goodies: boolean;
 		playlist_positions: boolean;
 		playlist_file: boolean;
+		parallel_tracks: number;
 		log_detail: LogLevel;
 		duplicates: Duplicates;
 	};

@@ -366,6 +366,9 @@ export const en = {
 	'settings.advanced.download_goodies': 'Download booklets and bonus files',
 	'settings.advanced.playlist_positions': 'Number playlist tracks by their place in the playlist',
 	'settings.advanced.playlist_file': 'Write an .m3u8 file for each playlist',
+	'settings.advanced.parallel_tracks': 'Tracks of an album downloaded at once',
+	'settings.advanced.parallel_tracks.hint':
+		'Qobuz serves each file at a modest speed: several at once finish a large library much sooner. Lower it if Qobuz starts refusing requests.',
 	'settings.advanced.log_detail': 'Level of detail of the log',
 	'log_detail.errors': 'Errors only',
 	'log_detail.normal': 'Normal',

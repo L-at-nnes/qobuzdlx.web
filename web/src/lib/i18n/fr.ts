@@ -379,6 +379,9 @@ export const fr: Record<Key, Message> = {
 	'settings.advanced.download_goodies': 'Télécharger les livrets et les fichiers bonus',
 	'settings.advanced.playlist_positions': 'Numéroter les pistes selon leur place dans la playlist',
 	'settings.advanced.playlist_file': 'Écrire un fichier .m3u8 pour chaque playlist',
+	'settings.advanced.parallel_tracks': "Pistes d'un album téléchargées en même temps",
+	'settings.advanced.parallel_tracks.hint':
+		"Qobuz sert chaque fichier à une vitesse modeste : plusieurs à la fois terminent une grande bibliothèque bien plus tôt. Baissez-le si Qobuz se met à refuser des requêtes.",
 	'settings.advanced.log_detail': 'Niveau de détail du journal',
 	'log_detail.errors': 'Erreurs seulement',
 	'log_detail.normal': 'Normal',

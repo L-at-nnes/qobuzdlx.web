@@ -8,6 +8,7 @@
 	let { draft = $bindable() }: { draft: Settings } = $props();
 
 	const levels: LogLevel[] = ['errors', 'normal', 'detailed'];
+	const parallel = [1, 2, 3, 4, 5, 6];
 </script>
 
 <Section id="advanced" title={t('settings.advanced')}>
@@ -34,6 +35,12 @@
 		label={t('settings.advanced.playlist_positions')}
 	/>
 	<Switch bind:checked={draft.advanced.playlist_file} label={t('settings.advanced.playlist_file')} />
+	<SelectField
+		label={t('settings.advanced.parallel_tracks')}
+		hint={t('settings.advanced.parallel_tracks.hint')}
+		bind:value={draft.advanced.parallel_tracks}
+		options={parallel.map((value) => ({ value, label: String(value) }))}
+	/>
 	<SelectField
 		label={t('settings.advanced.log_detail')}
 		bind:value={draft.advanced.log_detail}
