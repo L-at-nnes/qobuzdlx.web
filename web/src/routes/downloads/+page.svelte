@@ -2,6 +2,7 @@
 	import { api } from '#lib/api.ts';
 	import ConfirmButton from '#lib/components/ConfirmButton.svelte';
 	import EmptyState from '#lib/components/EmptyState.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 	import ImportList from '#lib/components/ImportList.svelte';
 	import LogPanel from '#lib/components/LogPanel.svelte';
 	import NowDownloading from '#lib/components/NowDownloading.svelte';
@@ -26,6 +27,16 @@
 		<h1>{t('downloads.title')}</h1>
 		<ImportList />
 	</div>
+
+	{#if downloads.progress.halt}
+		<div class="notice" role="alert">
+			<Icon name="warning" size={18} />
+			<span>{t(`downloads.halted.${downloads.progress.halt}`)}</span>
+			<Button size="sm" variant="quiet" icon="retry" onclick={() => api.resume()}>
+				{t('downloads.resume')}
+			</Button>
+		</div>
+	{/if}
 
 	<NowDownloading />
 
@@ -85,6 +96,21 @@
 	.page {
 		display: grid;
 		gap: var(--space-5);
+	}
+
+	.notice {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid var(--warning);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+	}
+
+	.notice span {
+		flex: 1 1 18rem;
 	}
 
 	.heading {

@@ -174,6 +174,9 @@ export const fr: Record<Key, Message> = {
 	'downloads.empty.text':
 		'Ce que vous téléchargez apparaît ici. Vous pouvez fermer cette page : la file continue sur le serveur.',
 	'downloads.empty.action': 'Chercher de la musique',
+	'downloads.halted.storage_full':
+		"La file s'est arrêtée : le disque ne peut plus recevoir de fichiers (plein, quota atteint ou en lecture seule). Ce qui attend est conservé. Faites de la place, puis reprenez.",
+	'downloads.resume': 'Reprendre',
 	'downloads.now': 'En cours de téléchargement',
 	'downloads.idle': 'Aucun téléchargement en cours.',
 	'downloads.trackOf': 'Piste {index} sur {total}',

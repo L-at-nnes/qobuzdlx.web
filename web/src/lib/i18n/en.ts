@@ -170,6 +170,9 @@ export const en = {
 		'What you download appears here. You can close this page: the queue keeps running on the server.',
 	'downloads.empty.action': 'Search for music',
 	'downloads.now': 'Now downloading',
+	'downloads.halted.storage_full':
+		'The queue stopped: the disk cannot take any more files (it is full, over its quota or read-only). What is waiting is kept. Make room, then go on.',
+	'downloads.resume': 'Go on',
 	'downloads.idle': 'Nothing is downloading.',
 	'downloads.trackOf': 'Track {index} of {total}',
 	'downloads.preparing': 'Preparing',

@@ -6,7 +6,14 @@ const MAX_LOG_LINES = 1200;
 
 export type UrlState = 'queued' | 'done' | null;
 
-const resting: Progress = { running: false, item_id: null, percent: 0, album: null, track: null };
+const resting: Progress = {
+	running: false,
+	item_id: null,
+	percent: 0,
+	album: null,
+	track: null,
+	halt: null
+};
 
 /** The download queue as the server tells it, live. */
 class DownloadsState {

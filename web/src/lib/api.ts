@@ -125,6 +125,7 @@ export const api = {
 		post<Enqueued>('/api/downloads', { items }),
 	/** A text with one address per line, as the file chosen by the user holds it. */
 	importList: (text: string) => post<Enqueued>('/api/downloads/import', text),
+	resume: () => post<void>('/api/downloads/resume'),
 	cancel: () => post<void>('/api/downloads/cancel'),
 	skip: () => post<void>('/api/downloads/skip'),
 	clearPending: () => post<void>('/api/downloads/clear-pending'),

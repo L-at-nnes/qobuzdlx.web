@@ -131,6 +131,8 @@ export interface Progress {
 	percent: number;
 	album: AlbumCard | null;
 	track: TrackProgress | null;
+	/** Why the queue stopped by itself, when it did. */
+	halt: 'storage_full' | null;
 }
 
 export interface Enqueued {
