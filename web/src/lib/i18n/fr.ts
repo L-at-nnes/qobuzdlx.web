@@ -158,6 +158,13 @@ export const fr: Record<Key, Message> = {
 		one: '{count} élément était déjà dans la file.',
 		other: '{count} éléments étaient déjà dans la file.'
 	},
+	'import.button': 'Importer une liste',
+	'import.hint':
+		"Un fichier texte avec une adresse Qobuz par ligne. Les lignes qui commencent par # sont ignorées.",
+	'import.done':
+		'Import : {added} ajoutés, {duplicates} déjà dans la file, {ignored} lignes ignorées.',
+	'import.empty': "Le fichier ne contient aucune adresse.",
+	'import.tooBig': 'Le fichier est trop gros (16 Mo au plus).',
 	'queue.invalid': "Une adresse n'a pas été comprise.",
 	'queue.failed': 'La file est injoignable.',
 

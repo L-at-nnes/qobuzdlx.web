@@ -2,6 +2,7 @@
 	import { api } from '#lib/api.ts';
 	import ConfirmButton from '#lib/components/ConfirmButton.svelte';
 	import EmptyState from '#lib/components/EmptyState.svelte';
+	import ImportList from '#lib/components/ImportList.svelte';
 	import LogPanel from '#lib/components/LogPanel.svelte';
 	import NowDownloading from '#lib/components/NowDownloading.svelte';
 	import QueueRow from '#lib/components/QueueRow.svelte';
@@ -21,7 +22,10 @@
 </svelte:head>
 
 <div class="page">
-	<h1>{t('downloads.title')}</h1>
+	<div class="heading">
+		<h1>{t('downloads.title')}</h1>
+		<ImportList />
+	</div>
 
 	<NowDownloading />
 
@@ -81,6 +85,14 @@
 	.page {
 		display: grid;
 		gap: var(--space-5);
+	}
+
+	.heading {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
 	}
 
 	.toolbar {

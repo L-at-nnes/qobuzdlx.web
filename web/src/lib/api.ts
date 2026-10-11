@@ -49,13 +49,18 @@ export function onApiError(listener: Listener): () => void {
 	return () => listeners.delete(listener);
 }
 
+/** A text is sent as it is, as a file would be; anything else as JSON. */
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+	const isText = typeof body === 'string';
 	let response: Response;
 	try {
 		response = await fetch(path, {
 			method,
-			headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-			body: body === undefined ? undefined : JSON.stringify(body),
+			headers:
+				body === undefined
+					? undefined
+					: { 'content-type': isText ? 'text/plain; charset=utf-8' : 'application/json' },
+			body: body === undefined ? undefined : isText ? body : JSON.stringify(body),
 			credentials: 'same-origin'
 		});
 	} catch {
@@ -118,6 +123,8 @@ export const api = {
 		get<{ queue: QueueItem[]; progress: Progress; remaining: number }>('/api/downloads'),
 	enqueue: (items: { url: string; label?: string; sub_label?: string; thumbnail?: string }[]) =>
 		post<Enqueued>('/api/downloads', { items }),
+	/** A text with one address per line, as the file chosen by the user holds it. */
+	importList: (text: string) => post<Enqueued>('/api/downloads/import', text),
 	cancel: () => post<void>('/api/downloads/cancel'),
 	skip: () => post<void>('/api/downloads/skip'),
 	clearPending: () => post<void>('/api/downloads/clear-pending'),

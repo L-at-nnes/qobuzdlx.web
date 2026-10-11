@@ -155,6 +155,12 @@ export const en = {
 		other: '{count} items were already in the queue.'
 	},
 	'queue.invalid': 'An address was not understood.',
+
+	'import.button': 'Import a list',
+	'import.hint': 'A text file with one Qobuz address per line. Lines starting with # are skipped.',
+	'import.done': 'Imported: {added} added, {duplicates} already in the queue, {ignored} lines ignored.',
+	'import.empty': 'The file holds no address.',
+	'import.tooBig': 'The file is too big (16 MB at most).',
 	'queue.failed': 'The queue could not be reached.',
 
 	// ─── Downloads ───
