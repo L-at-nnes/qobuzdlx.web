@@ -26,7 +26,7 @@ pub use job::{Job, JobError, JobSetup};
 pub use list::{AddressList, parse_list};
 pub use log::{Log, LogEvent, LogLine};
 pub use manager::{Event, InvalidAddress, Manager, ManagerConfig, Snapshot};
-pub use progress::{AlbumCard, Progress, ProgressScope, TrackProgress};
+pub use progress::{AlbumCard, Halt, Progress, ProgressScope, TrackProgress};
 pub use queue::{Enqueued, EnqueuedCounts, Queue};
 pub use report::{Outcome, Reporter, StepTrack};
 pub use store::QueueStore;

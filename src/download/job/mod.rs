@@ -40,6 +40,9 @@ pub enum JobError {
     /// A track that was asked for on its own could not be downloaded.
     #[error("{0}")]
     Track(TrackError),
+    /// The disk is full (or over its quota, or read-only): nothing more can be written.
+    #[error("the disk cannot take any more files: {0}")]
+    StorageFull(String),
 }
 
 impl From<qobuz::Error> for JobError {
@@ -57,6 +60,7 @@ impl From<TrackError> for JobError {
         match error {
             TrackError::Cancelled => Self::Cancelled,
             TrackError::Api(api) if api.is_unauthorized() => Self::SessionExpired,
+            full if full.is_storage_full() => Self::StorageFull(full.to_string()),
             other => Self::Track(other),
         }
     }
@@ -191,7 +195,7 @@ impl Job {
             .folder(&self.settings.download.directory, album, track, playlist);
         tokio::fs::create_dir_all(&folder)
             .await
-            .map_err(|error| JobError::Track(TrackError::Io(error)))?;
+            .map_err(|error| JobError::from(TrackError::Io(error)))?;
         Ok(folder)
     }
 
@@ -262,5 +266,48 @@ impl Job {
         let embedded = embedded.map(Arc::new);
         self.pictures.insert(album.id.clone(), embedded.clone());
         embedded
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Error, ErrorKind};
+
+    use super::*;
+    use crate::download::transfer::Error as TransferError;
+
+    #[test]
+    fn a_full_disk_stops_the_job_whichever_way_it_was_met() {
+        for kind in [
+            ErrorKind::StorageFull,
+            ErrorKind::QuotaExceeded,
+            ErrorKind::ReadOnlyFilesystem,
+        ] {
+            let writing = TrackError::Io(Error::from(kind));
+            let receiving = TrackError::Transfer(TransferError::Io(Error::from(kind)));
+
+            assert!(writing.is_storage_full(), "{kind:?}");
+            assert!(receiving.is_storage_full(), "{kind:?}");
+            assert!(matches!(JobError::from(writing), JobError::StorageFull(_)));
+            assert!(matches!(
+                JobError::from(receiving),
+                JobError::StorageFull(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn other_write_errors_only_cost_their_track() {
+        let error = TrackError::Io(Error::from(ErrorKind::PermissionDenied));
+
+        assert!(!error.is_storage_full());
+        assert!(matches!(JobError::from(error), JobError::Track(_)));
+    }
+
+    #[test]
+    fn a_dropped_connection_is_not_a_full_disk() {
+        let error = TrackError::Transfer(TransferError::Stalled(std::time::Duration::from_secs(1)));
+
+        assert!(!error.is_storage_full());
     }
 }

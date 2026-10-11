@@ -102,6 +102,8 @@ pub(super) struct Inner {
     pub(super) current: Mutex<Option<CancellationToken>>,
     /// "Skip": the album in progress is dropped.
     pub(super) skip: Arc<AtomicBool>,
+    /// The queue stopped by itself (the disk is full) and waits to be told to go on.
+    pub(super) halted: AtomicBool,
     /// The interface was told the session expired, and has not been given a new one since.
     expiry_announced: AtomicBool,
 }
@@ -159,6 +161,7 @@ impl Manager {
                 shutdown: CancellationToken::new(),
                 current: Mutex::new(None),
                 skip: Arc::new(AtomicBool::new(false)),
+                halted: AtomicBool::new(false),
                 expiry_announced: AtomicBool::new(false),
             }),
         };
@@ -300,6 +303,17 @@ impl Manager {
             self.inner.queue_changed();
         }
         counts
+    }
+
+    /// Goes on after the queue stopped by itself, once the cause has been dealt with.
+    pub fn resume(&self) {
+        if self.inner.halted.swap(false, Ordering::SeqCst) {
+            let mut state = locked(&self.inner.state);
+            state.progress.halt = None;
+            self.inner.progress_changed(&mut state, true);
+            drop(state);
+            self.inner.wake.notify_one();
+        }
     }
 
     /// "Skip": drops the album in progress, an artist has dozens. The item goes on.

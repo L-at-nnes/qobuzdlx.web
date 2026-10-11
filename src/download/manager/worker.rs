@@ -6,7 +6,7 @@ use super::{Inner, locked};
 use crate::download::item::{ItemStatus, QueueItem};
 use crate::download::job::{Job, JobError, JobSetup};
 use crate::download::log::LogEvent;
-use crate::download::progress::Progress;
+use crate::download::progress::{Halt, Progress};
 use crate::download::report::Outcome;
 use crate::settings::LogDetail;
 
@@ -19,6 +19,8 @@ pub(super) async fn run(inner: Arc<Inner>) {
             // The permit is kept if nobody waits: a wake-up is never lost
             () = inner.wake.notified() => {}
         }
+        // Whoever woke the worker wants it to try again, with room made or not
+        inner.halted.store(false, Ordering::SeqCst);
 
         // Drained until nothing is left: a wake-up says there is work, not how much
         let mut processed = false;
@@ -28,10 +30,18 @@ pub(super) async fn run(inner: Arc<Inner>) {
             };
             processed = true;
             inner.process(item).await;
+            // Nothing more can be written: every item that follows would fail the same way
+            if inner.halted.load(Ordering::SeqCst) {
+                break;
+            }
         }
 
         if processed && !inner.shutdown.is_cancelled() {
-            inner.go_idle();
+            if inner.halted.load(Ordering::SeqCst) {
+                inner.announce_halt();
+            } else {
+                inner.go_idle();
+            }
         }
     }
 }
@@ -118,6 +128,9 @@ impl Inner {
                 )
             }
             Err(error) => {
+                if matches!(error, JobError::StorageFull(_)) {
+                    self.halted.store(true, Ordering::SeqCst);
+                }
                 let message = error.to_string();
                 self.log_at(
                     LogEvent::Error {
@@ -136,6 +149,19 @@ impl Inner {
             state.progress.album = None;
             state.progress.track = None;
             state.progress.percent = 0;
+            self.progress_changed(&mut state, true);
+        }
+        self.queue_changed();
+    }
+
+    /// The queue stops by itself: what is waiting stays so, and the interface says why.
+    fn announce_halt(&self) {
+        {
+            let mut state = locked(&self.state);
+            state.progress = Progress {
+                halt: Some(Halt::StorageFull),
+                ..Progress::default()
+            };
             self.progress_changed(&mut state, true);
         }
         self.queue_changed();

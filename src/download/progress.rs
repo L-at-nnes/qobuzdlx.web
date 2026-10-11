@@ -102,6 +102,16 @@ pub struct Progress {
     pub percent: u8,
     pub album: Option<AlbumCard>,
     pub track: Option<TrackProgress>,
+    /// Why the queue stopped by itself, when it did: it goes on when asked to.
+    pub halt: Option<Halt>,
+}
+
+/// Why the queue stopped by itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Halt {
+    /// The disk is full, over its quota or read-only: going on would fail every item.
+    StorageFull,
 }
 
 #[cfg(test)]

@@ -33,6 +33,7 @@ pub fn routes() -> Router<AppState> {
         .route("/downloads/events", get(events))
         .route("/downloads/cancel", post(cancel))
         .route("/downloads/skip", post(skip))
+        .route("/downloads/resume", post(resume))
         .route("/downloads/clear-pending", post(clear_pending))
         .route("/downloads/clear-finished", post(clear_finished))
         .route("/downloads/{id}", delete(remove))
@@ -124,6 +125,11 @@ async fn import(State(state): State<AppState>, body: Bytes) -> ApiResult<Json<Co
 
 async fn cancel(State(state): State<AppState>) -> StatusCode {
     state.downloads.cancel_current();
+    StatusCode::NO_CONTENT
+}
+
+async fn resume(State(state): State<AppState>) -> StatusCode {
+    state.downloads.resume();
     StatusCode::NO_CONTENT
 }
 

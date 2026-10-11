@@ -110,8 +110,23 @@ impl TrackError {
         match self {
             Self::Cancelled | Self::PreviewOnly => true,
             Self::Api(error) => error.is_unauthorized(),
-            _ => false,
+            _ => self.is_storage_full(),
         }
+    }
+
+    /// Whether the disk cannot take any more: it is full, over its quota or read-only. Every other
+    /// track would meet the same refusal.
+    #[must_use]
+    pub fn is_storage_full(&self) -> bool {
+        let (Self::Io(error) | Self::Transfer(TransferError::Io(error))) = self else {
+            return false;
+        };
+        matches!(
+            error.kind(),
+            io::ErrorKind::StorageFull
+                | io::ErrorKind::QuotaExceeded
+                | io::ErrorKind::ReadOnlyFilesystem
+        )
     }
 }
 
