@@ -14,6 +14,10 @@ pub enum Enqueued {
     AlreadyQueued,
 }
 
+/// How many finished items are kept. The oldest go first; waiting and running items never do. Without
+/// a bound, a queue that processes thousands of albums would hold, show and save all of them.
+pub const MAX_FINISHED: usize = 500;
+
 /// What queuing several addresses at once did, counted by outcome.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EnqueuedCounts {
@@ -32,7 +36,29 @@ pub struct Queue {
 impl Queue {
     #[must_use]
     pub fn new(items: Vec<QueueItem>) -> Self {
-        Self { items }
+        let mut queue = Self { items };
+        queue.forget_old_finished();
+        queue
+    }
+
+    /// Drops the oldest finished items beyond `MAX_FINISHED`.
+    fn forget_old_finished(&mut self) {
+        let mut excess = self
+            .items
+            .iter()
+            .filter(|item| item.is_finished())
+            .count()
+            .saturating_sub(MAX_FINISHED);
+        if excess == 0 {
+            return;
+        }
+        self.items.retain(|item| {
+            if excess > 0 && item.is_finished() {
+                excess -= 1;
+                return false;
+            }
+            true
+        });
     }
 
     #[must_use]
@@ -156,6 +182,7 @@ impl Queue {
                 item.finished_at = Some(now());
             }
         }
+        self.forget_old_finished();
     }
 
     /// Puts back to waiting an item that was running when the process stopped.
@@ -323,6 +350,27 @@ mod tests {
             kind,
             ref_id: id.to_owned(),
         }
+    }
+
+    #[test]
+    fn only_the_most_recent_finished_items_stay_in_the_queue() {
+        let mut queue = Queue::default();
+        for number in 0..MAX_FINISHED + 3 {
+            let url = format!("https://play.qobuz.com/album/a{number}");
+            queue.enqueue(&url, ItemKind::Album, "x", Display::default());
+            let id = id_of(&queue, &url);
+            queue.finish(&id, ItemStatus::Completed, None);
+        }
+        queue.enqueue(
+            "https://play.qobuz.com/album/waiting",
+            ItemKind::Album,
+            "w",
+            Display::default(),
+        );
+
+        assert_eq!(queue.items().len(), MAX_FINISHED + 1);
+        assert_eq!(queue.items()[0].url, "https://play.qobuz.com/album/a3");
+        assert!(queue.has_pending());
     }
 
     #[test]

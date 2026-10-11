@@ -5,9 +5,6 @@ use super::item::QueueItem;
 use super::queue::Queue;
 use crate::storage::{Access, JsonFile};
 
-/// How many finished items are kept. The oldest go first; waiting and running items never do.
-const MAX_FINISHED: usize = 200;
-
 /// The queue on disk, so that what was waiting survives a restart.
 #[derive(Debug, Clone)]
 pub struct QueueStore {
@@ -31,31 +28,15 @@ impl QueueStore {
     }
 
     pub fn save(&self, queue: &Queue) -> io::Result<()> {
-        self.file.save(&trimmed(queue.items()))
+        self.file.save(&queue.items())
     }
-}
-
-/// The items to keep: all the unfinished ones, and the most recent finished ones.
-fn trimmed(items: &[QueueItem]) -> Vec<&QueueItem> {
-    let finished = items.iter().filter(|item| item.is_finished()).count();
-    let mut to_drop = finished.saturating_sub(MAX_FINISHED);
-
-    items
-        .iter()
-        .filter(|item| {
-            if item.is_finished() && to_drop > 0 {
-                to_drop -= 1;
-                return false;
-            }
-            true
-        })
-        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::download::item::{Display, ItemKind, ItemStatus};
+    use crate::download::queue::MAX_FINISHED;
     use std::fs;
     use tempfile::TempDir;
 
