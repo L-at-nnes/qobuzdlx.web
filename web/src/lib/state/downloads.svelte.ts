@@ -56,6 +56,12 @@ class DownloadsState {
 			const data = JSON.parse((event as MessageEvent).data);
 			this.queue = data.queue;
 		});
+		// One item's counts, which change with every track: the whole queue is not sent for that
+		source.addEventListener('item', (event) => {
+			const item = JSON.parse((event as MessageEvent).data) as QueueItem;
+			const at = this.queue.findIndex((candidate) => candidate.id === item.id);
+			if (at >= 0) this.queue[at] = item;
+		});
 		source.addEventListener('progress', (event) => {
 			this.progress = JSON.parse((event as MessageEvent).data);
 		});

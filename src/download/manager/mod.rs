@@ -35,8 +35,11 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(200);
 /// What the interface is told as the download goes.
 #[derive(Debug, Clone)]
 pub enum Event {
-    /// The queue changed: an item was added, moved, started, finished, or counted a track.
+    /// The queue changed: an item was added, moved, started, named or finished.
     Queue,
+    /// The counts of one item changed (a track was written, skipped or failed): the item is named
+    /// by its id. Much lighter to tell than the whole queue, and there is one per track.
+    Item(String),
     /// The progress changed.
     Progress,
     /// A line was added to the log.
@@ -197,6 +200,17 @@ impl Manager {
             progress: state.progress.clone(),
             remaining: state.queue.remaining(),
         }
+    }
+
+    /// An item of the queue, as it is now.
+    #[must_use]
+    pub fn item(&self, id: &str) -> Option<QueueItem> {
+        locked(&self.inner.state).queue.get(id).cloned()
+    }
+
+    #[must_use]
+    pub fn progress(&self) -> Progress {
+        locked(&self.inner.state).progress.clone()
     }
 
     #[must_use]

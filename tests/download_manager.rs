@@ -518,7 +518,7 @@ async fn the_interface_is_told_about_the_queue_the_progress_and_the_log() {
     let mut seen = (false, false, false);
     while let Ok(event) = events.try_recv() {
         match event {
-            Event::Queue => seen.0 = true,
+            Event::Queue | Event::Item(_) => seen.0 = true,
             Event::Progress => seen.1 = true,
             Event::Log(_) => seen.2 = true,
             Event::SessionExpired => {}

@@ -18,7 +18,7 @@ use tokio::sync::broadcast::error::RecvError;
 use super::dto::{ItemView, SnapshotView};
 use super::error::{ApiError, ApiResult};
 use super::state::AppState;
-use crate::download::{Display, EnqueuedCounts, Event, Snapshot, parse_list};
+use crate::download::{Display, EnqueuedCounts, Event, Manager, Progress, Snapshot, parse_list};
 
 /// The largest list that is read: some 100 000 lines.
 const IMPORT_LIMIT: usize = 16 * 1024 * 1024;
@@ -231,26 +231,114 @@ async fn events(
     let mut receiver = manager.subscribe();
 
     let stream = async_stream::stream! {
-        yield Ok(queue_event(&manager.snapshot()));
-        yield Ok(progress_event(&manager.snapshot()));
+        let first = manager.snapshot();
+        yield Ok(queue_event(&first));
+        yield Ok(progress_event(&first.progress));
 
-        loop {
-            match receiver.recv().await {
-                Ok(Event::Queue) => yield Ok(queue_event(&manager.snapshot())),
-                Ok(Event::Progress) => yield Ok(progress_event(&manager.snapshot())),
-                Ok(Event::Log(line)) => yield Ok(json_event("log", &line)),
-                Ok(Event::SessionExpired) => yield Ok(Sse::default().event("session_expired").data("")),
-                Err(RecvError::Lagged(_)) => {
-                    let snapshot = manager.snapshot();
-                    yield Ok(queue_event(&snapshot));
-                    yield Ok(progress_event(&snapshot));
+        let mut held = Held::default();
+        let mut closed = false;
+        while !closed {
+            match held.absorb(receiver.recv().await) {
+                Absorbed::Send(event) => yield Ok(event),
+                Absorbed::Held => {}
+                Absorbed::Closed => break,
+            }
+            if held.is_empty() {
+                continue;
+            }
+
+            // What changed is told once for a burst of changes: with a thousand albums waiting, a
+            // download changes something many times a second
+            let window = tokio::time::sleep(COALESCE);
+            tokio::pin!(window);
+            loop {
+                tokio::select! {
+                    () = &mut window => break,
+                    next = receiver.recv() => match held.absorb(next) {
+                        Absorbed::Send(event) => yield Ok(event),
+                        Absorbed::Held => {}
+                        Absorbed::Closed => {
+                            closed = true;
+                            break;
+                        }
+                    },
                 }
-                Err(RecvError::Closed) => break,
+            }
+            for event in held.take(&manager) {
+                yield Ok(event);
             }
         }
     };
 
     axum::response::Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
+}
+
+/// How long a change waits for others before it is told.
+const COALESCE: Duration = Duration::from_millis(250);
+
+/// What changed and has not been told yet.
+#[derive(Default)]
+struct Held {
+    queue: bool,
+    progress: bool,
+    /// Items whose counts changed, each once, in the order they did.
+    items: Vec<String>,
+}
+
+enum Absorbed {
+    /// Something to tell at once.
+    Send(Sse),
+    /// A change kept for the next time what changed is told.
+    Held,
+    Closed,
+}
+
+impl Held {
+    fn is_empty(&self) -> bool {
+        !self.queue && !self.progress && self.items.is_empty()
+    }
+
+    fn absorb(&mut self, event: Result<Event, RecvError>) -> Absorbed {
+        match event {
+            Ok(Event::Queue) => self.queue = true,
+            Ok(Event::Progress) => self.progress = true,
+            Ok(Event::Item(id)) => {
+                if !self.items.contains(&id) {
+                    self.items.push(id);
+                }
+            }
+            Ok(Event::Log(line)) => return Absorbed::Send(json_event("log", &line)),
+            Ok(Event::SessionExpired) => {
+                return Absorbed::Send(Sse::default().event("session_expired").data(""));
+            }
+            // A listener that fell behind is given the state again rather than the events it missed
+            Err(RecvError::Lagged(_)) => {
+                self.queue = true;
+                self.progress = true;
+            }
+            Err(RecvError::Closed) => return Absorbed::Closed,
+        }
+        Absorbed::Held
+    }
+
+    /// What is to be told now, and forgets it. The whole queue says what an item's counts say.
+    fn take(&mut self, manager: &Manager) -> Vec<Sse> {
+        let mut events = Vec::new();
+        if self.queue {
+            events.push(queue_event(&manager.snapshot()));
+        } else {
+            for id in &self.items {
+                if let Some(item) = manager.item(id) {
+                    events.push(json_event("item", &ItemView::from(&item)));
+                }
+            }
+        }
+        if self.progress {
+            events.push(progress_event(&manager.progress()));
+        }
+        *self = Self::default();
+        events
+    }
 }
 
 fn json_event<T: Serialize>(name: &str, value: &T) -> Sse {
@@ -275,6 +363,72 @@ fn queue_event(snapshot: &Snapshot) -> Sse {
     )
 }
 
-fn progress_event(snapshot: &Snapshot) -> Sse {
-    json_event("progress", &snapshot.progress)
+fn progress_event(progress: &Progress) -> Sse {
+    json_event("progress", progress)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn held_after(events: impl IntoIterator<Item = Result<Event, RecvError>>) -> Held {
+        let mut held = Held::default();
+        for event in events {
+            assert!(matches!(held.absorb(event), Absorbed::Held));
+        }
+        held
+    }
+
+    #[test]
+    fn nothing_is_held_until_something_changes() {
+        assert!(Held::default().is_empty());
+    }
+
+    #[test]
+    fn an_item_whose_counts_changed_many_times_is_told_once() {
+        let held = held_after([
+            Ok(Event::Item("a".into())),
+            Ok(Event::Item("b".into())),
+            Ok(Event::Item("a".into())),
+        ]);
+
+        assert_eq!(held.items, ["a", "b"]);
+        assert!(!held.queue && !held.progress);
+    }
+
+    #[test]
+    fn a_change_of_the_queue_and_of_the_progress_are_held_apart() {
+        let held = held_after([Ok(Event::Queue), Ok(Event::Progress)]);
+
+        assert!(held.queue && held.progress);
+        assert!(held.items.is_empty());
+    }
+
+    #[test]
+    fn a_listener_that_fell_behind_is_given_the_state_again() {
+        let held = held_after([Err(RecvError::Lagged(40))]);
+
+        assert!(held.queue && held.progress);
+    }
+
+    #[test]
+    fn a_closed_channel_ends_the_stream() {
+        let mut held = Held::default();
+
+        assert!(matches!(
+            held.absorb(Err(RecvError::Closed)),
+            Absorbed::Closed
+        ));
+    }
+
+    #[test]
+    fn the_session_expiring_is_told_at_once() {
+        let mut held = Held::default();
+
+        assert!(matches!(
+            held.absorb(Ok(Event::SessionExpired)),
+            Absorbed::Send(_)
+        ));
+        assert!(held.is_empty());
+    }
 }

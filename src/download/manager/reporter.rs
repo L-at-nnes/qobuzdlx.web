@@ -111,6 +111,6 @@ impl Reporter for ItemReporter {
         if let Some(item) = locked(&self.inner.state).queue.get_mut(&self.item_id) {
             outcome.write_to(item);
         }
-        self.inner.emit(Event::Queue);
+        self.inner.emit(Event::Item(self.item_id.clone()));
     }
 }
