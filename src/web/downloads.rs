@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::sync::broadcast::error::RecvError;
 
+use super::dto::{ItemView, SnapshotView};
 use super::error::{ApiError, ApiResult};
 use super::state::AppState;
 use crate::download::{Display, EnqueuedCounts, Event, Snapshot, parse_list};
@@ -42,8 +43,8 @@ pub fn routes() -> Router<AppState> {
         .route("/log/export", get(export_log))
 }
 
-async fn snapshot(State(state): State<AppState>) -> Json<Snapshot> {
-    Json(state.downloads.snapshot())
+async fn snapshot(State(state): State<AppState>) -> Response {
+    Json(SnapshotView::from(&state.downloads.snapshot())).into_response()
 }
 
 #[derive(Deserialize)]
@@ -262,13 +263,13 @@ fn json_event<T: Serialize>(name: &str, value: &T) -> Sse {
 fn queue_event(snapshot: &Snapshot) -> Sse {
     #[derive(Serialize)]
     struct Queue<'a> {
-        queue: &'a [crate::download::QueueItem],
+        queue: Vec<ItemView<'a>>,
         remaining: usize,
     }
     json_event(
         "queue",
         &Queue {
-            queue: &snapshot.queue,
+            queue: snapshot.queue.iter().map(ItemView::from).collect(),
             remaining: snapshot.remaining,
         },
     )

@@ -471,3 +471,26 @@ async fn a_big_list_is_queued_at_once() {
     assert_eq!(answer.json()["added"], 5000);
     assert_eq!(queue_of(&browser).await.len(), 5000);
 }
+
+#[tokio::test]
+async fn the_queue_sent_to_the_page_leaves_out_what_only_the_server_needs() {
+    let app = TestApp::start().await;
+    add_one(&app);
+    app.catalogue
+        .add_playlist(5, "Evening Concert", &[(11, 1), (12, 2)]);
+    let browser = app.browser();
+    browser
+        .post(
+            "/api/downloads",
+            json!({ "items": [{ "url": "https://play.qobuz.com/playlist/5" }] }),
+        )
+        .await;
+    finished(&browser).await;
+
+    let queue = queue_of(&browser).await;
+
+    assert_eq!(queue[0]["status"], "completed");
+    assert_eq!(queue[0]["downloaded"], 2);
+    assert!(queue[0].get("playlist_entries").is_none(), "{}", queue[0]);
+    assert!(queue[0].get("only_track_ids").is_none(), "{}", queue[0]);
+}

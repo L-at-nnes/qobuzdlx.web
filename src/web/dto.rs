@@ -5,7 +5,9 @@
 
 use serde::Serialize;
 
-use crate::download::{ItemKind, canonical_url};
+use crate::download::{
+    FailedTrack, ItemKind, ItemStatus, Progress, QueueItem, Snapshot, canonical_url,
+};
 use crate::qobuz::{Album, Artist, Playlist, Track};
 
 #[derive(Debug, Serialize)]
@@ -142,6 +144,70 @@ impl From<&Playlist> for PlaylistItem {
                 .as_ref()
                 .and_then(|images| images.first().cloned())
                 .filter(|image| !image.is_empty()),
+        }
+    }
+}
+
+/// An item of the download queue, as the page shows it.
+///
+/// Without what the server keeps for itself (the files of a playlist already in place, the tracks a
+/// retry is limited to): a playlist of a thousand tracks would otherwise weigh as much as the rest of
+/// the queue each time the queue is sent.
+#[derive(Debug, Serialize)]
+pub struct ItemView<'a> {
+    pub id: &'a str,
+    pub url: &'a str,
+    pub kind: ItemKind,
+    pub ref_id: &'a str,
+    pub label: &'a str,
+    pub sub_label: Option<&'a str>,
+    pub thumbnail: Option<&'a str>,
+    pub status: ItemStatus,
+    pub error: Option<&'a str>,
+    pub enqueued_at: u64,
+    pub started_at: Option<u64>,
+    pub finished_at: Option<u64>,
+    pub downloaded: u32,
+    pub skipped: u32,
+    pub failures: &'a [FailedTrack],
+}
+
+impl<'a> From<&'a QueueItem> for ItemView<'a> {
+    fn from(item: &'a QueueItem) -> Self {
+        Self {
+            id: &item.id,
+            url: &item.url,
+            kind: item.kind,
+            ref_id: &item.ref_id,
+            label: &item.label,
+            sub_label: item.sub_label.as_deref(),
+            thumbnail: item.thumbnail.as_deref(),
+            status: item.status,
+            error: item.error.as_deref(),
+            enqueued_at: item.enqueued_at,
+            started_at: item.started_at,
+            finished_at: item.finished_at,
+            downloaded: item.downloaded,
+            skipped: item.skipped,
+            failures: &item.failures,
+        }
+    }
+}
+
+/// The queue and what is going on, as the page reads them.
+#[derive(Debug, Serialize)]
+pub struct SnapshotView<'a> {
+    pub queue: Vec<ItemView<'a>>,
+    pub progress: &'a Progress,
+    pub remaining: usize,
+}
+
+impl<'a> From<&'a Snapshot> for SnapshotView<'a> {
+    fn from(snapshot: &'a Snapshot) -> Self {
+        Self {
+            queue: snapshot.queue.iter().map(ItemView::from).collect(),
+            progress: &snapshot.progress,
+            remaining: snapshot.remaining,
         }
     }
 }
