@@ -21,8 +21,22 @@ pub trait Reporter: Send + Sync {
     fn album(&self, album: Option<&Album>);
 
     /// How far the whole item has got (already fitted to its share of the bar), and the track in
-    /// progress.
+    /// progress: the only one, which replaces any other.
     fn step(&self, percent: u8, track: Option<StepTrack>);
+
+    /// How far the whole item has got, the tracks in progress staying as they are.
+    fn overall(&self, _percent: u8) {}
+
+    /// A track starts while others may be in progress: an album downloads several at once.
+    fn track_started(&self, _track: StepTrack) {}
+
+    /// The track at this position (from 1) is no longer in progress.
+    fn track_ended(&self, _index: usize) {}
+
+    /// How far the file of the track at this position has got.
+    fn track_transfer(&self, _index: usize, update: Update) {
+        self.transfer(update);
+    }
 
     /// What the thing being downloaded is called, for an item that was queued with nothing but its
     /// address (an imported list). Playlists, artists, labels and single tracks say it; an album

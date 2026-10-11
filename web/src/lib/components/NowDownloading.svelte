@@ -15,11 +15,15 @@
 	const byTrack = $derived(
 		item !== undefined && ['album', 'track', 'playlist', 'favorite_tracks'].includes(item.kind)
 	);
+	/** What is finished, plus the share of each file in transfer: the bar moves while a long track comes. */
 	const overall = $derived(
-		byTrack && progress.track
+		byTrack
 			? Math.min(
 					100,
-					Math.floor(((progress.track.index - 1 + progress.track.percent / 100) / progress.track.total) * 100)
+					Math.floor(
+						progress.percent +
+							progress.tracks.reduce((sum, track) => sum + track.percent / track.total, 0)
+					)
 				)
 			: progress.percent
 	);
@@ -56,25 +60,25 @@
 				<ProgressBar value={overall} label={item.label} />
 				<span class="figures meta">{overall}%</span>
 			</div>
-			{#if progress.track}
+			{#each progress.tracks as track (track.index)}
 				<p class="track meta">
 					<span class="figures">
-						{t('downloads.trackOf', { index: progress.track.index, total: progress.track.total })}
+						{t('downloads.trackOf', { index: track.index, total: track.total })}
 					</span>
-					<span class="name">{progress.track.title}</span>
+					<span class="name">{track.title}</span>
 				</p>
 				<div class="bar">
-					<ProgressBar value={progress.track.percent} label={progress.track.title} tone="quiet" />
+					<ProgressBar value={track.percent} label={track.title} tone="quiet" />
 					<span class="figures meta">
-						{progress.track.percent}%
-						{#if progress.track.bytes_per_second}
-							· {formatSpeed(progress.track.bytes_per_second, locale.current)}
+						{track.percent}%
+						{#if track.bytes_per_second}
+							· {formatSpeed(track.bytes_per_second, locale.current)}
 						{/if}
 					</span>
 				</div>
 			{:else}
 				<p class="track meta">{t('downloads.preparing')}</p>
-			{/if}
+			{/each}
 		</div>
 	</section>
 {/if}

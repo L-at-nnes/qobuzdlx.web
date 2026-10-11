@@ -101,7 +101,8 @@ pub struct Progress {
     /// How far the item has got, from 0 to 100.
     pub percent: u8,
     pub album: Option<AlbumCard>,
-    pub track: Option<TrackProgress>,
+    /// The tracks being downloaded, by position: an album downloads several at once.
+    pub tracks: Vec<TrackProgress>,
     /// Why the queue stopped by itself, when it did: it goes on when asked to.
     pub halt: Option<Halt>,
 }

@@ -17,6 +17,17 @@ pub(super) struct ItemReporter {
     pub(super) detail: LogDetail,
 }
 
+/// A track that has just started: nothing received yet.
+fn started(track: StepTrack) -> TrackProgress {
+    TrackProgress {
+        title: track.title,
+        index: track.index,
+        total: track.total,
+        percent: 0,
+        bytes_per_second: 0,
+    }
+}
+
 impl ItemReporter {
     /// Gives the item the name of what it turned out to be, when it only had its address to show
     /// and is of a kind that this thing names. A name the interface gave is never replaced.
@@ -88,19 +99,49 @@ impl Reporter for ItemReporter {
     fn step(&self, percent: u8, track: Option<StepTrack>) {
         let mut state = locked(&self.inner.state);
         state.progress.percent = percent;
-        state.progress.track = track.map(|track| TrackProgress {
-            title: track.title,
-            index: track.index,
-            total: track.total,
-            percent: 0,
-            bytes_per_second: 0,
-        });
+        state.progress.tracks = track.map(started).into_iter().collect();
+        self.inner.progress_changed(&mut state, true);
+    }
+
+    fn overall(&self, percent: u8) {
+        let mut state = locked(&self.inner.state);
+        state.progress.percent = percent;
+        self.inner.progress_changed(&mut state, true);
+    }
+
+    fn track_started(&self, track: StepTrack) {
+        let mut state = locked(&self.inner.state);
+        let tracks = &mut state.progress.tracks;
+        tracks.retain(|known| known.index != track.index);
+        tracks.push(started(track));
+        tracks.sort_by_key(|known| known.index);
+        self.inner.progress_changed(&mut state, true);
+    }
+
+    fn track_ended(&self, index: usize) {
+        let mut state = locked(&self.inner.state);
+        state.progress.tracks.retain(|known| known.index != index);
         self.inner.progress_changed(&mut state, true);
     }
 
     fn transfer(&self, update: Update) {
+        // One track at a time: the one in progress
         let mut state = locked(&self.inner.state);
-        if let Some(track) = state.progress.track.as_mut() {
+        if let Some(track) = state.progress.tracks.first_mut() {
+            track.percent = update.percent;
+            track.bytes_per_second = update.bytes_per_second;
+        }
+        self.inner.progress_changed(&mut state, false);
+    }
+
+    fn track_transfer(&self, index: usize, update: Update) {
+        let mut state = locked(&self.inner.state);
+        if let Some(track) = state
+            .progress
+            .tracks
+            .iter_mut()
+            .find(|known| known.index == index)
+        {
             track.percent = update.percent;
             track.bytes_per_second = update.bytes_per_second;
         }

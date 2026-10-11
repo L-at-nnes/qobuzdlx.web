@@ -147,7 +147,7 @@ impl Inner {
             state.queue.finish(id, status, error);
             state.progress.item_id = None;
             state.progress.album = None;
-            state.progress.track = None;
+            state.progress.tracks.clear();
             state.progress.percent = 0;
             self.progress_changed(&mut state, true);
         }

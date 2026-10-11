@@ -11,7 +11,7 @@ const resting: Progress = {
 	item_id: null,
 	percent: 0,
 	album: null,
-	track: null,
+	tracks: [],
 	halt: null
 };
 

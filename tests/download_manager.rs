@@ -293,7 +293,7 @@ async fn cancelling_gives_up_the_item_and_the_queue_goes_on() {
         .enqueue(&album_url("fast"), Display::default())
         .unwrap();
     eventually("the first track to start", || {
-        manager.snapshot().progress.track.is_some()
+        !manager.snapshot().progress.tracks.is_empty()
     })
     .await;
 
@@ -333,7 +333,7 @@ async fn an_item_stopped_by_the_shutdown_waits_again_at_the_next_start() {
         .enqueue(&album_url("slow"), Display::default())
         .unwrap();
     eventually("the track to start", || {
-        manager.snapshot().progress.track.is_some()
+        !manager.snapshot().progress.tracks.is_empty()
     })
     .await;
 
