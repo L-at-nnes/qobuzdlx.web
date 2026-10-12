@@ -11,7 +11,30 @@
 	import { t } from '#lib/i18n/index.svelte.ts';
 	import { downloads } from '#lib/state/downloads.svelte.ts';
 
+	/** How many rows are drawn at first, and added by each "show more": a queue can hold thousands. */
+	const PAGE = 100;
+	const FINISHED_AT_FIRST = 20;
+
+	let pendingLimit = $state(PAGE);
+	let finishedLimit = $state(FINISHED_AT_FIRST);
+
 	const queue = $derived(downloads.queue);
+
+	/** The rows to draw: the oldest finished items and the last waiting ones are kept behind a button. */
+	const shown = $derived.by(() => {
+		const done = (status: string) => status !== 'pending' && status !== 'running';
+		const finishedTotal = queue.filter((item) => done(item.status)).length;
+		const pendingTotal = queue.filter((item) => item.status === 'pending').length;
+		const hiddenFinished = Math.max(0, finishedTotal - finishedLimit);
+		let finishedSeen = 0;
+		let pendingSeen = 0;
+		const rows = queue.filter((item) => {
+			if (done(item.status)) return ++finishedSeen > hiddenFinished;
+			if (item.status === 'pending') return ++pendingSeen <= pendingLimit;
+			return true;
+		});
+		return { rows, hiddenFinished, hiddenPending: Math.max(0, pendingTotal - pendingLimit) };
+	});
 	const pendingIds = $derived(queue.filter((item) => item.status === 'pending').map((item) => item.id));
 	const hasFinished = $derived(
 		queue.some((item) => item.status !== 'pending' && item.status !== 'running')
@@ -77,8 +100,15 @@
 				</div>
 			</div>
 
+			{#if shown.hiddenFinished > 0}
+				<div class="more">
+					<Button variant="ghost" size="sm" onclick={() => (finishedLimit += PAGE)}>
+						{t('downloads.showEarlier', { count: shown.hiddenFinished })}
+					</Button>
+				</div>
+			{/if}
 			<ul class="queue">
-				{#each queue as item (item.id)}
+				{#each shown.rows as item (item.id)}
 					<QueueRow
 						{item}
 						first={pendingIds[0] === item.id}
@@ -86,6 +116,13 @@
 					/>
 				{/each}
 			</ul>
+			{#if shown.hiddenPending > 0}
+				<div class="more">
+					<Button variant="ghost" size="sm" onclick={() => (pendingLimit += PAGE)}>
+						{t('downloads.showMoreWaiting', { count: shown.hiddenPending })}
+					</Button>
+				</div>
+			{/if}
 		</section>
 	{/if}
 
@@ -111,6 +148,12 @@
 
 	.notice span {
 		flex: 1 1 18rem;
+	}
+
+	.more {
+		display: flex;
+		justify-content: center;
+		padding: var(--space-2) 0;
 	}
 
 	.heading {

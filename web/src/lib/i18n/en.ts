@@ -188,6 +188,14 @@ export const en = {
 	'downloads.confirmClearPending': 'Remove all waiting items?',
 	'downloads.confirmClearFinished': 'Remove all finished items?',
 	'downloads.confirm': 'Remove',
+	'downloads.showEarlier': {
+		one: 'Show {count} earlier finished item',
+		other: 'Show {count} earlier finished items'
+	},
+	'downloads.showMoreWaiting': {
+		one: 'Show {count} more waiting item',
+		other: 'Show {count} more waiting items'
+	},
 
 	'status.pending': 'Waiting',
 	'status.running': 'Downloading',

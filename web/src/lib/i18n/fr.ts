@@ -192,6 +192,14 @@ export const fr: Record<Key, Message> = {
 	'downloads.clearFinished': 'Vider les éléments terminés',
 	'downloads.confirmClearPending': 'Retirer tous les éléments en attente ?',
 	'downloads.confirmClearFinished': 'Retirer tous les éléments terminés ?',
+	'downloads.showEarlier': {
+		one: "Afficher {count} élément terminé plus ancien",
+		other: 'Afficher {count} éléments terminés plus anciens'
+	},
+	'downloads.showMoreWaiting': {
+		one: "Afficher {count} élément en attente de plus",
+		other: "Afficher {count} éléments en attente de plus"
+	},
 	'downloads.confirm': 'Retirer',
 
 	'status.pending': 'En attente',
