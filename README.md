@@ -49,20 +49,26 @@ I rewrote it because I was not happy with the interface or with the language it 
 
 ### With Docker Compose
 
-No image is published: Compose builds it from this repository, interface and server included.
+GitHub builds the image for x86 and ARM at every change and publishes it, so the server downloads it in a few seconds and compiles nothing.
 
 ```bash
-git clone https://gitlab.com/L-at-nnes/qobuzdlx.web.git
+git clone https://github.com/L-at-nnes/qobuzdlx.web.git
 cd qobuzdlx.web
-sudo docker compose up -d --build
+sudo docker compose pull
+sudo docker compose up -d
 ```
 
-Then open `http://<your server>:8080` and sign in to Qobuz. The settings, the session and the queue live in a Docker volume and survive a rebuild; to update, `git pull` and run the same `docker compose up -d --build`.
+Then open `http://<your server>:8080` and sign in to Qobuz. The settings, the session and the queue live in a Docker volume and survive an update. To update, `git pull`, then run the same two `docker compose` commands.
+
+The image is `ghcr.io/l-at-nnes/qobuzdlx.web`. `latest` follows the main branch, a version tag gives `1.2.3` and `1.2`, and each build is also kept under its short commit hash. If `docker compose pull` is refused, the package is still private: on GitHub, open the package, then Package settings, then Change visibility, then Public (or run `docker login ghcr.io` on the server).
+
+To build the image on the server from the source instead, run `sudo docker compose up -d --build`. The first time it compiles for 10 to 40 minutes depending on the machine.
 
 To change anything, copy `.env.example` to `.env` and edit it (all of it is optional):
 
 | Setting | Default | Meaning |
 |---|---|---|
+| `QOBUZDLX_IMAGE` | `ghcr.io/l-at-nnes/qobuzdlx.web:latest` | The image to run; a version pins it |
 | `PORT` | `8080` | Port of the interface on the host |
 | `ACCESS_PASSWORD` | none | Password of the interface, at least 8 characters |
 | `DOWNLOADS_DIR` | `downloads` | A name keeps the music in a Docker volume; a path (`/srv/music`) puts it in that folder of the host |
@@ -73,14 +79,15 @@ The application runs as an unprivileged user (uid 65532): a folder of the host g
 ### With plain Docker
 
 ```bash
-docker build -t qobuzdlx .
 docker run -d --name qobuzdlx \
   -p 8080:8080 \
   -v qobuzdlx-config:/config \
   -v /srv/music:/downloads \
   -e ACCESS_PASSWORD='a long password' \
-  qobuzdlx
+  ghcr.io/l-at-nnes/qobuzdlx.web:latest
 ```
+
+To build it yourself, run `docker build -t qobuzdlx .` and use `qobuzdlx` as the image name.
 
 The variables of the application, which Compose fills in for you:
 
