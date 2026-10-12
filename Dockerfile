@@ -30,6 +30,11 @@ RUN mkdir -p /rootfs/config /rootfs/downloads
 
 # ── What runs ──
 FROM gcr.io/distroless/cc-debian12:nonroot
+# The source label is what ties the image to this repository on GitHub's registry
+LABEL org.opencontainers.image.title="QobuzDLX" \
+      org.opencontainers.image.description="Searches Qobuz and downloads what a subscription gives into a tagged library" \
+      org.opencontainers.image.source="https://github.com/L-at-nnes/qobuzdlx.web" \
+      org.opencontainers.image.licenses="MIT"
 ENV BIND=0.0.0.0:8080 \
     CONFIG_PATH=/config \
     DOWNLOADS_PATH=/downloads
