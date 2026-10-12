@@ -3,6 +3,7 @@
 A self-hosted web application that searches Qobuz and downloads what your subscription gives you into a tidy, tagged library. One small Rust executable with its interface inside, made to run in a container on a NAS or a home server.
 
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Docker image](https://github.com/L-at-nnes/qobuzdlx.web/actions/workflows/docker.yml/badge.svg)](https://github.com/L-at-nnes/qobuzdlx.web/actions/workflows/docker.yml)
 
 <p align="center">
   <img src="docs/screenshots/search-light.png" alt="Searching Beethoven symphonies, results as rows with their quality" width="880">
