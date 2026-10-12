@@ -12,6 +12,7 @@ use crate::download::report::StepTrack;
 use crate::download::track::{Context, TrackRequest};
 use crate::naming::{DownloadKind, track_title};
 use crate::qobuz::{Album, Goody, Track};
+use crate::settings::DuplicateMode;
 
 /// What a track downloading beside others knows of the album's run.
 struct TrackSlot<'a> {
@@ -206,6 +207,20 @@ impl Job {
         folder: &Path,
         cover: Option<&Vec<u8>>,
     ) -> Result<TrackEnd, JobError> {
+        // A track already in place is found from the listing of the album, without asking Qobuz for
+        // the track itself: going through an album again costs one request, not one per track
+        if self.settings.advanced.duplicates == DuplicateMode::Skip {
+            let wanted =
+                self.namer()
+                    .track_path(folder, DownloadKind::Album, album, listed, None, "");
+            if wanted.exists() {
+                self.log(LogEvent::FileExists {
+                    number: listed.track_number,
+                });
+                return Ok(TrackEnd::AlreadyThere);
+            }
+        }
+
         // The listing of an album holds less than the track itself
         let Some(track) = self.track_info(listed.id).await? else {
             self.log(LogEvent::TrackUnavailable {

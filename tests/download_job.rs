@@ -244,6 +244,26 @@ async fn one_at_a_time_is_one_at_a_time() {
 }
 
 #[tokio::test]
+async fn an_album_already_in_place_is_gone_through_without_asking_for_each_track() {
+    let rig = Rig::new().await;
+    rig.add_album("alb", "Six Pieces", "Anna", &SIX_TRACKS);
+    let (first, _) = rig.run(ItemKind::Album, "alb").await;
+    first.unwrap();
+    assert_eq!(rig.server.count("/api/track/get"), 6);
+
+    let (second, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    second.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (0, 6));
+    assert_eq!(
+        rig.server.count("/api/track/get"),
+        6,
+        "no request for a track that is there"
+    );
+    assert_eq!(rig.server.count("/api/track/getFileUrl"), 6);
+}
+
+#[tokio::test]
 async fn the_progress_of_an_album_counts_the_tracks_in_place() {
     let mut rig = Rig::new().await;
     rig.settings.advanced.parallel_tracks = 2;
