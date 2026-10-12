@@ -1,12 +1,15 @@
-# git clone <this repository> && cd qobuzdlx.web
-# docker compose up -d --build
+# Ready-made image, built by GitHub for x86 and ARM (a few seconds to download):
+#   docker compose pull && docker compose up -d
+# Or build it here from the source (takes a while the first time):
+#   docker compose up -d --build
 #
 # Then open http://<this machine>:8080. Settings go in a file named .env next to this one
 # (copy .env.example); every one of them is optional.
 services:
   qobuzdlx:
     build: .
-    image: qobuzdlx:latest
+    # A version can be chosen in .env: QOBUZDLX_IMAGE=ghcr.io/l-at-nnes/qobuzdlx.web:1.2.3
+    image: ${QOBUZDLX_IMAGE:-ghcr.io/l-at-nnes/qobuzdlx.web:latest}
     container_name: qobuzdlx
     ports:
       - "${PORT:-8080}:8080"
