@@ -13,7 +13,7 @@ A self-hosted web application that searches Qobuz and downloads what your subscr
 
 ## Where it comes from
 
-QobuzDLX started as a fork of [thimble9057's `qobuzdlx.web`](https://gitlab.com/thimble9057/qobuzdlx.web), a Blazor Server application, and this is a rewrite of it in Rust with a new interface. The behaviour, the naming variables and many of the lessons learned (how the Qobuz API really answers, what the CDN does to a download) come from that project and from the desktop program it was itself inspired by, and the rewrite follows them closely. It is an adaptation, not an independent invention: thimble9057 is credited in the [license](LICENSE) next to my own name, and the .NET version stays available at the `legacy-dotnet` tag.
+QobuzDLX started as a fork of [thimble9057's `qobuzdlx.web`](https://gitlab.com/thimble9057/qobuzdlx.web), a Blazor Server application, and this is a rewrite of it in Rust with a new interface. The behaviour, the naming variables and many of the lessons learned (how the Qobuz API really answers, what the CDN does to a download) come from that project and from the desktop program it was itself inspired by, and the rewrite follows them closely. It is an adaptation, not an independent invention: thimble9057 is credited in the [license](LICENSE) next to my own name, and the .NET version is the first part of this repository's history, up to the commit "fix(ui): version the stylesheet URL so an update is not shown with the old CSS".
 
 I rewrote it because I was not happy with the interface or with the language it was written in for a tool like this one, and I wanted something lighter, more powerful and nicer to use.
 
