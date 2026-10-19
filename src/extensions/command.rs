@@ -176,7 +176,6 @@ mod tests {
 
     #[tokio::test]
     async fn the_secrets_of_the_application_are_not_passed_on() {
-        // SAFETY-free: only reads what the test process has, and PATH is always there
         let (extension, directory) = extension(r#"env > env.txt"#, Duration::from_secs(10));
 
         extension.handle(&Event::QueueDrained).await.unwrap();
