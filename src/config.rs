@@ -28,6 +28,9 @@ pub struct RuntimeConfig {
     pub config_dir: PathBuf,
     /// Download folder used until the user picks another one (`DOWNLOADS_PATH`).
     pub default_downloads_dir: PathBuf,
+    /// Where the extensions are looked for (`EXTENSIONS_PATH`), `extensions` inside the config
+    /// folder unless set.
+    pub extensions_dir: PathBuf,
     /// Address the server listens on (`BIND`).
     ///
     /// Loopback by default: outside a container the application is not reachable from the network
@@ -67,9 +70,13 @@ impl RuntimeConfig {
             return Err(ConfigError::AccessPasswordTooShort);
         }
 
+        let config_dir = non_empty("CONFIG_PATH")
+            .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_DIR), PathBuf::from);
+
         Ok(Self {
-            config_dir: non_empty("CONFIG_PATH")
-                .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_DIR), PathBuf::from),
+            extensions_dir: non_empty("EXTENSIONS_PATH")
+                .map_or_else(|| config_dir.join("extensions"), PathBuf::from),
+            config_dir,
             default_downloads_dir: non_empty("DOWNLOADS_PATH")
                 .map_or_else(|| PathBuf::from(DEFAULT_DOWNLOADS_DIR), PathBuf::from),
             bind,
@@ -97,6 +104,7 @@ mod tests {
         assert_eq!(config.bind.to_string(), "127.0.0.1:8080");
         assert_eq!(config.config_dir, PathBuf::from("/config"));
         assert_eq!(config.default_downloads_dir, PathBuf::from("/downloads"));
+        assert_eq!(config.extensions_dir, PathBuf::from("/config/extensions"));
         assert_eq!(config.access_password, None);
         assert!(!config.cookie_secure);
     }
@@ -107,6 +115,7 @@ mod tests {
             ("BIND", "0.0.0.0:9000"),
             ("CONFIG_PATH", "/data/config"),
             ("DOWNLOADS_PATH", "/data/music"),
+            ("EXTENSIONS_PATH", "/data/plugins"),
             ("ACCESS_PASSWORD", "long enough"),
             ("COOKIE_SECURE", "TRUE"),
         ])
@@ -115,8 +124,19 @@ mod tests {
         assert_eq!(config.bind.to_string(), "0.0.0.0:9000");
         assert_eq!(config.config_dir, PathBuf::from("/data/config"));
         assert_eq!(config.default_downloads_dir, PathBuf::from("/data/music"));
+        assert_eq!(config.extensions_dir, PathBuf::from("/data/plugins"));
         assert_eq!(config.access_password.as_deref(), Some("long enough"));
         assert!(config.cookie_secure);
+    }
+
+    #[test]
+    fn extensions_follow_the_config_folder_unless_told_otherwise() {
+        let config = config(&[("CONFIG_PATH", "/data/config")]).unwrap();
+
+        assert_eq!(
+            config.extensions_dir,
+            PathBuf::from("/data/config/extensions")
+        );
     }
 
     #[test]
