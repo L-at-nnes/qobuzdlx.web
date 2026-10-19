@@ -32,6 +32,7 @@ I rewrote it because I was not happy with the interface or with the language it 
 - **Bonus files** (booklets) are downloaded next to the music.
 - **A live view** of the album in progress, the speed, and a log you can filter, export and clear.
 - **French and English**, two themes (dark and light, following the system or chosen by hand), usable on a phone and installable from the browser.
+- **Extensions.** React to a track saved, an album finished or an empty queue with a program, a webhook or a bit of Rust, without touching the download code. Add one by dropping a folder: see [Extensions](#extensions).
 - **Protected access.** An optional password (Argon2id, with a progressive lock after wrong attempts and cookies signed by a key kept on disk) keeps the interface, and the Qobuz account behind it, to those who know it.
 
 <p align="center">
@@ -99,6 +100,7 @@ The variables of the application, which Compose fills in for you:
 | `DOWNLOADS_PATH` | `/downloads` | Download folder used until you choose another in the settings |
 | `ACCESS_PASSWORD` | none | Password of the interface, at least 8 characters. When set, it cannot be changed from the interface |
 | `COOKIE_SECURE` | `false` | Set to `true` when the interface is served over HTTPS, to mark the cookie `Secure` |
+| `EXTENSIONS_PATH` | `<CONFIG_PATH>/extensions` | Where [extensions](#extensions) are looked for |
 
 Without a password, anyone who can reach the server can use the Qobuz account linked to it. Set one if the server is reachable from anywhere but your own machine. Behind a reverse proxy, forward the `Host` header (or `X-Forwarded-Host`) so that the check of cross-site requests recognises your address.
 
@@ -120,6 +122,28 @@ cargo fmt --check && cargo clippy --all-targets && cargo test
 cd web && npm run check && npm test
 ```
 
+## Extensions
+
+QobuzDLX tells **extensions** what it does, so that you can add your own actions after a download: move or convert files, rescan a media server, send a notification. They never get in the way of a download.
+
+| Event | When |
+|---|---|
+| `track_saved` | A track is in its final place, tagged and verified |
+| `item_finished` | An album, playlist, discography... ended, with its counts and the folders written |
+| `queue_drained` | Nothing is left to download |
+
+There are three kinds, and the first two are added without recompiling: a **command** (a program that gets the event as JSON on its standard input), a **webhook** (the event is `POST`ed to an address) and a **built-in** extension (Rust). To add one, put a folder with an `extension.json` into `<config>/extensions` (`/config/extensions` in the image) and restart:
+
+```json
+{
+  "name": "notify",
+  "events": ["item_finished"],
+  "webhook": { "url": "http://my-service:9000/qobuzdlx" }
+}
+```
+
+The container image has no shell, so in it a webhook is the easy way; see the guide for programs. The complete guide, with the manifest, every event, Docker, Rust, guarantees and troubleshooting, is in [docs/extensions.md](docs/extensions.md), and two examples are in [examples/extensions/](examples/extensions). `GET /api/extensions` lists what is loaded.
+
 ## How it is organised
 
 | Path | What it holds |
@@ -127,9 +151,11 @@ cd web && npm run check && npm test
 | `src/qobuz/` | The Qobuz client: sign-in, app identifiers found in the web player, signed requests, retries, pagination |
 | `src/download/` | The queue, the track pipeline (quality fallback, resuming, integrity check), jobs per kind of item, the manager |
 | `src/naming/`, `src/tagging/` | Folder and file names from templates; tags and covers written with `lofty` |
+| `src/extensions/` | The extension system: events, the manifest and loader, the command and webhook runners, the per-extension queues |
 | `src/access/` | The password, the lock after wrong attempts, the signed cookie |
 | `src/web/` | The HTTP API, the live events, and the interface served from the executable |
 | `web/` | The interface (SvelteKit, built to static files) |
+| `examples/extensions/` | Ready-to-copy extensions |
 | `tests/` | Integration tests against a scripted fake of Qobuz and its CDN: no network, no account |
 
 ## Credits and license

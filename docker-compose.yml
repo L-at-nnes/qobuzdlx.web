@@ -23,6 +23,8 @@ services:
       # A name keeps the music in a Docker volume. A path (/srv/music) puts it in that folder of the
       # host, which then has to belong to uid 65532: chown -R 65532 /srv/music
       - ${DOWNLOADS_DIR:-downloads}:/downloads
+      # Extensions: uncomment to load the folders of ./extensions (see docs/extensions.md)
+      # - ./extensions:/config/extensions:ro
     restart: unless-stopped
     # The application needs no privilege: it runs as an unprivileged user and listens on a high port.
     security_opt:
