@@ -7,6 +7,7 @@ mod cookie;
 mod downloads;
 mod dto;
 mod error;
+mod extensions;
 mod guard;
 mod session;
 mod settings;
@@ -28,6 +29,7 @@ pub fn router(state: AppState) -> Router {
         .merge(session::routes())
         .merge(catalogue::routes())
         .merge(downloads::routes())
+        .merge(extensions::routes())
         .merge(settings::routes())
         .layer(from_fn_with_state(state.clone(), guard::require_unlock));
     let api = Router::new().merge(access::open()).merge(guarded);
