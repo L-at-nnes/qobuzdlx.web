@@ -1,5 +1,7 @@
-use std::sync::Arc;
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 
 use super::reporter::ItemReporter;
 use super::{Inner, locked};
@@ -7,7 +9,8 @@ use crate::download::item::{ItemStatus, QueueItem};
 use crate::download::job::{Job, JobError, JobSetup};
 use crate::download::log::LogEvent;
 use crate::download::progress::{Halt, Progress};
-use crate::download::report::Outcome;
+use crate::download::report::{Outcome, Reporter};
+use crate::extensions::{self, ItemFinished};
 use crate::settings::LogDetail;
 
 /// Goes through the queue, one item at a time, whenever there is something to do and a session to
@@ -78,15 +81,17 @@ impl Inner {
             self.progress_changed(&mut state, true);
         }
 
+        let reporter = Arc::new(ItemReporter {
+            inner: Arc::clone(self),
+            item_id: item.id.clone(),
+            detail,
+            folders: Mutex::default(),
+        });
         let mut job = Job::new(
             JobSetup {
                 env: self.env.clone(),
                 settings,
-                reporter: Arc::new(ItemReporter {
-                    inner: Arc::clone(self),
-                    item_id: item.id.clone(),
-                    detail,
-                }),
+                reporter: Arc::clone(&reporter) as Arc<dyn Reporter>,
                 cancel,
                 skip: Arc::clone(&self.skip),
                 covers: self.covers.clone(),
@@ -98,11 +103,19 @@ impl Inner {
         let outcome = job.into_outcome();
 
         *locked(&self.current) = None;
-        self.finish(&item.id, &outcome, result, detail);
+        let folders = std::mem::take(&mut *locked(&reporter.folders));
+        self.finish(&item.id, &outcome, result, detail, &folders);
     }
 
     /// Records how an item ended.
-    fn finish(&self, id: &str, outcome: &Outcome, result: Result<(), JobError>, detail: LogDetail) {
+    fn finish(
+        &self,
+        id: &str,
+        outcome: &Outcome,
+        result: Result<(), JobError>,
+        detail: LogDetail,
+        folders: &BTreeSet<PathBuf>,
+    ) {
         if let Some(item) = locked(&self.state).queue.get_mut(id) {
             outcome.write_to(item);
         }
@@ -142,16 +155,36 @@ impl Inner {
             }
         };
 
-        {
+        let finished = {
             let mut state = locked(&self.state);
             state.queue.finish(id, status, error);
+            let finished = state.queue.get(id).cloned();
             state.progress.item_id = None;
             state.progress.album = None;
             state.progress.tracks.clear();
             state.progress.percent = 0;
             self.progress_changed(&mut state, true);
-        }
+            finished
+        };
         self.queue_changed();
+        if let Some(item) = finished {
+            self.extensions
+                .emit(extensions::Event::ItemFinished(ItemFinished {
+                    item_id: item.id,
+                    url: item.url,
+                    kind: item.kind,
+                    label: item.label,
+                    status: item.status,
+                    error: item.error,
+                    downloaded: item.downloaded,
+                    skipped: item.skipped,
+                    failed: u32::try_from(item.failures.len()).unwrap_or(u32::MAX),
+                    folders: folders
+                        .iter()
+                        .map(|folder| folder.to_string_lossy().into_owned())
+                        .collect(),
+                }));
+        }
     }
 
     /// The queue stops by itself: what is waiting stays so, and the interface says why.
@@ -177,6 +210,7 @@ impl Inner {
         }
         if drained {
             self.log(LogEvent::QueueDrained);
+            self.extensions.emit(extensions::Event::QueueDrained);
         }
         self.queue_changed();
     }

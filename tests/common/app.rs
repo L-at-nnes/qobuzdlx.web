@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use qobuzdlx::access::{AccessStore, Gate, Tokens};
 use qobuzdlx::download::{Manager, ManagerConfig, Tuning};
+use qobuzdlx::extensions::Extensions;
 use qobuzdlx::qobuz::Sessions;
 use qobuzdlx::settings::{Quality, SettingsStore};
 use qobuzdlx::web::{self, AppState, Shared};
@@ -55,6 +56,7 @@ impl TestApp {
                 attempts_per_quality: 2,
                 backoff: Duration::ZERO,
             },
+            extensions: Extensions::default(),
         });
         let state = AppState::new(Shared {
             version: "test",
@@ -67,6 +69,7 @@ impl TestApp {
             client,
             settings,
             downloads,
+            extensions: Extensions::default(),
         });
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

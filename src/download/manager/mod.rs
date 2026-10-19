@@ -22,6 +22,7 @@ use super::store::QueueStore;
 use super::track::{Environment, TEMP_PREFIX, Tuning};
 use super::transfer::Fetcher;
 use super::url::{QobuzUrl, parse};
+use crate::extensions::Extensions;
 use crate::qobuz::{Client, SessionEvent};
 use crate::settings::SettingsStore;
 
@@ -74,6 +75,8 @@ pub struct ManagerConfig {
     pub http: reqwest::Client,
     pub stall_timeout: Duration,
     pub tuning: Tuning,
+    /// Told about what the downloads do. The default has none.
+    pub extensions: Extensions,
 }
 
 pub(super) struct State {
@@ -88,6 +91,7 @@ pub(super) struct Inner {
     pub(super) settings: SettingsStore,
     pub(super) env: Environment,
     pub(super) covers: Covers,
+    pub(super) extensions: Extensions,
     store: QueueStore,
     pub(super) state: Mutex<State>,
     /// Serialises the writes of `queue.json`: a slow writer must not replace a recent version with an
@@ -147,6 +151,7 @@ impl Manager {
                 settings: config.settings,
                 env,
                 covers: Covers::new(config.http),
+                extensions: config.extensions,
                 store,
                 state: Mutex::new(State {
                     queue,

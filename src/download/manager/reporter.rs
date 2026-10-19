@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use super::{Event, Inner, locked};
 use crate::download::item::ItemKind;
@@ -6,6 +8,7 @@ use crate::download::log::LogEvent;
 use crate::download::progress::{AlbumCard, TrackProgress};
 use crate::download::report::{Outcome, Reporter, StepTrack};
 use crate::download::transfer::Update;
+use crate::extensions::{self, TrackSaved};
 use crate::qobuz::Album;
 use crate::settings::LogDetail;
 
@@ -15,6 +18,8 @@ pub(super) struct ItemReporter {
     pub(super) item_id: String,
     /// The level of detail when the item started: the log does not change halfway through.
     pub(super) detail: LogDetail,
+    /// The folders that received a file, for the extensions told when the item ends.
+    pub(super) folders: Mutex<BTreeSet<PathBuf>>,
 }
 
 /// A track that has just started: nothing received yet.
@@ -146,6 +151,17 @@ impl Reporter for ItemReporter {
             track.bytes_per_second = update.bytes_per_second;
         }
         self.inner.progress_changed(&mut state, false);
+    }
+
+    fn track_saved(&self, saved: TrackSaved) {
+        self.folders
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(PathBuf::from(&saved.folder));
+        self.inner.extensions.emit(extensions::Event::TrackSaved {
+            item_id: self.item_id.clone(),
+            track: saved,
+        });
     }
 
     fn outcome(&self, outcome: &Outcome) {

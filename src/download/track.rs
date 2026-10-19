@@ -9,6 +9,7 @@ use super::log::LogEvent;
 use super::report::Reporter;
 use super::transfer::{Error as TransferError, Fetcher, Transfer};
 use super::verify::{self, Error as VerifyError};
+use crate::extensions::TrackSaved;
 use crate::naming::{DownloadKind, Namer, track_title};
 use crate::qobuz::{self, Album, Client, Playlist, Track};
 use crate::settings::{DuplicateMode, Quality, Settings};
@@ -130,6 +131,26 @@ impl TrackError {
     }
 }
 
+/// What extensions are told about a track that is in place.
+fn saved(request: &TrackRequest<'_>, path: &Path, quality: String) -> TrackSaved {
+    let name = |person: &qobuz::Person| person.name.clone();
+    TrackSaved {
+        path: path.to_string_lossy().into_owned(),
+        folder: path
+            .parent()
+            .map_or_else(String::new, |folder| folder.to_string_lossy().into_owned()),
+        track_id: request.track.id,
+        title: track_title(request.track),
+        track_number: request.track.track_number,
+        disc_number: request.track.media_number,
+        artist: request.track.performer.as_ref().and_then(name),
+        album_id: request.album.id.clone(),
+        album_title: request.album.title.clone(),
+        album_artist: name(&request.album.artist),
+        quality,
+    }
+}
+
 /// A track received in full.
 struct Received {
     quality: String,
@@ -205,11 +226,13 @@ impl Context<'_> {
         let target = place(temp, wanted, settings.advanced.duplicates).await?;
 
         self.reporter.log(LogEvent::TrackTransfer {
-            quality: received.quality,
+            quality: received.quality.clone(),
             megabytes: received.transfer.megabytes(),
             megabytes_per_second: received.transfer.megabytes_per_second(),
         });
         self.reporter.log(LogEvent::Done);
+        self.reporter
+            .track_saved(saved(request, &target, received.quality));
         Ok(TrackResult {
             path: target,
             already_existed: false,

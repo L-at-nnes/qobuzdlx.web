@@ -1,6 +1,7 @@
 use super::item::{FailedTrack, PlaylistEntry, QueueItem};
 use super::log::LogEvent;
 use super::transfer::Update;
+use crate::extensions::TrackSaved;
 use crate::qobuz::Album;
 
 /// The track being processed, for the progress shown.
@@ -45,6 +46,9 @@ pub trait Reporter: Send + Sync {
 
     /// How far the file being received has got.
     fn transfer(&self, update: Update);
+
+    /// A track was written to its final place.
+    fn track_saved(&self, _saved: TrackSaved) {}
 
     /// What has been achieved so far.
     fn outcome(&self, outcome: &Outcome);

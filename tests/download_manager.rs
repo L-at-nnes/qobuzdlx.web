@@ -4,10 +4,12 @@ use std::time::Duration;
 
 use common::catalogue::Catalogue;
 use common::{Reply, session};
+use futures_util::future::BoxFuture;
 use qobuzdlx::download::{
     Display, Enqueued, Event, ItemKind, ItemStatus, LogEvent, Manager, ManagerConfig, Queue,
     QueueItem, QueueStore, Tuning,
 };
+use qobuzdlx::extensions::{Event as Told, Extension, Extensions, Failure, Info, Source};
 use qobuzdlx::settings::{Quality, SettingsStore};
 use serde_json::json;
 use tempfile::TempDir;
@@ -46,6 +48,10 @@ impl Rig {
     }
 
     fn start(&self) -> Manager {
+        self.start_with(Extensions::default())
+    }
+
+    fn start_with(&self, extensions: Extensions) -> Manager {
         Manager::start(ManagerConfig {
             client: self.catalogue.client.clone(),
             settings: self.settings.clone(),
@@ -56,6 +62,7 @@ impl Rig {
                 attempts_per_quality: 2,
                 backoff: Duration::ZERO,
             },
+            extensions,
         })
     }
 
@@ -116,6 +123,90 @@ async fn stalled_cdn() -> String {
         }
     });
     format!("http://{address}/file")
+}
+
+/// An extension that keeps everything it is told.
+struct Recorder(std::sync::Arc<std::sync::Mutex<Vec<Told>>>);
+
+impl Extension for Recorder {
+    fn info(&self) -> Info {
+        Info {
+            name: "recorder".into(),
+            version: None,
+            description: None,
+            source: Source::Builtin,
+            events: vec![],
+        }
+    }
+
+    fn handle<'a>(&'a self, event: &'a Told) -> BoxFuture<'a, Result<(), Failure>> {
+        Box::pin(async move {
+            self.0.lock().unwrap().push(event.clone());
+            Ok(())
+        })
+    }
+}
+
+// ─── Extensions ───
+
+#[tokio::test]
+async fn extensions_are_told_of_the_tracks_the_item_and_the_end_of_the_queue() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let extensions = Extensions::start(vec![std::sync::Arc::new(Recorder(told.clone()))], vec![]);
+    let manager = rig.start_with(extensions);
+
+    manager
+        .enqueue(&album_url("alb"), Display::default())
+        .unwrap();
+    eventually("the queue to be drained", || {
+        told.lock()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(event, Told::QueueDrained))
+    })
+    .await;
+
+    let told = told.lock().unwrap();
+    let tracks: Vec<_> = told
+        .iter()
+        .filter_map(|event| match event {
+            Told::TrackSaved { track, .. } => Some(track),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tracks.len(), 3);
+    assert!(
+        tracks
+            .iter()
+            .all(|track| std::path::Path::new(&track.path).exists())
+    );
+    assert!(
+        tracks
+            .iter()
+            .all(|track| track.album_title == "Kind of Blue")
+    );
+    assert!(tracks.iter().any(|track| track.title == "So What"));
+
+    let finished: Vec<_> = told
+        .iter()
+        .filter_map(|event| match event {
+            Told::ItemFinished(item) => Some(item),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(finished.len(), 1);
+    assert_eq!(finished[0].status, ItemStatus::Completed);
+    assert_eq!(finished[0].downloaded, 3);
+    assert_eq!(finished[0].folders.len(), 1);
+    // The item is announced after its tracks, and the end of the queue after the item
+    let position = |wanted: fn(&Told) -> bool| told.iter().position(wanted).unwrap();
+    assert!(
+        position(|event| matches!(event, Told::ItemFinished(_)))
+            < position(|event| matches!(event, Told::QueueDrained))
+    );
 }
 
 // ─── Asking ───

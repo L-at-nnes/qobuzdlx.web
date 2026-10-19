@@ -17,6 +17,7 @@ use super::log::LogEvent;
 use super::progress::ProgressScope;
 use super::report::{Outcome, Reporter, StepTrack};
 use super::track::{Context, Environment, TrackError};
+use crate::extensions::TrackSaved;
 use crate::naming::Namer;
 use crate::qobuz::{self, Album, Playlist, Track};
 use crate::settings::Settings;
@@ -88,6 +89,10 @@ impl Reporter for TrackReporter<'_> {
 
     fn transfer(&self, update: super::transfer::Update) {
         self.base.track_transfer(self.index, update);
+    }
+
+    fn track_saved(&self, saved: TrackSaved) {
+        self.base.track_saved(saved);
     }
 
     fn outcome(&self, outcome: &Outcome) {

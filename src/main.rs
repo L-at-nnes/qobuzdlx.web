@@ -5,6 +5,7 @@ use std::time::Duration;
 use qobuzdlx::access::{AccessStore, Gate, Tokens};
 use qobuzdlx::config::RuntimeConfig;
 use qobuzdlx::download::{Manager, ManagerConfig, Tuning};
+use qobuzdlx::extensions::{self, Extensions};
 use qobuzdlx::qobuz::{Client, Restored, Sessions};
 use qobuzdlx::settings::SettingsStore;
 use qobuzdlx::web::{self, AppState, Shared};
@@ -65,6 +66,9 @@ async fn run() -> anyhow::Result<()> {
         );
     }
 
+    let loaded = extensions::load_dir(&config.extensions_dir);
+    let extensions = Extensions::start(loaded.extensions, loaded.problems);
+
     // No overall timeout: a 24-bit album takes as long as it takes. A connection that goes silent
     // is given up by the transfer itself.
     let cdn = reqwest::Client::builder()
@@ -78,6 +82,7 @@ async fn run() -> anyhow::Result<()> {
         http: cdn,
         stall_timeout: STALL_TIMEOUT,
         tuning: Tuning::default(),
+        extensions: extensions.clone(),
     });
 
     let state = AppState::new(Shared {
@@ -91,6 +96,7 @@ async fn run() -> anyhow::Result<()> {
         client,
         settings,
         downloads,
+        extensions,
     });
 
     restore_session(&state);

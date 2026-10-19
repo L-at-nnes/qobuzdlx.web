@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::access::{AccessStore, Gate, Tokens};
 use crate::download::Manager;
+use crate::extensions::Extensions;
 use crate::qobuz::{Client, Sessions};
 use crate::settings::SettingsStore;
 
@@ -24,6 +25,7 @@ pub struct Shared {
     pub sessions: Sessions,
     pub settings: SettingsStore,
     pub downloads: Manager,
+    pub extensions: Extensions,
 }
 
 impl AppState {
