@@ -1,0 +1,12 @@
+{
+  "name": "notify-webhook",
+  "version": "1.0.0",
+  "description": "Tells an HTTP address whenever an item has finished or the queue is empty",
+  "enabled": false,
+  "events": ["item_finished", "queue_drained"],
+  "timeout_seconds": 10,
+  "webhook": {
+    "url": "http://my-service:9000/qobuzdlx",
+    "headers": { "Authorization": "Bearer change-me" }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "log-saved-tracks",
+  "version": "1.0.0",
+  "description": "Appends the path of every saved track to saved.log, next to this file",
+  "events": ["track_saved"],
+  "timeout_seconds": 10,
+  "command": ["./run.sh"]
+}
