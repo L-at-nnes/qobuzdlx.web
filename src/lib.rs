@@ -4,6 +4,7 @@ pub mod access;
 pub mod cause;
 pub mod config;
 pub mod download;
+pub mod extensions;
 pub mod healthcheck;
 pub mod hex;
 pub mod naming;
