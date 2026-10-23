@@ -80,6 +80,18 @@ pub enum LogEvent {
     QueuePaused,
     /// The user let the queue go on.
     QueueResumed,
+    /// Qobuz asked to slow down: the item waits and the queue holds back.
+    RateLimited {
+        seconds: u64,
+    },
+    /// The long break taken every so many albums.
+    BreakStarted {
+        seconds: u64,
+    },
+    /// The pause set between two albums.
+    BetweenAlbums {
+        seconds: u64,
+    },
     AlbumSkipped,
     AlbumNotStreamable,
     TrackNotStreamable {
@@ -134,6 +146,7 @@ impl LogEvent {
             | Self::ItemSummary { .. }
             | Self::Error { .. }
             | Self::SessionExpired
+            | Self::RateLimited { .. }
             | Self::TrackFailed { .. }
             | Self::AlbumFailed { .. }
             | Self::ArtistFailed { .. }
@@ -144,7 +157,9 @@ impl LogEvent {
             | Self::GoodyFailed { .. }
             | Self::Md5FixFailed { .. }
             | Self::VerifyFailed { .. } => LogDetail::Errors,
-            Self::AttemptFailed { .. } | Self::TrackTransfer { .. } => LogDetail::Detailed,
+            Self::AttemptFailed { .. }
+            | Self::TrackTransfer { .. }
+            | Self::BetweenAlbums { .. } => LogDetail::Detailed,
             _ => LogDetail::Normal,
         }
     }
@@ -227,6 +242,16 @@ impl fmt::Display for LogEvent {
                 formatter,
                 "Signed out of Qobuz: the queue waits for a sign-in."
             ),
+            Self::RateLimited { seconds } => write!(
+                formatter,
+                "Qobuz asked to slow down: waiting {seconds} s before trying again."
+            ),
+            Self::BreakStarted { seconds } => {
+                write!(formatter, "Taking a break of {seconds} s.")
+            }
+            Self::BetweenAlbums { seconds } => {
+                write!(formatter, "Waiting {seconds} s before the next album.")
+            }
             Self::QueuePaused => write!(formatter, "Queue paused."),
             Self::QueueResumed => write!(formatter, "Queue resumed."),
             Self::AlbumSkipped => write!(formatter, "Album skipped."),

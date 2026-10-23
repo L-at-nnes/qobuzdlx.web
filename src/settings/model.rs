@@ -5,6 +5,9 @@
 //! missing, so a file written by an older version keeps loading.
 
 use std::path::PathBuf;
+use std::time::Duration;
+
+use rand::RngExt;
 
 use serde::{Deserialize, Serialize};
 
@@ -351,6 +354,126 @@ impl Default for Advanced {
     }
 }
 
+/// A wait drawn at random, each time, between two bounds in milliseconds. A fixed pause is a
+/// pattern a server can recognise; a drawn one is not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Delay {
+    pub min_ms: u32,
+    pub max_ms: u32,
+}
+
+impl Delay {
+    /// The longest wait that is accepted: one hour.
+    pub const LIMIT_MS: u32 = 3_600_000;
+
+    #[must_use]
+    pub const fn new(min_ms: u32, max_ms: u32) -> Self {
+        Self { min_ms, max_ms }
+    }
+
+    /// No wait at all.
+    pub const NONE: Self = Self::new(0, 0);
+
+    /// Whether the bounds are in order and not beyond the limit.
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        self.min_ms <= self.max_ms && self.max_ms <= Self::LIMIT_MS
+    }
+
+    /// The bounds as a file edited by hand may have left them: in order and within the limit.
+    fn bounds(self) -> (u32, u32) {
+        let max = self.max_ms.min(Self::LIMIT_MS);
+        (self.min_ms.min(max), max)
+    }
+
+    /// A wait between the bounds, drawn now.
+    #[must_use]
+    pub fn pick(self) -> Duration {
+        let (min, max) = self.bounds();
+        Duration::from_millis(u64::from(rand::rng().random_range(min..=max)))
+    }
+
+    /// The shortest wait the bounds allow.
+    #[must_use]
+    pub fn shortest(self) -> Duration {
+        Duration::from_millis(u64::from(self.bounds().0))
+    }
+}
+
+impl Default for Delay {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+/// How gently Qobuz is asked for things. Qobuz publishes no limit: these waits keep a large queue
+/// from looking like a machine going as fast as it can.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RateLimit {
+    /// Before each track that has to be asked for. A file already in place costs no wait.
+    pub between_tracks: Delay,
+    /// Between two albums, and between two items of the queue.
+    pub between_albums: Delay,
+    /// After this many albums or items, a long break. `0`: never.
+    pub break_every: u32,
+    pub break_length: Delay,
+    /// First wait after Qobuz answered "too many requests"; it doubles each time it happens again
+    /// without an item going well in between.
+    pub cooldown_ms: u32,
+}
+
+impl RateLimit {
+    /// The most albums between two breaks that is accepted.
+    pub const BREAK_EVERY_LIMIT: u32 = 10_000;
+    /// The cooldown can double up to this many times its first value.
+    pub const COOLDOWN_DOUBLINGS: u32 = 6;
+
+    /// No wait anywhere but after Qobuz asked for one, for programs that talk to a server of their
+    /// own.
+    #[must_use]
+    pub const fn off() -> Self {
+        Self {
+            between_tracks: Delay::NONE,
+            between_albums: Delay::NONE,
+            break_every: 0,
+            break_length: Delay::NONE,
+            cooldown_ms: 1000,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_valid(&self) -> bool {
+        self.between_tracks.is_valid()
+            && self.between_albums.is_valid()
+            && self.break_length.is_valid()
+            && self.break_every <= Self::BREAK_EVERY_LIMIT
+            && self.cooldown_ms <= Delay::LIMIT_MS
+    }
+
+    /// How long to wait after Qobuz said "too many requests" for the `strikes`-th time in a row
+    /// (from 1).
+    #[must_use]
+    pub fn cooldown(&self, strikes: u32) -> Duration {
+        let doublings = strikes.saturating_sub(1).min(Self::COOLDOWN_DOUBLINGS);
+        let wait = u64::from(self.cooldown_ms) << doublings;
+        Duration::from_millis(wait.min(u64::from(Delay::LIMIT_MS)))
+    }
+}
+
+impl Default for RateLimit {
+    fn default() -> Self {
+        Self {
+            between_tracks: Delay::new(500, 1500),
+            between_albums: Delay::new(3000, 8000),
+            break_every: 0,
+            break_length: Delay::new(120_000, 300_000),
+            cooldown_ms: 60_000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -361,6 +484,7 @@ pub struct Settings {
     pub tags: Tags,
     pub artwork: Artwork,
     pub advanced: Advanced,
+    pub rate_limit: RateLimit,
 }
 
 #[cfg(test)]
@@ -376,6 +500,69 @@ mod tests {
         assert_eq!(advanced.parallel(), 1);
         advanced.parallel_tracks = 200;
         assert_eq!(advanced.parallel(), 6);
+    }
+
+    #[test]
+    fn a_delay_is_drawn_between_its_bounds() {
+        let delay = Delay::new(100, 200);
+
+        for _ in 0..200 {
+            let wait = delay.pick();
+            assert!(wait >= Duration::from_millis(100) && wait <= Duration::from_millis(200));
+        }
+        assert_eq!(delay.shortest(), Duration::from_millis(100));
+        assert_eq!(Delay::NONE.pick(), Duration::ZERO);
+    }
+
+    #[test]
+    fn a_delay_edited_by_hand_cannot_panic_or_run_for_days() {
+        let reversed = Delay::new(500, 100);
+        let huge = Delay::new(0, u32::MAX);
+
+        assert!(!reversed.is_valid() && !huge.is_valid());
+        assert_eq!(reversed.pick(), Duration::from_millis(100));
+        assert!(huge.pick() <= Duration::from_millis(u64::from(Delay::LIMIT_MS)));
+    }
+
+    #[test]
+    fn the_cooldown_doubles_up_to_a_bound() {
+        let limits = RateLimit {
+            cooldown_ms: 1000,
+            ..RateLimit::off()
+        };
+
+        assert_eq!(limits.cooldown(1), Duration::from_secs(1));
+        assert_eq!(limits.cooldown(2), Duration::from_secs(2));
+        assert_eq!(limits.cooldown(4), Duration::from_secs(8));
+        assert_eq!(limits.cooldown(500), Duration::from_secs(64));
+        let long = RateLimit {
+            cooldown_ms: Delay::LIMIT_MS,
+            ..RateLimit::off()
+        };
+        assert_eq!(
+            long.cooldown(7),
+            Duration::from_millis(u64::from(Delay::LIMIT_MS))
+        );
+    }
+
+    #[test]
+    fn the_defaults_are_valid_and_a_file_without_the_group_gets_them() {
+        assert!(RateLimit::default().is_valid());
+        assert!(RateLimit::off().is_valid());
+        let settings: Settings = serde_json::from_str(r#"{"advanced":{}}"#).unwrap();
+        assert_eq!(settings.rate_limit, RateLimit::default());
+    }
+
+    #[test]
+    fn a_group_missing_a_field_keeps_the_default_of_that_field() {
+        let settings: Settings =
+            serde_json::from_str(r#"{"rate_limit":{"break_every":50}}"#).unwrap();
+
+        assert_eq!(settings.rate_limit.break_every, 50);
+        assert_eq!(
+            settings.rate_limit.between_albums,
+            RateLimit::default().between_albums
+        );
     }
 
     #[test]

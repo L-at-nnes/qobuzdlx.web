@@ -75,6 +75,28 @@ async fn a_cover_size_out_of_range_is_refused() {
 }
 
 #[tokio::test]
+async fn the_waits_of_the_rate_limit_are_checked_and_kept() {
+    let app = TestApp::start().await;
+    let mut settings = current(&app).await;
+
+    settings["rate_limit"]["between_albums"] = json!({ "min_ms": 9000, "max_ms": 2000 });
+    let reversed = app.browser().put("/api/settings", settings.clone()).await;
+    settings["rate_limit"]["between_albums"] = json!({ "min_ms": 0, "max_ms": 7_200_000 });
+    let too_long = app.browser().put("/api/settings", settings.clone()).await;
+    settings["rate_limit"]["between_albums"] = json!({ "min_ms": 4000, "max_ms": 9000 });
+    settings["rate_limit"]["break_every"] = json!(100);
+    let fine = app.browser().put("/api/settings", settings).await;
+
+    assert_eq!(reversed.status, 400);
+    assert_eq!(reversed.json()["error"], "invalid_rate_limit");
+    assert_eq!(too_long.status, 400);
+    assert_eq!(fine.status, 200);
+    let reread = current(&app).await;
+    assert_eq!(reread["rate_limit"]["between_albums"]["max_ms"], 9000);
+    assert_eq!(reread["rate_limit"]["break_every"], 100);
+}
+
+#[tokio::test]
 async fn the_number_of_tracks_at_once_stays_within_its_range() {
     let app = TestApp::start().await;
     let mut settings = current(&app).await;

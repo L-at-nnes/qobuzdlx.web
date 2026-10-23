@@ -12,7 +12,7 @@ use qobuzdlx::download::{
     Covers, Display, Environment, Fetcher, ItemKind, Job, JobError, JobSetup, LogEvent, Outcome,
     QueueItem, Tuning,
 };
-use qobuzdlx::settings::{Quality, Settings};
+use qobuzdlx::settings::{Quality, RateLimit, Settings};
 use serde_json::json;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
@@ -45,7 +45,10 @@ impl Rig {
             recorder: Arc::new(Recorder::default()),
             cancel: CancellationToken::new(),
             skip: Arc::new(AtomicBool::new(false)),
-            settings: Settings::default(),
+            settings: Settings {
+                rate_limit: RateLimit::off(),
+                ..Settings::default()
+            },
         }
     }
 

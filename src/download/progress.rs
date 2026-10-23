@@ -105,6 +105,27 @@ pub struct Progress {
     pub tracks: Vec<TrackProgress>,
     /// Why the queue stopped by itself, when it did: it goes on when asked to.
     pub halt: Option<Halt>,
+    /// The queue is holding back on purpose, and until when.
+    pub wait: Option<Wait>,
+}
+
+/// Why the queue waits between two items, and until when.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Wait {
+    pub reason: WaitReason,
+    /// When it ends, in Unix seconds.
+    pub until: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WaitReason {
+    /// The pause set between two albums.
+    BetweenAlbums,
+    /// The long break taken every so many albums.
+    Break,
+    /// Qobuz asked to slow down.
+    RateLimited,
 }
 
 /// Why the queue stopped by itself.

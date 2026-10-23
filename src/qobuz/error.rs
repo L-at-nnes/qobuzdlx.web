@@ -52,6 +52,12 @@ impl Error {
         matches!(self, Self::Api { status, .. } if *status == StatusCode::UNAUTHORIZED)
     }
 
+    /// Qobuz answered "too many requests", and kept answering it through the retries.
+    #[must_use]
+    pub fn is_rate_limited(&self) -> bool {
+        matches!(self, Self::Api { status, .. } if *status == StatusCode::TOO_MANY_REQUESTS)
+    }
+
     /// There is no session to ask with any more: Qobuz refused the token, or nobody is signed in.
     /// Nothing can be asked until someone signs in, and what was being asked has not failed.
     #[must_use]
@@ -192,6 +198,13 @@ mod tests {
         assert!(Error::from_response(StatusCode::UNAUTHORIZED, "").is_session_gone());
         assert!(!Error::from_response(StatusCode::FORBIDDEN, "").is_session_gone());
         assert!(!Error::NotSignedIn.is_unauthorized());
+    }
+
+    #[test]
+    fn only_429_is_a_rate_limit() {
+        assert!(Error::from_response(StatusCode::TOO_MANY_REQUESTS, "").is_rate_limited());
+        assert!(!Error::from_response(StatusCode::SERVICE_UNAVAILABLE, "").is_rate_limited());
+        assert!(!Error::NotSignedIn.is_rate_limited());
     }
 
     #[test]

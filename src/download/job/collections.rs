@@ -168,6 +168,10 @@ impl Job {
                 continue;
             }
             self.step(index, total, None);
+            if index > 0 {
+                self.wait(self.settings.rate_limit.between_albums.pick())
+                    .await?;
+            }
 
             let outer = self.scope;
             self.scope = outer.slice(index, total);

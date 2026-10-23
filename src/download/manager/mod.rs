@@ -5,7 +5,7 @@ mod reporter;
 mod worker;
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -112,6 +112,10 @@ pub(super) struct Inner {
     pub(super) paused: AtomicBool,
     /// The item in progress is being stopped to wait again (paused, signed out) rather than to end.
     pub(super) interrupt: AtomicBool,
+    /// Wakes the worker out of a wait it was set to take (a pause, a sign-out).
+    pub(super) stir: Notify,
+    /// How many times in a row Qobuz asked to slow down, with no item going well in between.
+    pub(super) strikes: AtomicU32,
     /// The interface was told the session expired, and has not been given a new one since.
     expiry_announced: AtomicBool,
 }
@@ -173,6 +177,8 @@ impl Manager {
                 halted: AtomicBool::new(false),
                 paused: AtomicBool::new(false),
                 interrupt: AtomicBool::new(false),
+                stir: Notify::new(),
+                strikes: AtomicU32::new(0),
                 expiry_announced: AtomicBool::new(false),
             }),
         };
@@ -342,6 +348,7 @@ impl Manager {
             return;
         }
         self.inner.log(LogEvent::QueuePaused);
+        self.inner.stir.notify_waiters();
         if locked(&self.inner.current).is_some() {
             self.inner.interrupt_current();
         } else {
@@ -424,6 +431,7 @@ impl Inner {
     /// Stops the item in progress so that it waits again instead of ending.
     pub(super) fn interrupt_current(&self) {
         self.interrupt.store(true, Ordering::SeqCst);
+        self.stir.notify_waiters();
         if let Some(token) = locked(&self.current).as_ref() {
             token.cancel();
         }

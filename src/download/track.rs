@@ -106,11 +106,12 @@ pub enum TrackError {
 }
 
 impl TrackError {
-    /// Whether trying again, or in a lower quality, is pointless: the whole job has to stop.
+    /// Whether trying again, or in a lower quality, is pointless: the whole job has to stop. Asking
+    /// again at once is what Qobuz just refused.
     fn is_final(&self) -> bool {
         match self {
             Self::Cancelled | Self::PreviewOnly => true,
-            Self::Api(error) => error.is_session_gone(),
+            Self::Api(error) => error.is_session_gone() || error.is_rate_limited(),
             _ => self.is_storage_full(),
         }
     }

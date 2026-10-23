@@ -2,20 +2,35 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use super::reporter::ItemReporter;
 use super::{Inner, locked};
-use crate::download::item::{ItemStatus, QueueItem};
+use crate::download::item::{ItemStatus, QueueItem, now};
 use crate::download::job::{Job, JobError, JobSetup};
 use crate::download::log::LogEvent;
-use crate::download::progress::{Halt, Progress};
+use crate::download::progress::{Halt, Progress, Wait, WaitReason};
 use crate::download::report::{Outcome, Reporter};
 use crate::extensions::{self, ItemFinished};
 use crate::settings::LogDetail;
 
+/// What the worker does between an item and the next, as the end of the item decides it.
+#[derive(Debug, Clone, Copy)]
+enum Pace {
+    /// The item did not end (paused, signed out, the application stops): nothing to space.
+    None,
+    /// The item ended. Whether it wrote a file tells how much Qobuz was asked: an item that found
+    /// everything in place cost one request.
+    Spaced { wrote: bool },
+    /// Qobuz asked to slow down.
+    Cooldown,
+}
+
 /// Goes through the queue, one item at a time, whenever there is something to do and a session to
 /// do it with.
 pub(super) async fn run(inner: Arc<Inner>) {
+    // Items since the last long break
+    let mut since_break = 0;
     loop {
         tokio::select! {
             () = inner.shutdown.cancelled() => return,
@@ -37,11 +52,12 @@ pub(super) async fn run(inner: Arc<Inner>) {
                 break;
             };
             processed = true;
-            inner.process(item).await;
+            let pace = inner.process(item).await;
             // Nothing more can be written: every item that follows would fail the same way
             if inner.halted.load(Ordering::SeqCst) {
                 break;
             }
+            inner.rest(pace, &mut since_break).await;
         }
 
         if processed && !inner.shutdown.is_cancelled() {
@@ -61,7 +77,7 @@ impl Inner {
         Some(item)
     }
 
-    async fn process(self: &Arc<Self>, item: QueueItem) {
+    async fn process(self: &Arc<Self>, item: QueueItem) -> Pace {
         let cancel = self.shutdown.child_token();
         *locked(&self.current) = Some(cancel.clone());
         self.skip.store(false, Ordering::SeqCst);
@@ -109,10 +125,10 @@ impl Inner {
 
         *locked(&self.current) = None;
         let folders = std::mem::take(&mut *locked(&reporter.folders));
-        self.finish(&item.id, &outcome, result, detail, &folders);
+        self.finish(&item.id, &outcome, result, detail, &folders)
     }
 
-    /// Records how an item ended.
+    /// Records how an item ended, and tells how the worker should space what comes next.
     fn finish(
         &self,
         id: &str,
@@ -120,19 +136,26 @@ impl Inner {
         result: Result<(), JobError>,
         detail: LogDetail,
         folders: &BTreeSet<PathBuf>,
-    ) {
+    ) -> Pace {
         if let Some(item) = locked(&self.state).queue.get_mut(id) {
             outcome.write_to(item);
         }
 
         let interrupted = self.interrupt.swap(false, Ordering::SeqCst);
+        let mut cooldown = false;
         // `None`: the item did not end, it waits again
         let ended = match result {
             Ok(()) => Some((ItemStatus::Completed, None)),
             // The application is stopping: the item stays as it is, and waits again at the next start
             Err(JobError::Cancelled) if self.shutdown.is_cancelled() => {
                 self.queue_changed();
-                return;
+                return Pace::None;
+            }
+            // Qobuz said enough: the item keeps its place and is tried again after a pause
+            Err(JobError::RateLimited) => {
+                self.strikes.fetch_add(1, Ordering::SeqCst);
+                cooldown = true;
+                None
             }
             // Paused, or signed out: the item is not given up, nothing about it failed
             Err(JobError::Cancelled) if interrupted || !self.client.is_signed_in() => None,
@@ -180,6 +203,21 @@ impl Inner {
             finished
         };
         self.queue_changed();
+        if finished
+            .as_ref()
+            .is_some_and(|item| item.status == ItemStatus::Completed)
+        {
+            self.strikes.store(0, Ordering::SeqCst);
+        }
+        let pace = if cooldown {
+            Pace::Cooldown
+        } else if finished.is_some() {
+            Pace::Spaced {
+                wrote: outcome.downloaded > 0,
+            }
+        } else {
+            Pace::None
+        };
         if let Some(item) = finished {
             self.extensions
                 .emit(extensions::Event::ItemFinished(ItemFinished {
@@ -198,6 +236,81 @@ impl Inner {
                         .collect(),
                 }));
         }
+        pace
+    }
+
+    /// Whether the worker has to leave the queue alone: it stops, or it is told to.
+    fn must_stop(&self) -> bool {
+        self.shutdown.is_cancelled()
+            || self.halted.load(Ordering::SeqCst)
+            || self.paused.load(Ordering::SeqCst)
+            || !self.client.is_signed_in()
+    }
+
+    /// The wait between an item and the next one: a pause between albums, a long break every so
+    /// many, or the cooldown after Qobuz asked to slow down.
+    async fn rest(&self, pace: Pace, since_break: &mut u32) {
+        let limits = self.settings.get().rate_limit;
+        let (reason, duration) = match pace {
+            Pace::None => return,
+            Pace::Cooldown => (
+                WaitReason::RateLimited,
+                limits.cooldown(self.strikes.load(Ordering::SeqCst)),
+            ),
+            Pace::Spaced { wrote } => {
+                if !locked(&self.state).queue.has_pending() {
+                    return;
+                }
+                *since_break += 1;
+                if limits.break_every > 0 && *since_break >= limits.break_every {
+                    *since_break = 0;
+                    (WaitReason::Break, limits.break_length.pick())
+                } else if wrote {
+                    (WaitReason::BetweenAlbums, limits.between_albums.pick())
+                } else {
+                    // Nothing was fetched but a listing: the shortest pause is enough
+                    (WaitReason::BetweenAlbums, limits.between_albums.shortest())
+                }
+            }
+        };
+        self.hold_back(reason, duration).await;
+    }
+
+    /// Waits and says so, until the time is up, or the queue is paused, signed out or stopped.
+    async fn hold_back(&self, reason: WaitReason, duration: Duration) {
+        if duration.is_zero() {
+            return;
+        }
+        // Listening starts before the checks, so that a pause between the two is not missed
+        let stirred = self.stir.notified();
+        tokio::pin!(stirred);
+        stirred.as_mut().enable();
+        if self.must_stop() {
+            return;
+        }
+
+        let seconds = u64::try_from(duration.as_millis().div_ceil(1000)).unwrap_or(u64::MAX);
+        self.log(match reason {
+            WaitReason::RateLimited => LogEvent::RateLimited { seconds },
+            WaitReason::Break => LogEvent::BreakStarted { seconds },
+            WaitReason::BetweenAlbums => LogEvent::BetweenAlbums { seconds },
+        });
+        self.set_wait(Some(Wait {
+            reason,
+            until: now() + seconds,
+        }));
+        tokio::select! {
+            () = self.shutdown.cancelled() => {}
+            () = &mut stirred => {}
+            () = tokio::time::sleep(duration) => {}
+        }
+        self.set_wait(None);
+    }
+
+    fn set_wait(&self, wait: Option<Wait>) {
+        let mut state = locked(&self.state);
+        state.progress.wait = wait;
+        self.progress_changed(&mut state, true);
     }
 
     /// Why the worker has to stop going through the queue, if it has to.

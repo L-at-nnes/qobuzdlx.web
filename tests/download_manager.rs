@@ -9,8 +9,9 @@ use qobuzdlx::download::{
     Display, Enqueued, Event, ItemKind, ItemStatus, LogEvent, Manager, ManagerConfig, Queue,
     QueueItem, QueueStore, Tuning,
 };
+use qobuzdlx::download::{Halt, WaitReason};
 use qobuzdlx::extensions::{Event as Told, Extension, Extensions, Failure, Info, Source};
-use qobuzdlx::settings::{Quality, SettingsStore};
+use qobuzdlx::settings::{Delay, Quality, RateLimit, SettingsStore};
 use serde_json::json;
 use tempfile::TempDir;
 use tokio::io::AsyncWriteExt;
@@ -42,6 +43,7 @@ impl Rig {
             .update(|settings| {
                 settings.download.directory = music;
                 settings.download.quality = Quality::Flac16;
+                settings.rate_limit = RateLimit::off();
             })
             .unwrap();
         rig
@@ -607,6 +609,195 @@ async fn something_queued_while_paused_waits_for_the_resume() {
 
     manager.resume();
 
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+}
+
+// ─── Not going too fast ───
+
+fn pace(rig: &Rig, change: impl FnOnce(&mut RateLimit)) {
+    rig.settings
+        .update(|settings| change(&mut settings.rate_limit))
+        .unwrap();
+}
+
+fn waiting_for(manager: &Manager) -> Option<WaitReason> {
+    manager.progress().wait.map(|wait| wait.reason)
+}
+
+#[tokio::test]
+async fn the_queue_waits_between_two_albums_and_says_so() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    pace(&rig, |limits| limits.between_albums = Delay::new(800, 800));
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+
+    eventually("the pause between the albums", || {
+        waiting_for(&manager) == Some(WaitReason::BetweenAlbums)
+    })
+    .await;
+    assert_eq!(
+        status_of(&manager, &album_url("one")),
+        Some(ItemStatus::Completed)
+    );
+    assert_eq!(
+        status_of(&manager, &album_url("two")),
+        Some(ItemStatus::Pending)
+    );
+    let started = std::time::Instant::now();
+
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+    assert!(started.elapsed() >= Duration::from_millis(500));
+    assert_eq!(waiting_for(&manager), None);
+}
+
+#[tokio::test]
+async fn pausing_cuts_the_wait_short() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    pace(&rig, |limits| {
+        limits.between_albums = Delay::new(60_000, 60_000);
+    });
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+    eventually("the pause between the albums", || {
+        waiting_for(&manager).is_some()
+    })
+    .await;
+
+    manager.pause();
+
+    eventually("the wait to end", || waiting_for(&manager).is_none()).await;
+    assert_eq!(manager.progress().halt, Some(Halt::Paused));
+    // Going on does not start the wait again: only an item that ends makes one
+    manager.resume();
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn a_long_break_is_taken_every_so_many_albums() {
+    let rig = Rig::new().await;
+    for id in ["one", "two", "three"] {
+        rig.catalogue
+            .add_album(id, id, "Artist", &[(u64::from(id.as_bytes()[0]), 1, "A")]);
+    }
+    pace(&rig, |limits| {
+        limits.break_every = 2;
+        limits.break_length = Delay::new(600, 600);
+    });
+    let manager = rig.start();
+    for id in ["one", "two", "three"] {
+        manager.enqueue(&album_url(id), Display::default()).unwrap();
+    }
+
+    eventually("the break", || {
+        waiting_for(&manager) == Some(WaitReason::Break)
+    })
+    .await;
+    assert_eq!(
+        status_of(&manager, &album_url("two")),
+        Some(ItemStatus::Completed)
+    );
+    assert_eq!(
+        status_of(&manager, &album_url("three")),
+        Some(ItemStatus::Pending)
+    );
+    assert_eq!(
+        finished(&manager, &album_url("three")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn an_album_that_found_everything_in_place_only_waits_the_shortest_time() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    // The same album again finds its file: it costs one request, and the wait that follows is the
+    // shortest the bounds allow
+    pace(&rig, |limits| {
+        limits.between_albums = Delay::new(10, 60_000);
+    });
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn when_qobuz_says_to_slow_down_the_item_is_not_lost() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.cooldown_ms = 300);
+    // Qobuz refuses the first request of the album, and every retry the client makes of it
+    let refused = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let albums = rig.catalogue.albums.clone();
+    rig.catalogue.server.on("/api/album/get", {
+        let refused = refused.clone();
+        move |call| {
+            if refused.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 3 {
+                return Reply::error(429, "Too many requests");
+            }
+            let key = call.param("album_id").to_owned();
+            Reply::json(albums.lock().unwrap().get(&key).unwrap().clone())
+        }
+    });
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the cooldown", || {
+        waiting_for(&manager) == Some(WaitReason::RateLimited)
+    })
+    .await;
+    let item = item_of(&manager, &album_url("one"));
+    assert_eq!(item.status, ItemStatus::Pending);
+    assert_eq!(item.error, None);
     assert_eq!(
         finished(&manager, &album_url("one")).await,
         ItemStatus::Completed

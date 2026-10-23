@@ -7,7 +7,7 @@ use qobuzdlx::access::{AccessStore, Gate, Tokens};
 use qobuzdlx::download::{Manager, ManagerConfig, Tuning};
 use qobuzdlx::extensions::Extensions;
 use qobuzdlx::qobuz::Sessions;
-use qobuzdlx::settings::{Quality, SettingsStore};
+use qobuzdlx::settings::{Quality, RateLimit, SettingsStore};
 use qobuzdlx::web::{self, AppState, Shared};
 use reqwest::header::HeaderMap;
 use serde_json::Value;
@@ -42,6 +42,7 @@ impl TestApp {
             .update(|settings| {
                 settings.download.quality = Quality::Flac16;
                 settings.download.directory = music.path().to_path_buf();
+                settings.rate_limit = RateLimit::off();
             })
             .unwrap();
         let client = catalogue.client.clone();

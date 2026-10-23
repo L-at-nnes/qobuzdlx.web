@@ -63,6 +63,12 @@ async fn save(
             "between 1 and 6 tracks can download at the same time",
         ));
     }
+    if !settings.rate_limit.is_valid() {
+        return Err(ApiError::bad_request(
+            "invalid_rate_limit",
+            "a wait goes from its shortest to its longest, within one hour",
+        ));
+    }
     let directory = &settings.download.directory;
     if directory.as_os_str().is_empty() {
         return Err(ApiError::bad_request(

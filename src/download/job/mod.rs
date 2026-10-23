@@ -35,6 +35,9 @@ pub enum JobError {
     SessionExpired,
     #[error("{0}")]
     Api(qobuz::Error),
+    /// Qobuz keeps answering "too many requests": the item waits and is tried again after a pause.
+    #[error("Qobuz asked to slow down")]
+    RateLimited,
     /// An address whose identifier is not what its kind needs.
     #[error("not a valid Qobuz address")]
     InvalidAddress,
@@ -50,6 +53,8 @@ impl From<qobuz::Error> for JobError {
     fn from(error: qobuz::Error) -> Self {
         if error.is_session_gone() {
             Self::SessionExpired
+        } else if error.is_rate_limited() {
+            Self::RateLimited
         } else {
             Self::Api(error)
         }
@@ -61,6 +66,7 @@ impl From<TrackError> for JobError {
         match error {
             TrackError::Cancelled => Self::Cancelled,
             TrackError::Api(api) if api.is_session_gone() => Self::SessionExpired,
+            TrackError::Api(api) if api.is_rate_limited() => Self::RateLimited,
             full if full.is_storage_full() => Self::StorageFull(full.to_string()),
             other => Self::Track(other),
         }
@@ -196,6 +202,17 @@ impl Job {
         }
     }
 
+    /// Waits, unless the item is cancelled first.
+    async fn wait(&self, duration: std::time::Duration) -> Result<(), JobError> {
+        if duration.is_zero() {
+            return Ok(());
+        }
+        tokio::select! {
+            () = self.cancel.cancelled() => Err(JobError::Cancelled),
+            () = tokio::time::sleep(duration) => Ok(()),
+        }
+    }
+
     fn check_cancelled(&self) -> Result<(), JobError> {
         if self.cancel.is_cancelled() {
             Err(JobError::Cancelled)
@@ -260,6 +277,8 @@ impl Job {
 
     /// A track by its id, `None` when Qobuz does not know it.
     async fn track_info(&self, track_id: u64) -> Result<Option<Track>, JobError> {
+        self.wait(self.settings.rate_limit.between_tracks.pick())
+            .await?;
         match self.env.client.track(track_id).await {
             Ok(track) => Ok(Some(track)),
             Err(error) if error.status().is_some_and(|status| status.as_u16() == 404) => Ok(None),
