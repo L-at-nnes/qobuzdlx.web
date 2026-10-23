@@ -192,13 +192,19 @@ impl Queue {
             .iter_mut()
             .filter(|item| item.status == ItemStatus::Running)
         {
-            item.status = ItemStatus::Pending;
-            item.started_at = None;
-            // A whole item restarts from scratch: what it had counted would be counted twice. A
-            // "retry the failures" pass keeps its earlier outcome, which its own counters build on.
-            if item.only_track_ids.is_none() {
-                item.reset_outcome();
-            }
+            item.put_back();
+        }
+    }
+
+    /// Puts back to waiting the running item `id`, which keeps its place: it is the next to start.
+    /// For an item that could not go on through no fault of its own (signed out, paused).
+    pub fn suspend(&mut self, id: &str) {
+        if let Some(item) = self
+            .items
+            .iter_mut()
+            .find(|item| item.id == id && item.status == ItemStatus::Running)
+        {
+            item.put_back();
         }
     }
 
@@ -350,6 +356,36 @@ mod tests {
             kind,
             ref_id: id.to_owned(),
         }
+    }
+
+    #[test]
+    fn a_suspended_item_waits_again_in_its_place_with_nothing_counted() {
+        let mut queue = queue_with(&[
+            "https://play.qobuz.com/album/a",
+            "https://play.qobuz.com/album/b",
+        ]);
+        let running = queue.start_next().unwrap();
+        queue.get_mut(&running.id).unwrap().downloaded = 3;
+
+        queue.suspend(&running.id);
+
+        assert_eq!(queue.items()[0].status, ItemStatus::Pending);
+        assert_eq!(queue.items()[0].downloaded, 0);
+        assert_eq!(queue.start_next().unwrap().id, running.id);
+    }
+
+    #[test]
+    fn only_a_running_item_can_be_suspended() {
+        let mut queue = queue_with(&["https://play.qobuz.com/album/a"]);
+        let id = finished(
+            &mut queue,
+            "https://play.qobuz.com/album/a",
+            ItemStatus::Completed,
+        );
+
+        queue.suspend(&id);
+
+        assert_eq!(queue.get(&id).unwrap().status, ItemStatus::Completed);
     }
 
     #[test]

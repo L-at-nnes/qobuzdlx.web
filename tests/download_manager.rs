@@ -437,7 +437,7 @@ async fn an_item_stopped_by_the_shutdown_waits_again_at_the_next_start() {
 }
 
 #[tokio::test]
-async fn a_refused_session_fails_the_item_and_leaves_the_rest_waiting() {
+async fn a_refused_session_pauses_the_item_instead_of_failing_it() {
     let rig = Rig::new().await;
     rig.catalogue
         .add_album("one", "First", "Artist", &[(21, 1, "A")]);
@@ -456,25 +456,161 @@ async fn a_refused_session_fails_the_item_and_leaves_the_rest_waiting() {
         .enqueue(&album_url("two"), Display::default())
         .unwrap();
 
-    assert_eq!(
-        finished(&manager, &album_url("one")).await,
-        ItemStatus::Failed
-    );
-    let item = manager.snapshot().queue[0].clone();
-    assert!(item.error.unwrap().contains("session"));
     eventually("the session to be forgotten", || {
         !rig.catalogue.client.is_signed_in()
+    })
+    .await;
+    eventually("the item to wait again", || {
+        status_of(&manager, &album_url("one")) == Some(ItemStatus::Pending)
     })
     .await;
     assert_eq!(
         status_of(&manager, &album_url("two")),
         Some(ItemStatus::Pending)
     );
+    assert!(
+        manager
+            .snapshot()
+            .queue
+            .iter()
+            .all(|item| item.error.is_none())
+    );
     let mut announced = false;
     while let Ok(event) = events.try_recv() {
         announced |= matches!(event, Event::SessionExpired);
     }
     assert!(announced, "the interface is told to ask for a new sign-in");
+}
+
+#[tokio::test]
+async fn signing_out_midway_pauses_the_queue_and_a_new_sign_in_goes_on_by_itself() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    // The file of the first album is slow to arrive: the sign-out comes in the middle of it
+    let audio = common::flac_bytes();
+    rig.catalogue.server.on("/cdn/audio", move |_| {
+        Reply::bytes(audio.clone()).after(Duration::from_millis(500))
+    });
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+    eventually("the file to be asked for", || {
+        rig.catalogue.server.count("/cdn/audio") > 0
+    })
+    .await;
+
+    rig.catalogue.client.end_session();
+
+    eventually("the item to wait again", || {
+        status_of(&manager, &album_url("one")) == Some(ItemStatus::Pending)
+            && !manager.progress().running
+    })
+    .await;
+    for url in [album_url("one"), album_url("two")] {
+        assert_eq!(status_of(&manager, &url), Some(ItemStatus::Pending));
+    }
+    assert_eq!(
+        manager.progress().halt,
+        Some(qobuzdlx::download::Halt::SignedOut)
+    );
+    assert!(
+        manager
+            .snapshot()
+            .queue
+            .iter()
+            .all(|item| item.error.is_none())
+    );
+
+    rig.catalogue.client.start_session(session());
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn a_paused_queue_keeps_its_item_and_goes_on_when_resumed() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    let audio = common::flac_bytes();
+    rig.catalogue.server.on("/cdn/audio", move |_| {
+        Reply::bytes(audio.clone()).after(Duration::from_millis(500))
+    });
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+    eventually("the file to be asked for", || {
+        rig.catalogue.server.count("/cdn/audio") > 0
+    })
+    .await;
+
+    manager.pause();
+
+    eventually("the queue to stand still", || {
+        !manager.progress().running
+            && manager.progress().halt == Some(qobuzdlx::download::Halt::Paused)
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    for url in [album_url("one"), album_url("two")] {
+        assert_eq!(status_of(&manager, &url), Some(ItemStatus::Pending));
+    }
+
+    manager.resume();
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(manager.progress().halt, None);
+}
+
+#[tokio::test]
+async fn something_queued_while_paused_waits_for_the_resume() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    let manager = rig.start();
+    manager.pause();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(
+        status_of(&manager, &album_url("one")),
+        Some(ItemStatus::Pending)
+    );
+
+    manager.resume();
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
 }
 
 // ─── Waiting and resuming ───

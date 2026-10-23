@@ -74,6 +74,12 @@ pub enum LogEvent {
         message: String,
     },
     SessionExpired,
+    /// The user signed out: what was running waits for the next sign-in.
+    SignedOut,
+    /// The user paused the queue.
+    QueuePaused,
+    /// The user let the queue go on.
+    QueueResumed,
     AlbumSkipped,
     AlbumNotStreamable,
     TrackNotStreamable {
@@ -217,6 +223,12 @@ impl fmt::Display for LogEvent {
             }
             Self::Error { message } => write!(formatter, "ERROR: {message}"),
             Self::SessionExpired => write!(formatter, "The Qobuz session expired: sign in again."),
+            Self::SignedOut => write!(
+                formatter,
+                "Signed out of Qobuz: the queue waits for a sign-in."
+            ),
+            Self::QueuePaused => write!(formatter, "Queue paused."),
+            Self::QueueResumed => write!(formatter, "Queue resumed."),
             Self::AlbumSkipped => write!(formatter, "Album skipped."),
             Self::AlbumNotStreamable => write!(formatter, "This album is not streamable."),
             Self::TrackNotStreamable { number } => {

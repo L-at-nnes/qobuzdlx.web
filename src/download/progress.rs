@@ -113,6 +113,10 @@ pub struct Progress {
 pub enum Halt {
     /// The disk is full, over its quota or read-only: going on would fail every item.
     StorageFull,
+    /// Nobody is signed in to Qobuz: the queue goes on by itself once someone is.
+    SignedOut,
+    /// The user paused the queue.
+    Paused,
 }
 
 #[cfg(test)]

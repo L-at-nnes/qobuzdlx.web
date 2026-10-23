@@ -22,12 +22,17 @@ pub(super) async fn run(inner: Arc<Inner>) {
             // The permit is kept if nobody waits: a wake-up is never lost
             () = inner.wake.notified() => {}
         }
-        // Whoever woke the worker wants it to try again, with room made or not
+        // Whoever woke the worker wants it to try again, with room made or not. A user's pause is
+        // lifted by the user alone
         inner.halted.store(false, Ordering::SeqCst);
+        inner.clear_halt(Halt::SignedOut);
 
         // Drained until nothing is left: a wake-up says there is work, not how much
         let mut processed = false;
-        while !inner.shutdown.is_cancelled() && inner.client.is_signed_in() {
+        while !inner.shutdown.is_cancelled()
+            && inner.client.is_signed_in()
+            && !inner.paused.load(Ordering::SeqCst)
+        {
             let Some(item) = inner.take_next() else {
                 break;
             };
@@ -40,10 +45,9 @@ pub(super) async fn run(inner: Arc<Inner>) {
         }
 
         if processed && !inner.shutdown.is_cancelled() {
-            if inner.halted.load(Ordering::SeqCst) {
-                inner.announce_halt();
-            } else {
-                inner.go_idle();
+            match inner.stop_reason() {
+                Some(halt) => inner.announce_halt(halt),
+                None => inner.go_idle(),
             }
         }
     }
@@ -61,6 +65,7 @@ impl Inner {
         let cancel = self.shutdown.child_token();
         *locked(&self.current) = Some(cancel.clone());
         self.skip.store(false, Ordering::SeqCst);
+        self.interrupt.store(false, Ordering::SeqCst);
 
         // The settings are those of the moment the item starts: changing them halfway through would
         // give one folder two naming schemes
@@ -120,25 +125,28 @@ impl Inner {
             outcome.write_to(item);
         }
 
-        let (status, error) = match result {
-            Ok(()) => (ItemStatus::Completed, None),
+        let interrupted = self.interrupt.swap(false, Ordering::SeqCst);
+        // `None`: the item did not end, it waits again
+        let ended = match result {
+            Ok(()) => Some((ItemStatus::Completed, None)),
             // The application is stopping: the item stays as it is, and waits again at the next start
             Err(JobError::Cancelled) if self.shutdown.is_cancelled() => {
                 self.queue_changed();
                 return;
             }
+            // Paused, or signed out: the item is not given up, nothing about it failed
+            Err(JobError::Cancelled) if interrupted || !self.client.is_signed_in() => None,
             Err(JobError::Cancelled) => {
                 self.log_at(LogEvent::Aborted, detail);
-                (ItemStatus::Cancelled, None)
+                Some((ItemStatus::Cancelled, None))
             }
             Err(JobError::SessionExpired) => {
-                // Before the next item is picked: it would meet the same refusal
-                self.session_expired();
-                self.log_at(LogEvent::SessionExpired, detail);
-                (
-                    ItemStatus::Failed,
-                    Some(LogEvent::SessionExpired.to_string()),
-                )
+                // Before the next item is picked: it would meet the same refusal. When the user
+                // signed out there is nothing to announce
+                if self.client.is_signed_in() {
+                    self.session_expired();
+                }
+                None
             }
             Err(error) => {
                 if matches!(error, JobError::StorageFull(_)) {
@@ -151,14 +159,19 @@ impl Inner {
                     },
                     detail,
                 );
-                (ItemStatus::Failed, Some(message))
+                Some((ItemStatus::Failed, Some(message)))
             }
         };
 
         let finished = {
             let mut state = locked(&self.state);
-            state.queue.finish(id, status, error);
-            let finished = state.queue.get(id).cloned();
+            let finished = if let Some((status, error)) = ended {
+                state.queue.finish(id, status, error);
+                state.queue.get(id).cloned()
+            } else {
+                state.queue.suspend(id);
+                None
+            };
             state.progress.item_id = None;
             state.progress.album = None;
             state.progress.tracks.clear();
@@ -187,17 +200,39 @@ impl Inner {
         }
     }
 
-    /// The queue stops by itself: what is waiting stays so, and the interface says why.
-    fn announce_halt(&self) {
+    /// Why the worker has to stop going through the queue, if it has to.
+    pub(super) fn stop_reason(&self) -> Option<Halt> {
+        if self.halted.load(Ordering::SeqCst) {
+            Some(Halt::StorageFull)
+        } else if self.paused.load(Ordering::SeqCst) {
+            Some(Halt::Paused)
+        } else if !self.client.is_signed_in() && locked(&self.state).queue.has_pending() {
+            Some(Halt::SignedOut)
+        } else {
+            None
+        }
+    }
+
+    /// The queue stops: what is waiting stays so, and the interface says why.
+    pub(super) fn announce_halt(&self, halt: Halt) {
         {
             let mut state = locked(&self.state);
             state.progress = Progress {
-                halt: Some(Halt::StorageFull),
+                halt: Some(halt),
                 ..Progress::default()
             };
             self.progress_changed(&mut state, true);
         }
         self.queue_changed();
+    }
+
+    /// Forgets that the queue stopped for this reason.
+    fn clear_halt(&self, halt: Halt) {
+        let mut state = locked(&self.state);
+        if state.progress.halt == Some(halt) {
+            state.progress.halt = None;
+            self.progress_changed(&mut state, true);
+        }
     }
 
     /// Nothing is running any more: the card of the last download should not stay on screen.

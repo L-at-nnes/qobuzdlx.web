@@ -52,6 +52,13 @@ impl Error {
         matches!(self, Self::Api { status, .. } if *status == StatusCode::UNAUTHORIZED)
     }
 
+    /// There is no session to ask with any more: Qobuz refused the token, or nobody is signed in.
+    /// Nothing can be asked until someone signs in, and what was being asked has not failed.
+    #[must_use]
+    pub fn is_session_gone(&self) -> bool {
+        self.is_unauthorized() || matches!(self, Self::NotSignedIn)
+    }
+
     /// The HTTP status of an API error.
     #[must_use]
     pub fn status(&self) -> Option<StatusCode> {
@@ -177,6 +184,14 @@ mod tests {
     fn only_401_means_the_session_was_refused() {
         assert!(Error::from_response(StatusCode::UNAUTHORIZED, "").is_unauthorized());
         assert!(!Error::from_response(StatusCode::FORBIDDEN, "").is_unauthorized());
+    }
+
+    #[test]
+    fn a_missing_session_is_as_good_as_a_refused_one() {
+        assert!(Error::NotSignedIn.is_session_gone());
+        assert!(Error::from_response(StatusCode::UNAUTHORIZED, "").is_session_gone());
+        assert!(!Error::from_response(StatusCode::FORBIDDEN, "").is_session_gone());
+        assert!(!Error::NotSignedIn.is_unauthorized());
     }
 
     #[test]

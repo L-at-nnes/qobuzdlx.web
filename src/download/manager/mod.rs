@@ -16,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 use super::artwork::Covers;
 use super::item::{Display, QueueItem};
 use super::log::{Log, LogEvent, LogLine};
-use super::progress::Progress;
+use super::progress::{Halt, Progress};
 use super::queue::{Enqueued, EnqueuedCounts, Queue};
 use super::store::QueueStore;
 use super::track::{Environment, TEMP_PREFIX, Tuning};
@@ -108,6 +108,10 @@ pub(super) struct Inner {
     pub(super) skip: Arc<AtomicBool>,
     /// The queue stopped by itself (the disk is full) and waits to be told to go on.
     pub(super) halted: AtomicBool,
+    /// The user paused the queue: no item starts until it goes on.
+    pub(super) paused: AtomicBool,
+    /// The item in progress is being stopped to wait again (paused, signed out) rather than to end.
+    pub(super) interrupt: AtomicBool,
     /// The interface was told the session expired, and has not been given a new one since.
     expiry_announced: AtomicBool,
 }
@@ -167,6 +171,8 @@ impl Manager {
                 current: Mutex::new(None),
                 skip: Arc::new(AtomicBool::new(false)),
                 halted: AtomicBool::new(false),
+                paused: AtomicBool::new(false),
+                interrupt: AtomicBool::new(false),
                 expiry_announced: AtomicBool::new(false),
             }),
         };
@@ -310,14 +316,36 @@ impl Manager {
         counts
     }
 
-    /// Goes on after the queue stopped by itself, once the cause has been dealt with.
+    /// Goes on after the queue stopped by itself, once the cause has been dealt with, or after the
+    /// user paused it.
     pub fn resume(&self) {
-        if self.inner.halted.swap(false, Ordering::SeqCst) {
+        let paused = self.inner.paused.swap(false, Ordering::SeqCst);
+        let halted = self.inner.halted.swap(false, Ordering::SeqCst);
+        if !(paused || halted) {
+            return;
+        }
+        if paused {
+            self.inner.log(LogEvent::QueueResumed);
+        }
+        {
             let mut state = locked(&self.inner.state);
             state.progress.halt = None;
             self.inner.progress_changed(&mut state, true);
-            drop(state);
-            self.inner.wake.notify_one();
+        }
+        self.inner.wake.notify_one();
+    }
+
+    /// Stops the queue until `resume`. The item in progress is given back to the queue, not failed: it
+    /// is the first to start again, and the files it had written are recognised and left alone.
+    pub fn pause(&self) {
+        if self.inner.paused.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.inner.log(LogEvent::QueuePaused);
+        if locked(&self.inner.current).is_some() {
+            self.inner.interrupt_current();
+        } else {
+            self.inner.announce_halt(Halt::Paused);
         }
     }
 
@@ -384,9 +412,20 @@ impl Inner {
     /// Qobuz refused the session: forget it so that nothing presents the token again, and tell the
     /// interface once. Called by whoever notices first, the job or the listener of the session.
     pub(super) fn session_expired(&self) {
+        // Before the session ends: whoever hears of the end must find it was an expiry
+        let first = !self.expiry_announced.swap(true, Ordering::SeqCst);
         self.client.end_session();
-        if !self.expiry_announced.swap(true, Ordering::SeqCst) {
+        if first {
+            self.log(LogEvent::SessionExpired);
             self.emit(Event::SessionExpired);
+        }
+    }
+
+    /// Stops the item in progress so that it waits again instead of ending.
+    pub(super) fn interrupt_current(&self) {
+        self.interrupt.store(true, Ordering::SeqCst);
+        if let Some(token) = locked(&self.current).as_ref() {
+            token.cancel();
         }
     }
 
@@ -480,7 +519,14 @@ async fn watch_session(inner: Arc<Inner>) {
                 inner.wake.notify_one();
             }
             Ok(SessionEvent::Rejected) => inner.session_expired(),
-            Ok(SessionEvent::Ended) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+            // What runs waits for the next sign-in instead of failing on its next request
+            Ok(SessionEvent::Ended) => {
+                if !inner.expiry_announced.load(Ordering::SeqCst) {
+                    inner.log(LogEvent::SignedOut);
+                }
+                inner.interrupt_current();
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => {}
             Err(broadcast::error::RecvError::Closed) => return,
         }
     }

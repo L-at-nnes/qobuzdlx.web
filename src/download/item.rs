@@ -139,6 +139,17 @@ impl QueueItem {
         self.only_track_ids = None;
     }
 
+    /// Makes a running item wait again, to be processed from the start.
+    pub(super) fn put_back(&mut self) {
+        self.status = ItemStatus::Pending;
+        self.started_at = None;
+        // A whole item restarts from scratch: what it had counted would be counted twice. A
+        // "retry the failures" pass keeps its earlier outcome, which its own counters build on.
+        if self.only_track_ids.is_none() {
+            self.reset_outcome();
+        }
+    }
+
     /// Puts the item back at the start of its life, as if it had just been queued.
     pub(super) fn requeue(&mut self) {
         self.status = ItemStatus::Pending;

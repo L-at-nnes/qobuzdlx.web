@@ -30,7 +30,7 @@ const ALBUM_CACHE_MAX: usize = 50;
 pub enum JobError {
     #[error("cancelled")]
     Cancelled,
-    /// Qobuz refused the session token: nothing more can be asked.
+    /// Qobuz refused the session token, or nobody is signed in any more: nothing more can be asked.
     #[error("the Qobuz session expired")]
     SessionExpired,
     #[error("{0}")]
@@ -48,7 +48,7 @@ pub enum JobError {
 
 impl From<qobuz::Error> for JobError {
     fn from(error: qobuz::Error) -> Self {
-        if error.is_unauthorized() {
+        if error.is_session_gone() {
             Self::SessionExpired
         } else {
             Self::Api(error)
@@ -60,7 +60,7 @@ impl From<TrackError> for JobError {
     fn from(error: TrackError) -> Self {
         match error {
             TrackError::Cancelled => Self::Cancelled,
-            TrackError::Api(api) if api.is_unauthorized() => Self::SessionExpired,
+            TrackError::Api(api) if api.is_session_gone() => Self::SessionExpired,
             full if full.is_storage_full() => Self::StorageFull(full.to_string()),
             other => Self::Track(other),
         }
