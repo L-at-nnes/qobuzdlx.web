@@ -133,7 +133,7 @@ export interface Progress {
 	/** The tracks being downloaded, by position: an album downloads several at once. */
 	tracks: TrackProgress[];
 	/** Why the queue stopped by itself, when it did. */
-	halt: 'storage_full' | null;
+	halt: 'storage_full' | 'signed_out' | 'paused' | null;
 }
 
 export interface Enqueued {

@@ -172,7 +172,11 @@ export const en = {
 	'downloads.now': 'Now downloading',
 	'downloads.halted.storage_full':
 		'The queue stopped: the disk cannot take any more files (it is full, over its quota or read-only). What is waiting is kept. Make room, then go on.',
+	'downloads.halted.signed_out':
+		'Signed out of Qobuz. Nothing failed: the queue is kept and goes on by itself when you sign in again, with this account or another one.',
+	'downloads.halted.paused': 'The queue is paused. What is waiting is kept.',
 	'downloads.resume': 'Go on',
+	'downloads.pause': 'Pause the queue',
 	'downloads.idle': 'Nothing is downloading.',
 	'downloads.trackOf': 'Track {index} of {total}',
 	'downloads.preparing': 'Preparing',
@@ -244,6 +248,9 @@ export const en = {
 		other: 'Queue restored after a restart: {waiting} items waiting.'
 	},
 	'log.error': 'Error: {message}',
+	'log.signed_out': 'Signed out of Qobuz: the queue waits for a sign-in.',
+	'log.queue_paused': 'The queue is paused.',
+	'log.queue_resumed': 'The queue goes on.',
 	'log.session_expired': 'The Qobuz session expired. Sign in again.',
 	'log.album_skipped': 'Album skipped',
 	'log.album_not_streamable': 'This album cannot be streamed.',

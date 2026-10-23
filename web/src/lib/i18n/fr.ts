@@ -176,7 +176,11 @@ export const fr: Record<Key, Message> = {
 	'downloads.empty.action': 'Chercher de la musique',
 	'downloads.halted.storage_full':
 		"La file s'est arrêtée : le disque ne peut plus recevoir de fichiers (plein, quota atteint ou en lecture seule). Ce qui attend est conservé. Faites de la place, puis reprenez.",
+	'downloads.halted.signed_out':
+		"Déconnecté de Qobuz. Rien n'a échoué : la file est conservée et repart toute seule quand vous vous reconnectez, avec ce compte ou un autre.",
+	'downloads.halted.paused': 'La file est en pause. Ce qui attend est conservé.',
 	'downloads.resume': 'Reprendre',
+	'downloads.pause': 'Mettre la file en pause',
 	'downloads.now': 'En cours de téléchargement',
 	'downloads.idle': 'Aucun téléchargement en cours.',
 	'downloads.trackOf': 'Piste {index} sur {total}',
@@ -249,6 +253,9 @@ export const fr: Record<Key, Message> = {
 		other: 'File restaurée après un redémarrage : {waiting} éléments en attente.'
 	},
 	'log.error': 'Erreur : {message}',
+	'log.signed_out': 'Déconnecté de Qobuz : la file attend une connexion.',
+	'log.queue_paused': 'La file est en pause.',
+	'log.queue_resumed': 'La file reprend.',
 	'log.session_expired': 'La session Qobuz a expiré. Reconnectez-vous.',
 	'log.album_skipped': 'Album passé',
 	'log.album_not_streamable': 'Cet album ne peut pas être diffusé.',

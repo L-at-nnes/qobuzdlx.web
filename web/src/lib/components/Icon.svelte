@@ -35,6 +35,7 @@
 		folder:
 			'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
 		clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+		pause: '<path d="M9 5v14M15 5v14"/>',
 		stop: '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>',
 		log: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
 		loader: '<path d="M12 3a9 9 0 1 0 9 9"/>'

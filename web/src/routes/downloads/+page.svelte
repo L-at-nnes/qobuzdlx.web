@@ -55,9 +55,11 @@
 		<div class="notice" role="alert">
 			<Icon name="warning" size={18} />
 			<span>{t(`downloads.halted.${downloads.progress.halt}`)}</span>
-			<Button size="sm" variant="quiet" icon="retry" onclick={() => api.resume()}>
-				{t('downloads.resume')}
-			</Button>
+			{#if downloads.progress.halt !== 'signed_out'}
+				<Button size="sm" variant="quiet" icon="retry" onclick={() => api.resume()}>
+					{t('downloads.resume')}
+				</Button>
+			{/if}
 		</div>
 	{/if}
 
@@ -81,6 +83,15 @@
 					{/if}
 				</h2>
 				<div class="tools">
+					<Button
+						size="sm"
+						variant="quiet"
+						icon="pause"
+						disabled={downloads.remaining === 0 || downloads.progress.halt !== null}
+						onclick={() => api.pause()}
+					>
+						{t('downloads.pause')}
+					</Button>
 					<ConfirmButton
 						label={t('downloads.clearPending')}
 						question={t('downloads.confirmClearPending')}
