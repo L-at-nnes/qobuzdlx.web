@@ -1,6 +1,7 @@
 //! The download queue as the rest of the application sees it: what can be asked, what is shown, and
 //! the worker that goes through the queue one item at a time.
 
+mod quota;
 mod reporter;
 mod worker;
 
@@ -116,6 +117,8 @@ pub(super) struct Inner {
     pub(super) stir: Notify,
     /// How many times in a row Qobuz asked to slow down, with no item going well in between.
     pub(super) strikes: AtomicU32,
+    /// What was fetched since the last long break.
+    quota: Mutex<quota::Quota>,
     /// The interface was told the session expired, and has not been given a new one since.
     expiry_announced: AtomicBool,
 }
@@ -179,6 +182,7 @@ impl Manager {
                 interrupt: AtomicBool::new(false),
                 stir: Notify::new(),
                 strikes: AtomicU32::new(0),
+                quota: Mutex::default(),
                 expiry_announced: AtomicBool::new(false),
             }),
         };
@@ -469,6 +473,22 @@ impl Inner {
     }
 
     /// Adds a line to the log, if the level asks for it.
+    /// A file was written: it counts toward the next long break.
+    pub(super) fn count_saved(&self, album_id: &str, bytes: u64) {
+        locked(&self.quota).saved(album_id, bytes);
+    }
+
+    /// How long to rest if a condition of the long break is reached, which starts the count again.
+    pub(super) fn break_due(&self) -> Option<Duration> {
+        let limits = self.settings.get().rate_limit;
+        let mut quota = locked(&self.quota);
+        if !quota.reached(&limits) {
+            return None;
+        }
+        quota.reset();
+        Some(limits.break_length.pick())
+    }
+
     pub(super) fn log(&self, event: LogEvent) {
         let detail = self.settings.get().advanced.log_detail;
         self.log_at(event, detail);

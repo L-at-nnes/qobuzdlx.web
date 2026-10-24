@@ -50,6 +50,14 @@ pub trait Reporter: Send + Sync {
     /// A track was written to its final place.
     fn track_saved(&self, _saved: TrackSaved) {}
 
+    /// How long to rest now, if a long break is due: between two albums of the same item.
+    fn break_due(&self) -> Option<std::time::Duration> {
+        None
+    }
+
+    /// The item rests for this long (a long break), or no longer does.
+    fn resting(&self, _break_for: Option<std::time::Duration>) {}
+
     /// What has been achieved so far.
     fn outcome(&self, outcome: &Outcome);
 }

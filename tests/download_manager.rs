@@ -2,7 +2,7 @@ mod common;
 
 use std::time::Duration;
 
-use common::catalogue::Catalogue;
+use common::catalogue::{Catalogue, page};
 use common::{Reply, session};
 use futures_util::future::BoxFuture;
 use qobuzdlx::download::{
@@ -700,14 +700,14 @@ async fn pausing_cuts_the_wait_short() {
 }
 
 #[tokio::test]
-async fn a_long_break_is_taken_every_so_many_albums() {
+async fn a_long_break_is_taken_once_the_albums_written_reach_the_limit() {
     let rig = Rig::new().await;
     for id in ["one", "two", "three"] {
         rig.catalogue
             .add_album(id, id, "Artist", &[(u64::from(id.as_bytes()[0]), 1, "A")]);
     }
     pace(&rig, |limits| {
-        limits.break_every = 2;
+        limits.break_after_albums = 2;
         limits.break_length = Delay::new(600, 600);
     });
     let manager = rig.start();
@@ -731,6 +731,72 @@ async fn a_long_break_is_taken_every_so_many_albums() {
         finished(&manager, &album_url("three")).await,
         ItemStatus::Completed
     );
+}
+
+#[tokio::test]
+async fn a_long_break_is_also_due_when_enough_tracks_were_written() {
+    let rig = Rig::new().await;
+    rig.catalogue.add_album(
+        "one",
+        "One",
+        "Artist",
+        &[(31, 1, "A"), (32, 2, "B"), (33, 3, "C")],
+    );
+    rig.catalogue
+        .add_album("two", "Two", "Artist", &[(34, 1, "D")]);
+    pace(&rig, |limits| {
+        limits.break_after_tracks = 3;
+        limits.break_length = Delay::new(600, 600);
+    });
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+
+    // One album only, but three tracks: the break comes before the next album
+    eventually("the break", || {
+        waiting_for(&manager) == Some(WaitReason::Break)
+    })
+    .await;
+    assert_eq!(
+        status_of(&manager, &album_url("two")),
+        Some(ItemStatus::Pending)
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn a_long_break_is_taken_between_two_albums_of_the_same_artist() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("a1", "First", "Artist", &[(51, 1, "A")]);
+    rig.catalogue
+        .add_album("a2", "Second", "Artist", &[(52, 1, "B")]);
+    rig.catalogue.artists.lock().unwrap().insert(
+        7,
+        json!({ "id": 7, "name": "Artist", "albums": page(vec![json!({"id": "a1", "title": "First", "artist": {"id": 7}}), json!({"id": "a2", "title": "Second", "artist": {"id": 7}})]) }),
+    );
+    pace(&rig, |limits| {
+        limits.break_after_albums = 1;
+        limits.break_length = Delay::new(600, 600);
+    });
+    let manager = rig.start();
+    let url = "https://play.qobuz.com/artist/7";
+    manager.enqueue(url, Display::default()).unwrap();
+
+    // Nothing else is waiting in the queue: the break is the one inside the item
+    eventually("the break", || {
+        waiting_for(&manager) == Some(WaitReason::Break)
+    })
+    .await;
+    assert_eq!(status_of(&manager, url), Some(ItemStatus::Running));
+    assert_eq!(finished(&manager, url).await, ItemStatus::Completed);
 }
 
 #[tokio::test]

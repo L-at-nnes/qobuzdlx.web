@@ -29,8 +29,6 @@ enum Pace {
 /// Goes through the queue, one item at a time, whenever there is something to do and a session to
 /// do it with.
 pub(super) async fn run(inner: Arc<Inner>) {
-    // Items since the last long break
-    let mut since_break = 0;
     loop {
         tokio::select! {
             () = inner.shutdown.cancelled() => return,
@@ -57,7 +55,7 @@ pub(super) async fn run(inner: Arc<Inner>) {
             if inner.halted.load(Ordering::SeqCst) {
                 break;
             }
-            inner.rest(pace, &mut since_break).await;
+            inner.rest(pace).await;
         }
 
         if processed && !inner.shutdown.is_cancelled() {
@@ -249,7 +247,7 @@ impl Inner {
 
     /// The wait between an item and the next one: a pause between albums, a long break every so
     /// many, or the cooldown after Qobuz asked to slow down.
-    async fn rest(&self, pace: Pace, since_break: &mut u32) {
+    async fn rest(&self, pace: Pace) {
         let limits = self.settings.get().rate_limit;
         let (reason, duration) = match pace {
             Pace::None => return,
@@ -261,10 +259,8 @@ impl Inner {
                 if !locked(&self.state).queue.has_pending() {
                     return;
                 }
-                *since_break += 1;
-                if limits.break_every > 0 && *since_break >= limits.break_every {
-                    *since_break = 0;
-                    (WaitReason::Break, limits.break_length.pick())
+                if let Some(duration) = self.break_due() {
+                    (WaitReason::Break, duration)
                 } else if wrote {
                     (WaitReason::BetweenAlbums, limits.between_albums.pick())
                 } else {
@@ -305,6 +301,20 @@ impl Inner {
             () = tokio::time::sleep(duration) => {}
         }
         self.set_wait(None);
+    }
+
+    /// Tells that the item in progress rests for a long break, or that it no longer does.
+    pub(super) fn show_break(&self, break_for: Option<Duration>) {
+        let Some(duration) = break_for else {
+            self.set_wait(None);
+            return;
+        };
+        let seconds = u64::try_from(duration.as_millis().div_ceil(1000)).unwrap_or(u64::MAX);
+        self.log(LogEvent::BreakStarted { seconds });
+        self.set_wait(Some(Wait {
+            reason: WaitReason::Break,
+            until: now() + seconds,
+        }));
     }
 
     fn set_wait(&self, wait: Option<Wait>) {

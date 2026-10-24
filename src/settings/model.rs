@@ -416,8 +416,12 @@ pub struct RateLimit {
     pub between_tracks: Delay,
     /// Between two albums, and between two items of the queue.
     pub between_albums: Delay,
-    /// After this many albums or items, a long break. `0`: never.
-    pub break_every: u32,
+    /// A long break is taken as soon as any of these is reached since the last one. `0`: that
+    /// condition is not used.
+    pub break_after_tracks: u32,
+    pub break_after_albums: u32,
+    /// Megabytes written, a megabyte being a million bytes.
+    pub break_after_megabytes: u32,
     pub break_length: Delay,
     /// First wait after Qobuz answered "too many requests"; it doubles each time it happens again
     /// without an item going well in between.
@@ -425,8 +429,10 @@ pub struct RateLimit {
 }
 
 impl RateLimit {
-    /// The most albums between two breaks that is accepted.
-    pub const BREAK_EVERY_LIMIT: u32 = 10_000;
+    /// The most tracks, albums and megabytes that a break condition may be set to.
+    pub const BREAK_TRACKS_LIMIT: u32 = 100_000;
+    pub const BREAK_ALBUMS_LIMIT: u32 = 10_000;
+    pub const BREAK_MEGABYTES_LIMIT: u32 = 10_000_000;
     /// The cooldown can double up to this many times its first value.
     pub const COOLDOWN_DOUBLINGS: u32 = 6;
 
@@ -437,7 +443,9 @@ impl RateLimit {
         Self {
             between_tracks: Delay::NONE,
             between_albums: Delay::NONE,
-            break_every: 0,
+            break_after_tracks: 0,
+            break_after_albums: 0,
+            break_after_megabytes: 0,
             break_length: Delay::NONE,
             cooldown_ms: 1000,
         }
@@ -448,7 +456,9 @@ impl RateLimit {
         self.between_tracks.is_valid()
             && self.between_albums.is_valid()
             && self.break_length.is_valid()
-            && self.break_every <= Self::BREAK_EVERY_LIMIT
+            && self.break_after_tracks <= Self::BREAK_TRACKS_LIMIT
+            && self.break_after_albums <= Self::BREAK_ALBUMS_LIMIT
+            && self.break_after_megabytes <= Self::BREAK_MEGABYTES_LIMIT
             && self.cooldown_ms <= Delay::LIMIT_MS
     }
 
@@ -467,7 +477,9 @@ impl Default for RateLimit {
         Self {
             between_tracks: Delay::new(500, 1500),
             between_albums: Delay::new(3000, 8000),
-            break_every: 0,
+            break_after_tracks: 150,
+            break_after_albums: 10,
+            break_after_megabytes: 3000,
             break_length: Delay::new(120_000, 300_000),
             cooldown_ms: 60_000,
         }
@@ -556,13 +568,31 @@ mod tests {
     #[test]
     fn a_group_missing_a_field_keeps_the_default_of_that_field() {
         let settings: Settings =
-            serde_json::from_str(r#"{"rate_limit":{"break_every":50}}"#).unwrap();
+            serde_json::from_str(r#"{"rate_limit":{"break_after_albums":50}}"#).unwrap();
 
-        assert_eq!(settings.rate_limit.break_every, 50);
+        assert_eq!(settings.rate_limit.break_after_albums, 50);
         assert_eq!(
             settings.rate_limit.between_albums,
             RateLimit::default().between_albums
         );
+    }
+
+    #[test]
+    fn the_conditions_of_a_break_are_held_to_their_limits() {
+        let mut limits = RateLimit::default();
+        assert!(limits.break_after_tracks > 0 && limits.break_after_albums > 0);
+        assert!(limits.break_after_megabytes > 0);
+
+        limits.break_after_tracks = RateLimit::BREAK_TRACKS_LIMIT + 1;
+        assert!(!limits.is_valid());
+        limits.break_after_tracks = 0;
+        limits.break_after_albums = RateLimit::BREAK_ALBUMS_LIMIT + 1;
+        assert!(!limits.is_valid());
+        limits.break_after_albums = 0;
+        limits.break_after_megabytes = RateLimit::BREAK_MEGABYTES_LIMIT + 1;
+        assert!(!limits.is_valid());
+        limits.break_after_megabytes = RateLimit::BREAK_MEGABYTES_LIMIT;
+        assert!(limits.is_valid());
     }
 
     #[test]

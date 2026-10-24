@@ -213,6 +213,17 @@ impl Job {
         }
     }
 
+    /// Rests, if the long break is due, unless the item is cancelled first.
+    async fn take_break(&self) -> Result<(), JobError> {
+        let Some(duration) = self.reporter.break_due() else {
+            return Ok(());
+        };
+        self.reporter.resting(Some(duration));
+        let result = self.wait(duration).await;
+        self.reporter.resting(None);
+        result
+    }
+
     fn check_cancelled(&self) -> Result<(), JobError> {
         if self.cancel.is_cancelled() {
             Err(JobError::Cancelled)

@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use super::{Event, Inner, locked};
 use crate::download::item::ItemKind;
@@ -154,6 +155,8 @@ impl Reporter for ItemReporter {
     }
 
     fn track_saved(&self, saved: TrackSaved) {
+        let bytes = std::fs::metadata(&saved.path).map_or(0, |file| file.len());
+        self.inner.count_saved(&saved.album_id, bytes);
         self.folders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -162,6 +165,14 @@ impl Reporter for ItemReporter {
             item_id: self.item_id.clone(),
             track: saved,
         });
+    }
+
+    fn break_due(&self) -> Option<Duration> {
+        self.inner.break_due()
+    }
+
+    fn resting(&self, break_for: Option<Duration>) {
+        self.inner.show_break(break_for);
     }
 
     fn outcome(&self, outcome: &Outcome) {

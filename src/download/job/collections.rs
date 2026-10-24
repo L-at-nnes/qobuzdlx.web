@@ -169,6 +169,7 @@ impl Job {
             }
             self.step(index, total, None);
             if index > 0 {
+                self.take_break().await?;
                 self.wait(self.settings.rate_limit.between_albums.pick())
                     .await?;
             }
