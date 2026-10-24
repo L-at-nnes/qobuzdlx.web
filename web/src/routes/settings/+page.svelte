@@ -6,6 +6,7 @@
 	import AdvancedSection from '#lib/settings/AdvancedSection.svelte';
 	import ArtworkSection from '#lib/settings/ArtworkSection.svelte';
 	import GeneralSection from '#lib/settings/GeneralSection.svelte';
+	import RateLimitSection from '#lib/settings/RateLimitSection.svelte';
 	import NamingSection from '#lib/settings/NamingSection.svelte';
 	import SecuritySection from '#lib/settings/SecuritySection.svelte';
 	import TagsSection from '#lib/settings/TagsSection.svelte';
@@ -26,6 +27,7 @@
 		{ id: 'tags', label: 'settings.tags' },
 		{ id: 'artwork', label: 'settings.artwork' },
 		{ id: 'advanced', label: 'settings.advanced' },
+		{ id: 'rate-limit', label: 'settings.rate' },
 		{ id: 'security', label: 'settings.security' },
 		{ id: 'account', label: 'settings.account' },
 		{ id: 'diagnostics', label: 'settings.diagnostics' }
@@ -46,7 +48,8 @@
 					'invalid_artwork_size',
 					'missing_download_directory',
 					'download_directory_not_absolute',
-					'invalid_templates'
+					'invalid_templates',
+					'invalid_rate_limit'
 				].includes(error.code);
 				toast.error(known ? t(key) : `${t('settings.saveFailed')} ${error.message}`);
 			} else {
@@ -81,6 +84,7 @@
 		<TagsSection bind:draft />
 		<ArtworkSection bind:draft />
 		<AdvancedSection bind:draft />
+		<RateLimitSection bind:draft />
 		<SecuritySection />
 		<AccountSection />
 	</div>

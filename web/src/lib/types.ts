@@ -134,6 +134,8 @@ export interface Progress {
 	tracks: TrackProgress[];
 	/** Why the queue stopped by itself, when it did. */
 	halt: 'storage_full' | 'signed_out' | 'paused' | null;
+	/** The queue holds back on purpose, until the given Unix time in seconds. */
+	wait: { reason: 'between_albums' | 'break' | 'rate_limited'; until: number } | null;
 }
 
 export interface Enqueued {
@@ -163,6 +165,20 @@ export interface TitleMarker {
 	enabled: boolean;
 	text: string;
 	position: 'prefix' | 'suffix';
+}
+
+/** A wait drawn at random between two bounds, in milliseconds. */
+export interface Delay {
+	min_ms: number;
+	max_ms: number;
+}
+
+export interface RateLimit {
+	between_tracks: Delay;
+	between_albums: Delay;
+	break_every: number;
+	break_length: Delay;
+	cooldown_ms: number;
 }
 
 export interface Settings {
@@ -216,6 +232,7 @@ export interface Settings {
 		log_detail: LogLevel;
 		duplicates: Duplicates;
 	};
+	rate_limit: RateLimit;
 }
 
 export type TemplateField =

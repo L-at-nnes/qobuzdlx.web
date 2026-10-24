@@ -8,7 +8,7 @@
 	import NowDownloading from '#lib/components/NowDownloading.svelte';
 	import QueueRow from '#lib/components/QueueRow.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import { t } from '#lib/i18n/index.svelte.ts';
+	import { locale, t } from '#lib/i18n/index.svelte.ts';
 	import { downloads } from '#lib/state/downloads.svelte.ts';
 
 	/** How many rows are drawn at first, and added by each "show more": a queue can hold thousands. */
@@ -19,6 +19,21 @@
 	let finishedLimit = $state(FINISHED_AT_FIRST);
 
 	const queue = $derived(downloads.queue);
+
+	/** The clock of the countdown, which runs only while the queue is holding back. */
+	let tick = $state(Date.now());
+	$effect(() => {
+		if (!downloads.progress.wait) return;
+		tick = Date.now();
+		const timer = setInterval(() => (tick = Date.now()), 1000);
+		return () => clearInterval(timer);
+	});
+	const waitEnds = $derived(
+		downloads.progress.wait ? new Date(downloads.progress.wait.until * 1000) : null
+	);
+	const waitLeft = $derived(
+		downloads.progress.wait ? Math.max(0, Math.ceil(downloads.progress.wait.until - tick / 1000)) : 0
+	);
 
 	/** The rows to draw: the oldest finished items and the last waiting ones are kept behind a button. */
 	const shown = $derived.by(() => {
@@ -60,6 +75,18 @@
 					{t('downloads.resume')}
 				</Button>
 			{/if}
+		</div>
+	{/if}
+
+	{#if downloads.progress.wait && waitEnds}
+		<div class="notice calm" role="status">
+			<Icon name="clock" size={18} />
+			<span>
+				{t(`downloads.wait.${downloads.progress.wait.reason}`, {
+					time: waitEnds.toLocaleTimeString(locale.current, { timeStyle: 'short' })
+				})}
+				<span class="figures muted">· {waitLeft} s</span>
+			</span>
 		</div>
 	{/if}
 
@@ -155,6 +182,10 @@
 		border: 1px solid var(--warning);
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
+	}
+
+	.notice.calm {
+		border-color: var(--line);
 	}
 
 	.notice span {

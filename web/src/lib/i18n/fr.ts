@@ -402,6 +402,44 @@ export const fr: Record<Key, Message> = {
 	'log_detail.normal': 'Normal',
 	'log_detail.detailed': 'Détaillé',
 
+	'settings.rate': 'Anti rate-limit',
+	'settings.rate.lead':
+		"Qobuz ne publie pas combien de requêtes il accepte, et aucune limite n'a été mesurée ici. Attendre entre les requêtes, comme le ferait une personne qui navigue, est la meilleure protection d'une longue file contre un ralentissement ou un refus. Chaque attente est tirée au hasard entre les deux valeurs données.",
+	'settings.rate.profiles': 'Points de départ',
+	'settings.rate.profile.light': 'Léger : quelques albums',
+	'settings.rate.profile.careful': 'Prudent : des centaines de liens',
+	'settings.rate.profile.patient': 'Patient : des milliers de liens',
+	'settings.rate.profiles.hint':
+		'Chacun remplit les valeurs ci-dessous et le nombre de pistes téléchargées en même temps. Ce sont des estimations prudentes, pas des limites mesurées : si Qobuz ralentit encore, passez au suivant.',
+	'settings.rate.tracks': 'Avant chaque piste',
+	'settings.rate.tracks.hint':
+		"Une attente avant de demander une piste. Une piste déjà sur le disque n'attend pas.",
+	'settings.rate.albums': 'Entre deux albums',
+	'settings.rate.albums.hint':
+		"Entre deux éléments de la file, et entre deux albums d'un artiste ou d'un label. Après un élément dont tout était déjà téléchargé, seule la plus courte valeur est attendue.",
+	'settings.rate.breakEvery': 'Longue pause tous les … éléments',
+	'settings.rate.breakEvery.hint':
+		"Après ce nombre d'éléments de la file, elle se repose longuement, comme quelqu'un qui quitte l'ordinateur. 0 : pas de pause.",
+	'settings.rate.breakLength': "Durée d'une pause",
+	'settings.rate.breakLength.hint': 'Tirée au hasard à chaque fois.',
+	'settings.rate.cooldown': 'Attente après « trop de requêtes », en secondes',
+	'settings.rate.cooldown.hint':
+		"Quand Qobuz répond qu'il a reçu trop de requêtes, l'élément retourne dans la file, qui attend ce temps puis réessaie toute seule. L'attente double à chaque nouvelle occurrence, jusqu'à 64 fois sa valeur, et jamais plus d'une heure.",
+	'settings.rate.parallel':
+		"Pour une longue file, baissez aussi « Pistes d'un album téléchargées en même temps » (Avancé) à 1 ou 2 : c'est le réglage qui change le plus le nombre de requêtes reçues par Qobuz chaque minute.",
+	'settings.error.invalid_rate_limit':
+		'Une attente va de sa plus courte à sa plus longue valeur, et dure une heure au plus.',
+	'delay.from': 'De',
+	'delay.to': 'À',
+	'delay.unit': 'secondes',
+	'delay.reversed': 'La première valeur ne peut pas dépasser la seconde.',
+	'downloads.wait.between_albums': "Attente avant l'album suivant, jusqu'à {time}.",
+	'downloads.wait.break': "Pause en cours, jusqu'à {time}.",
+	'downloads.wait.rate_limited': 'Qobuz a demandé de ralentir. Nouvel essai à {time}.',
+	'log.rate_limited': 'Qobuz a demandé de ralentir : attente de {seconds} s, puis nouvel essai.',
+	'log.break_started': 'Pause de {seconds} s.',
+	'log.between_albums': "Attente de {seconds} s avant l'album suivant.",
+
 	'settings.security': 'Accès',
 	'settings.security.lead':
 		"Un mot de passe réserve l'interface, et le compte Qobuz qui y est lié, à ceux qui le connaissent.",

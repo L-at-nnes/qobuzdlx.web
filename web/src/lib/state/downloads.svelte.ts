@@ -12,7 +12,8 @@ const resting: Progress = {
 	percent: 0,
 	album: null,
 	tracks: [],
-	halt: null
+	halt: null,
+	wait: null
 };
 
 /** The download queue as the server tells it, live. */

@@ -389,6 +389,44 @@ export const en = {
 	'log_detail.normal': 'Normal',
 	'log_detail.detailed': 'Detailed',
 
+	'settings.rate': 'Anti rate-limit',
+	'settings.rate.lead':
+		'Qobuz does not publish how many requests it accepts, and no limit has been measured here. Waiting between requests, as a person browsing would, is the best protection a long queue has against being slowed down or refused. Each wait is drawn at random between the two values you give.',
+	'settings.rate.profiles': 'Starting points',
+	'settings.rate.profile.light': 'Light: a few albums',
+	'settings.rate.profile.careful': 'Careful: hundreds of links',
+	'settings.rate.profile.patient': 'Patient: thousands of links',
+	'settings.rate.profiles.hint':
+		'Each fills in the values below and the number of tracks downloaded at once. They are cautious guesses, not measured limits: if Qobuz still slows down, move to the next one.',
+	'settings.rate.tracks': 'Before each track',
+	'settings.rate.tracks.hint':
+		'A wait before a track is asked for. A track already on the disk costs no wait.',
+	'settings.rate.albums': 'Between two albums',
+	'settings.rate.albums.hint':
+		'Between two items of the queue, and between two albums of an artist or a label. After an item that found everything already downloaded, only the shortest value is waited.',
+	'settings.rate.breakEvery': 'Long break every … items',
+	'settings.rate.breakEvery.hint':
+		'After this many items of the queue it rests for a long while, as someone leaving the computer would. 0 means no break.',
+	'settings.rate.breakLength': 'Length of a break',
+	'settings.rate.breakLength.hint': 'Drawn at random each time.',
+	'settings.rate.cooldown': 'Wait after "too many requests", in seconds',
+	'settings.rate.cooldown.hint':
+		'When Qobuz answers that it received too many requests, the item goes back to the queue, which waits this long, then tries again by itself. The wait doubles each time it happens again, up to 64 times its value, and never beyond an hour.',
+	'settings.rate.parallel':
+		'Also lower "Tracks of an album downloaded at once" (Advanced) to 1 or 2 for a long queue: it is the setting that most changes how many requests Qobuz receives per minute.',
+	'settings.error.invalid_rate_limit':
+		'A wait goes from its shortest to its longest value, and lasts an hour at most.',
+	'delay.from': 'From',
+	'delay.to': 'To',
+	'delay.unit': 'seconds',
+	'delay.reversed': 'The first value cannot be larger than the second.',
+	'downloads.wait.between_albums': 'Waiting before the next album, until {time}.',
+	'downloads.wait.break': 'Taking a break, until {time}.',
+	'downloads.wait.rate_limited': 'Qobuz asked to slow down. Trying again at {time}.',
+	'log.rate_limited': 'Qobuz asked to slow down: waiting {seconds} s, then trying again.',
+	'log.break_started': 'Taking a break of {seconds} s.',
+	'log.between_albums': 'Waiting {seconds} s before the next album.',
+
 	'settings.security': 'Access',
 	'settings.security.lead':
 		'A password keeps the interface, and the Qobuz account linked to it, to those who know it.',
