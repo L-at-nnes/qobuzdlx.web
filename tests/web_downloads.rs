@@ -473,6 +473,64 @@ async fn a_big_list_is_queued_at_once() {
 }
 
 #[tokio::test]
+async fn a_long_mixed_list_keeps_only_qobuz_links_in_their_order() {
+    let app = TestApp::start().await;
+    // Nobody is signed in: the queue is kept as it was imported, nothing is taken from it
+    app.catalogue.client.end_session();
+    let browser = app.browser();
+    let mut expected = Vec::new();
+    let mut lines = vec!["# my library".to_owned(), String::new()];
+    for number in 0..2400 {
+        let id = format!("{number:013}");
+        lines.push(match number % 6 {
+            0 => format!("https://play.qobuz.com/album/{id}"),
+            1 => format!("https://www.qobuz.com/fr-fr/album/some-title-{number}/{id}"),
+            2 => format!("https://open.qobuz.com/album/{id}"),
+            3 => format!("qobuz.com/us-en/album/other-{number}/{id}"),
+            4 => format!("play.qobuz.com/album/{id}?utm_source=share"),
+            _ => format!("   https://play.qobuz.com/album/{id}   "),
+        });
+        expected.push(format!("https://play.qobuz.com/album/{id}"));
+        // Between the links: notes, blanks and whatever else a list picks up
+        match number % 4 {
+            0 => lines.push("# --- next part ---".to_owned()),
+            1 => lines.push(String::new()),
+            2 => lines.push(format!("https://www.youtube.com/watch?v={number}")),
+            _ => lines.push(format!("https://example.com/album/{number}")),
+        }
+    }
+
+    let answer = browser
+        .post_text(
+            "/api/downloads/import",
+            &lines.join(
+                "
+",
+            ),
+        )
+        .await;
+
+    assert_eq!(answer.status, 200);
+    let counts = answer.json();
+    assert_eq!(counts["added"], 2400);
+    assert_eq!(counts["duplicates"], 0);
+    // The youtube and example.com lines
+    assert_eq!(counts["invalid"], 1200);
+    let urls: Vec<String> = queue_of(&browser)
+        .await
+        .iter()
+        .map(|item| item["url"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(urls, expected);
+    assert!(
+        queue_of(&browser)
+            .await
+            .iter()
+            .all(|item| item["status"] == "pending")
+    );
+}
+
+#[tokio::test]
 async fn the_queue_sent_to_the_page_leaves_out_what_only_the_server_needs() {
     let app = TestApp::start().await;
     add_one(&app);
