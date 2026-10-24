@@ -24,7 +24,9 @@ I rewrote it because I was not happy with the interface or with the language it 
 - **Download** albums, single tracks, playlists, whole discographies, labels and the favourites of the account, in MP3 320, FLAC 16-bit, FLAC up to 24-bit 96 kHz or FLAC up to 24-bit 192 kHz. FLAC never falls back to MP3, and the log tells the quality that was really served.
 - **A queue that runs unattended.** It survives a restart: what was waiting resumes, files already on disk are recognised, and the saved Qobuz session is opened again. Reorder, skip an album, cancel an item, retry only the tracks that failed.
 - **Made for large libraries.** Several tracks of an album download at once (1 to 6, 3 by default): Qobuz serves each file at a modest speed, so this is what turns weeks into days. A queue of thousands of albums stays light in the interface, an album already on disk is gone through with one request, and the queue stops by itself, with a notice, when the disk is full instead of failing every item.
-- **Import a list.** A text file with one Qobuz link per line; blank lines, lines starting with `#` and links to other sites are skipped, and a link may be written without `https://`.
+- **Import a list.** A text file with one Qobuz link per line (`play.qobuz.com`, `open.qobuz.com`, `www.qobuz.com` store links, with or without `https://`); blank lines, lines starting with `#` and links to other sites are skipped. The whole list is read, then queued in one step, in order, and the queue goes through it one item at a time: lists of several thousand links are expected.
+- **Signing out does not lose the queue.** Sign out, or let the session expire: the running item goes back to waiting instead of failing, and everything resumes by itself once you sign in again, with this account or another one. The queue can also be paused and resumed by hand.
+- **Anti rate-limit.** Random waits between tracks and between albums, a long break every so many items, and a cooldown that doubles when Qobuz answers "too many requests", so that a queue of thousands of links does not look like a machine going as fast as it can. See [Importing thousands of links](#importing-thousands-of-links).
 - **Resilient transfers.** The Qobuz CDN cuts connections after a few megabytes; a download goes on from where it stopped. Every FLAC file is decoded after the transfer to be sure it is whole, and a damaged file is fetched again.
 - **Tags and covers.** Vorbis comments and ID3v2.4 with every tag switchable, embedded and saved covers at a size you choose, parental advisory markers, optional repair of the missing FLAC checksum.
 - **Naming you control.** Templates with more than thirty variables for artist, album, track, compilation, playlist and disc folders, tried live on an invented release, with the problems of each template pointed out. A template can never leave the download folder.
@@ -121,6 +123,25 @@ Checks:
 cargo fmt --check && cargo clippy --all-targets && cargo test
 cd web && npm run check && npm test
 ```
+
+## Importing thousands of links
+
+Import the file from the Downloads page. Every line is read first, then the valid links are queued in one step: either all of them are, or (if the request is cut) none. The queue then works through them one item at a time, in order, and saves itself to disk as it goes, so a restart, a sign-out or a pause never loses the list. At most 500 finished items are kept in the list; older ones are forgotten, their files stay.
+
+**Qobuz publishes no rate limit, and none has been measured for this project.** What follows is advice drawn from how such services usually behave, not a guarantee: a very large queue downloaded flat out is the pattern most likely to be slowed down (HTTP 429) or looked at. The *Anti rate-limit* section of the settings gives three starting points that you can adjust:
+
+| Profile | Before a track | Between albums | Long break | Tracks at once | After "too many requests" |
+|---|---|---|---|---|---|
+| Light (a few albums) | 0.5 – 1.5 s | 3 – 8 s | none | 3 | 60 s |
+| Careful (hundreds of links) | 1 – 4 s | 8 – 20 s | 2 – 5 min every 25 items | 2 | 120 s |
+| Patient (thousands of links) | 2 – 6 s | 20 – 60 s | 5 – 15 min every 20 items | 1 | 300 s |
+
+- Every wait is **drawn at random** between its two bounds, each time: a fixed pause is a pattern, a drawn one is not.
+- A track already on the disk costs no wait, and an album that found everything in place only waits the shortest value: going through a list again is quick.
+- When Qobuz answers 429 even after the client's own retries, the item is **not failed**: it goes back to its place, the queue waits the cooldown (doubled each time it happens again, up to 64 times, one hour at most) and tries again by itself. The Downloads page and the log say when.
+- The number of tracks downloaded at once (Advanced) is the setting that most changes how many requests per minute Qobuz receives. For a long queue, use 1 or 2.
+- A queue left to run overnight is gentler than the same queue run in a hurry. If you still meet 429, move to the next profile; if you never do, you can move back.
+- Signing out, or a session that expires, pauses the queue without failing anything. Sign in again and it goes on. *Pause* in the Downloads page does the same by hand.
 
 ## Extensions
 
