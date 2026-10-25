@@ -615,6 +615,42 @@ async fn something_queued_while_paused_waits_for_the_resume() {
     );
 }
 
+#[tokio::test]
+async fn a_pause_survives_a_restart_until_it_is_lifted() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    let manager = rig.start();
+    manager.pause();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager.shutdown();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // The same folder, a new process: still paused, and it says so
+    let restarted = rig.start();
+    assert_eq!(restarted.progress().halt, Some(Halt::Paused));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(
+        status_of(&restarted, &album_url("one")),
+        Some(ItemStatus::Pending),
+        "nothing starts while paused"
+    );
+
+    restarted.resume();
+    assert_eq!(
+        finished(&restarted, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    restarted.shutdown();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // Lifted: the next start is not paused
+    let again = rig.start();
+    assert_eq!(again.progress().halt, None);
+}
+
 // ─── Not going too fast ───
 
 fn pace(rig: &Rig, change: impl FnOnce(&mut RateLimit)) {

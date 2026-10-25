@@ -149,6 +149,7 @@ impl Manager {
 
         let store = QueueStore::new(&config.config_dir);
         let queue = store.load();
+        let paused = store.load_paused();
         let env = Environment {
             client: config.client.clone(),
             fetcher: Fetcher::new(config.http.clone(), config.stall_timeout),
@@ -178,7 +179,7 @@ impl Manager {
                 current: Mutex::new(None),
                 skip: Arc::new(AtomicBool::new(false)),
                 halted: AtomicBool::new(false),
-                paused: AtomicBool::new(false),
+                paused: AtomicBool::new(paused),
                 interrupt: AtomicBool::new(false),
                 stir: Notify::new(),
                 strikes: AtomicU32::new(0),
@@ -196,6 +197,11 @@ impl Manager {
         if waiting > 0 {
             manager.inner.log(LogEvent::QueueRestored { waiting });
             manager.inner.wake.notify_one();
+        }
+
+        if paused {
+            manager.inner.log(LogEvent::QueuePaused);
+            manager.inner.announce_halt(Halt::Paused);
         }
 
         tokio::spawn(worker::run(Arc::clone(&manager.inner)));
@@ -335,6 +341,7 @@ impl Manager {
             return;
         }
         if paused {
+            self.inner.remember_pause(false);
             self.inner.log(LogEvent::QueueResumed);
         }
         {
@@ -351,6 +358,7 @@ impl Manager {
         if self.inner.paused.swap(true, Ordering::SeqCst) {
             return;
         }
+        self.inner.remember_pause(true);
         self.inner.log(LogEvent::QueuePaused);
         self.inner.stir.notify_waiters();
         if locked(&self.inner.current).is_some() {
@@ -473,6 +481,13 @@ impl Inner {
     }
 
     /// Adds a line to the log, if the level asks for it.
+    /// Writes down that the queue is paused, or no longer, so that a restart keeps it so.
+    fn remember_pause(&self, paused: bool) {
+        if let Err(error) = self.store.save_paused(paused) {
+            tracing::warn!(%error, "the pause of the queue could not be saved");
+        }
+    }
+
     /// A file was written: it counts toward the next long break.
     pub(super) fn count_saved(&self, album_id: &str, bytes: u64) {
         locked(&self.quota).saved(album_id, bytes);

@@ -1,6 +1,8 @@
 use std::io;
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
 use super::item::QueueItem;
 use super::queue::Queue;
 use crate::storage::{Access, JsonFile};
@@ -9,6 +11,15 @@ use crate::storage::{Access, JsonFile};
 #[derive(Debug, Clone)]
 pub struct QueueStore {
     file: JsonFile,
+    /// What is kept besides the items: for now, whether the user paused the queue.
+    state: JsonFile,
+}
+
+/// What the queue remembers besides its items.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct SavedState {
+    paused: bool,
 }
 
 impl QueueStore {
@@ -16,7 +27,19 @@ impl QueueStore {
     pub fn new(config_dir: &Path) -> Self {
         Self {
             file: JsonFile::new(config_dir.join("queue.json"), Access::Normal),
+            state: JsonFile::new(config_dir.join("queue-state.json"), Access::Normal),
         }
+    }
+
+    /// Whether the user had paused the queue when the process stopped: a pause lasts until the user
+    /// lifts it, restarts included.
+    #[must_use]
+    pub fn load_paused(&self) -> bool {
+        self.state.load::<SavedState>().unwrap_or_default().paused
+    }
+
+    pub fn save_paused(&self, paused: bool) -> io::Result<()> {
+        self.state.save(&SavedState { paused })
     }
 
     /// The saved queue. An item that was running when the process stopped is waiting again.
@@ -130,6 +153,27 @@ mod tests {
         store.save(&queue_of(MAX_FINISHED + 50)).unwrap();
 
         assert_eq!(store.load().items().len(), MAX_FINISHED + 50);
+    }
+
+    #[test]
+    fn a_pause_is_remembered_until_it_is_lifted() {
+        let directory = TempDir::new().unwrap();
+        let store = QueueStore::new(directory.path());
+        assert!(!store.load_paused(), "no file: not paused");
+
+        store.save_paused(true).unwrap();
+        assert!(QueueStore::new(directory.path()).load_paused());
+
+        store.save_paused(false).unwrap();
+        assert!(!QueueStore::new(directory.path()).load_paused());
+    }
+
+    #[test]
+    fn a_damaged_state_file_does_not_pause_the_queue() {
+        let directory = TempDir::new().unwrap();
+        fs::write(directory.path().join("queue-state.json"), "{ broken").unwrap();
+
+        assert!(!QueueStore::new(directory.path()).load_paused());
     }
 
     #[test]
