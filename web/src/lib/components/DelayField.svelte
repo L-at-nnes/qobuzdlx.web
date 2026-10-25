@@ -2,27 +2,29 @@
 	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { Delay } from '#lib/types.ts';
 
-	/** The longest wait the server accepts, in seconds. */
-	const MAX_SECONDS = 3600;
-
 	let {
 		label,
 		hint,
+		unit = 'seconds',
 		value = $bindable()
-	}: { label: string; hint?: string; value: Delay } = $props();
+	}: { label: string; hint?: string; unit?: 'seconds' | 'minutes'; value: Delay } = $props();
 
 	const uid = $props.id();
 
-	const seconds = (milliseconds: number) => Math.round(milliseconds / 10) / 100;
+	/** What one unit is in milliseconds, and the longest wait the server accepts (an hour). */
+	const scale = $derived(unit === 'minutes' ? 60_000 : 1000);
+	const max = $derived(3_600_000 / scale);
+
+	const shown = (milliseconds: number) => Math.round((milliseconds / scale) * 100) / 100;
 
 	/** A field left empty or mistyped is a zero, not a failure: the server holds the bounds in order. */
 	function parse(text: string): number {
 		const parsed = Number.parseFloat(text.replace(',', '.'));
-		return Number.isFinite(parsed) ? Math.min(MAX_SECONDS, Math.max(0, parsed)) : 0;
+		return Number.isFinite(parsed) ? Math.min(max, Math.max(0, parsed)) : 0;
 	}
 
 	function change(bound: 'min_ms' | 'max_ms', event: Event) {
-		value[bound] = Math.round(parse((event.currentTarget as HTMLInputElement).value) * 1000);
+		value[bound] = Math.round(parse((event.currentTarget as HTMLInputElement).value) * scale);
 	}
 
 	const reversed = $derived(value.min_ms > value.max_ms);
@@ -37,9 +39,9 @@
 				type="number"
 				inputmode="decimal"
 				min="0"
-				max={MAX_SECONDS}
+				max={max}
 				step="0.5"
-				value={seconds(value.min_ms)}
+				value={shown(value.min_ms)}
 				aria-invalid={reversed ? 'true' : undefined}
 				onchange={(event) => change('min_ms', event)}
 			/>
@@ -50,14 +52,14 @@
 				type="number"
 				inputmode="decimal"
 				min="0"
-				max={MAX_SECONDS}
+				max={max}
 				step="0.5"
-				value={seconds(value.max_ms)}
+				value={shown(value.max_ms)}
 				aria-invalid={reversed ? 'true' : undefined}
 				onchange={(event) => change('max_ms', event)}
 			/>
 		</label>
-		<span class="unit meta">{t('delay.unit')}</span>
+		<span class="unit meta">{t(unit === 'minutes' ? 'delay.unit.minutes' : 'delay.unit.seconds')}</span>
 	</div>
 	{#if reversed}
 		<p class="error" role="alert">{t('delay.reversed')}</p>

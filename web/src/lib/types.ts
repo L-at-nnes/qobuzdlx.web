@@ -176,7 +176,10 @@ export interface Delay {
 export interface RateLimit {
 	between_tracks: Delay;
 	between_albums: Delay;
-	break_every: number;
+	break_after_tracks: number;
+	break_after_albums: number;
+	/** Megabytes, a megabyte being a million bytes. */
+	break_after_megabytes: number;
 	break_length: Delay;
 	cooldown_ms: number;
 }
