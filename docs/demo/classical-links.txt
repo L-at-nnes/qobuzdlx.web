@@ -1,0 +1,189 @@
+# Classical music on Qobuz: a long list to import in one go.
+# Only the links of qobuz.com and play.qobuz.com are kept; comments, blank lines and
+# links to other sites (below) are ignored.
+
+
+# Beethoven
+https://www.qobuz.com/us-en/album/beethoven-complete-symphonies-marek-janowski-wdr-sinfonieorchester-koln/faoueax4xvcdc
+https://play.qobuz.com/album/etp8lnv68x0kc
+https://www.qobuz.com/us-en/album/beethoven-the-complete-symphonies-antonello-manacorda-kammerakademie-potsdam/bewom9hoz95mb
+https://www.qobuz.com/gb-en/album/beethoven-complete-symphonies-daniel-barenboim/tko7fqj9zgvwb
+https://www.qobuz.com/us-en/album/beethoven-complete-symphonies-wiener-philharmoniker-andris-nelsons/v5egdgnkclvyb
+https://play.qobuz.com/album/l7voyl86z34kb
+https://www.qobuz.com/us-en/album/beethoven-complete-symphonies-staatskapelle-dresden-herbert-blomstedt/bgsgz3u5d7rgb
+https://www.qobuz.com/se-en/album/beethoven-complete-symphonies-london-symphony-orchestra-josef-krips/0734796500023
+https://www.qobuz.com/ie-en/album/beethoven-the-complete-nine-symphonies-ludwig-van-beethoven/5055453630262
+
+# Bach
+https://play.qobuz.com/album/0829410479561
+https://www.qobuz.com/us-en/album/j-s-bach-goldberg-variations-bwv-988-oliver-schnyder/atdoxgz1q5ohc
+https://www.qobuz.com/au-en/album/bach-the-goldberg-variations-bwv-988-by-glenn-gould-johann-sebastian-bach-glenn-gould/oi4tzeewel0na
+https://www.qobuz.com/us-en/album/js-bach-goldberg-variations-vikingur-olafsson/kn46rpcn1k8lb
+https://play.qobuz.com/album/hrp82j6wpwssc
+https://www.qobuz.com/us-en/album/bach-goldberg-variations-bwv-988-murray-perahia/mx3lg06gqij3a
+https://www.qobuz.com/au-en/album/bach-js-goldberg-variations-bwv-988-catrin-finch/0002894778165
+https://open.qobuz.com/album/tobayjix1rkdc
+https://play.qobuz.com/album/zc8l9r1tbrc2b
+https://www.qobuz.com/us-en/album/j-s-bach-goldberg-variations-bwv-988-fazil-say/sti1p3jsl2alc
+https://www.qobuz.com/gb-en/album/bach-cello-suites-bwv-1007-1012-pablo-casals/5099996592151
+https://www.qobuz.com/us-en/album/bach-cello-suites-anastasia-kobekina/uozljemtwirob
+
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://play.qobuz.com/album/yyfz2347jvqlc
+https://www.qobuz.com/gb-en/album/bach-cello-suites-nos-1-5-6-yo-yo-ma/0696998979628
+https://www.qobuz.com/ca-en/album/bach-cello-suites-ophelie-gaillard/0794881993420
+https://www.qobuz.com/au-en/album/bach-cello-suites-1-2-3-pablo-casals/z2q0w9d9kh01b
+https://play.qobuz.com/album/0828767875125
+https://www.qobuz.com/ca-en/album/bach-cello-suites-nos-1-2-sonia-wieder-atherton/o927e96fu36ob
+https://open.qobuz.com/album/0724355560551
+https://www.qobuz.com/us-en/album/j-s-bach-cello-suites-miriam-prandi/ifqw0pbnbx50a
+
+# Mozart
+https://play.qobuz.com/album/0002894474362
+https://www.qobuz.com/us-en/album/mozart-the-complete-piano-concertos-daniel-barenboim/5099998461653
+https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy
+not a link at all
+https://www.qobuz.com/us-en/album/mozart-piano-concertos-nos-5-6-11-16-17-18-19-christian-zacharias-radio-sinfonieorchester-stuttgart-sir-neville-marriner/w3jdrlhvsqw9a
+https://www.qobuz.com/us-en/album/wolfgang-amadeus-mozart-the-piano-concertos-english-chamber-orchestra-murray-perahia/0886443281714
+https://play.qobuz.com/album/lu049di5tjj6o
+https://www.qobuz.com/us-en/album/mozart-the-complete-piano-concertos-murray-perahia/0884977746174
+https://www.qobuz.com/us-en/album/mozart-concertos-pour-piano-n-20-21-23-27-daniel-barenboim/5099963179651
+https://www.qobuz.com/us-en/album/mozart-piano-concertos-nos-11-12-13-daniel-barenboim-english-chamber-orchestra/ebo527otg2lnc
+https://play.qobuz.com/album/udgaqw9wtosca
+https://open.qobuz.com/album/bt9lv20q2e0nc
+
+# Mahler
+https://www.qobuz.com/us-en/album/mahler-symphonies-nos-1-9-philharmonia-orchestra-lorin-maazel/0635212036327
+https://www.qobuz.com/ie-en/album/mahler-symphony-no-1-london-symphony-orchestra-and-valery-gergiev/kj7dm4ir1vuja
+https://play.qobuz.com/album/0002894795447
+https://www.qobuz.com/us-en/album/mahler-symphony-no-5-london-symphony-orchestra-and-valery-gergiev/by491dzaehpja
+https://www.qobuz.com/us-en/album/leonard-bernstein-the-complete-mahler-symphonies-leonard-bernstein/0886443494633
+https://www.qobuz.com/us-en/album/mahler-symphony-no-7-tonhalle-orchester-zurich-and-paavo-jarvi/o2z98g5lz28jc
+https://play.qobuz.com/album/fsppmd6qlom5b
+https://www.qobuz.com/us-en/album/mahler-symphony-no-5-leonard-bernstein/5099706308423
+https://www.qobuz.com/us-en/album/mahler-symphony-no-1-berliner-philharmoniker-daniel-harding/gf487c4g4ddqc
+https://www.qobuz.com/us-en/album/mahler-symphony-no5-pierre-boulez-wiener-philharmoniker/0002894534162
+
+# Brahms
+https://play.qobuz.com/album/khvybrn6xngec
+https://www.qobuz.com/us-en/album/brahms-the-symphonies-christoph-eschenbach-konzerthausorchester-berlin/j9n1cptttx83b
+https://www.qobuz.com/us-en/album/johannes-brahms-the-symphonies-riccardo-chailly-gewandhausorchester-leipzig/0002894785819
+https://www.qobuz.com/us-en/album/johannes-brahms-complete-symphonies-royal-concertgebouw-orchestra-john-eliot-gardiner/haqgpgvx82mwc
+https://play.qobuz.com/album/0724356274259
+https://www.qobuz.com/us-en/album/brahms-symphonies-1-3-ouvertures-eugen-jochum-london-philharmonic-orchestra/0724356951556
+https://www.qobuz.com/nz-en/album/brahms-the-complete-symphonies-overtures-haydn-variations-violin-concerto-deutsches-requiem-alto-rhapsody-otto-klemperer/ukkiq8sj0z2na
+https://www.qobuz.com/ie-en/album/brahms-complete-symphonies-danish-chamber-orchestra-adam-fischer/ucqf26heconzb
+https://play.qobuz.com/album/0888608468800
+
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://www.qobuz.com/us-en/album/brahms-complete-symphonies-john-eliot-gardiner-royal-concertgebouw-orchestra/k5okvpywdrjrb
+
+# Schubert
+https://www.qobuz.com/us-en/album/schubert-piano-sonatas-d-959-960-krystian-zimerman/0002894798191
+https://open.qobuz.com/album/0002894565732
+https://play.qobuz.com/album/0794881650323
+https://www.qobuz.com/us-en/album/schubert-piano-sonatas-d-157-537-566-elisabeth-leonskaja/y9adpcxvg213a
+https://www.qobuz.com/us-en/album/schubert-piano-sonatas-d840-850-894-impromptus-d-899-klavierstucke-d-946-paul-lewis/3149020211526
+https://www.qobuz.com/us-en/album/schubert-piano-sonatas-vol-3-vladimir-feltsman/0710357633324
+https://play.qobuz.com/album/bykksqeug7vba
+https://www.qobuz.com/us-en/album/schubert-12-great-piano-sonatas-daniel-ben-pienaar/qz387ujgcuyoa
+https://www.qobuz.com/us-en/album/schubert-piano-sonatas-vol-2-yasuyo-yano/n844ti6gze7pb
+https://www.qobuz.com/nz-en/album/schubert-piano-sonatas-nos13-21-radu-lupu/0002894402952
+
+# Chopin
+https://play.qobuz.com/album/wrvlhrd1001mb
+https://www.qobuz.com/us-en/album/frederic-chopin-etudes-ballades-nocturnes-polonaise-fantaisie-svjatoslav-richter/bhlwa29vjfnjc
+https://open.qobuz.com/album/jxk7vy2bi56ta
+https://www.qobuz.com/us-en/album/chopin-the-nocturnes-maria-joao-pires/0002894470962
+https://play.qobuz.com/album/0002894151172
+https://www.qobuz.com/us-en/album/nocturnes-frederic-chopin/ltkcecfigltnc
+https://www.qobuz.com/be-fr/album/chopin-the-complete-nocturnes-stephane-de-may/5410939753222
+https://www.qobuz.com/us-en/album/chopin-nocturnes-maurizio-pollini/0002894775718
+https://play.qobuz.com/album/hs3oncnsrmthc
+https://www.qobuz.com/fi-en/album/chopin-les-nocturnes-integrale-nelson-freire/0002894782185
+
+# Debussy and Ravel
+https://www.qobuz.com/us-en/album/debussy-ravel-piano-music-claude-debussy-maurice-ravel/0730099427920
+https://www.qobuz.com/gb-en/album/debussy-ravel-skriabin-orchestral-works-vera-dulova-yu-bespolko-samuil-feinberg/j0fi6sfqn8dlc
+https://play.qobuz.com/album/0190295712709
+https://open.qobuz.com/album/jgasrwxdftwra
+https://www.qobuz.com/us-en/album/franck-ravel-and-debussy-piano-works-ivan-moravec/pmr0em2h0gjyc
+https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy
+not a link at all
+https://www.qobuz.com/us-en/album/chopin-debussy-ravel-kim-bernard/iw7uwnsj3k2fb
+https://play.qobuz.com/album/0002894467132
+https://www.qobuz.com/gb-en/album/ravel-debussy-detroit-symphony-orchestra-paul-paray/0002894343062
+https://www.qobuz.com/au-en/album/debussy-complete-orchestral-work-jun-markl-orchestre-national-de-lyon/0747313900237
+
+# Shostakovich
+https://www.qobuz.com/us-en/album/shostakovich-the-complete-string-quartets-quatuor-danel/piha0et69s7nb
+https://play.qobuz.com/album/vwz4hlgpu733b
+https://www.qobuz.com/ca-en/album/shostakovich-string-quartets-nos-3-7-8-borodin-quartet/0077775904154
+https://www.qobuz.com/gb-en/album/shostakovich-string-quartets-nos-2-7-10-jerusalem-quartet/q6ngg2a6cx1ta
+https://www.qobuz.com/se-en/album/shostakovich-string-quartets-nos-6-8-11-jerusalem-quartet/ri07ewkc9tuva
+https://play.qobuz.com/album/0896931004251
+https://www.qobuz.com/us-en/album/shostakovich-complete-string-quartets-vol-3-nos-13-15-cuarteto-casals/sroenecgh3wgc
+
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://www.qobuz.com/us-en/album/shostakovich-string-quartets-nos-1-8-14-borodin-quartet/0002894788209
+https://www.qobuz.com/au-en/album/shostakovich-string-quartets-nos-14-and-15-eder-quartet/tnht4t1znnm4b
+https://play.qobuz.com/album/bxzbm25db1luc
+
+# Vivaldi
+https://www.qobuz.com/us-en/album/vivaldi-the-four-seasons-il-giardino-armonico/0825646518340
+https://www.qobuz.com/us-en/album/vivaldi-the-four-seasons-i-musici-pina-carmirelli/0002894100012
+https://www.qobuz.com/us-en/album/vivaldi-the-four-seasons-janine-jansen/0002894756293
+https://play.qobuz.com/album/ifetgdk0smcoc
+https://www.qobuz.com/us-en/album/vivaldi-the-four-seasons-and-three-concertos-for-violin-and-orchestra-giuliano-carmignola/0886443374911
+https://www.qobuz.com/us-en/album/vivaldi-the-four-seasons-jordi-savall-alfia-bakieva/eoqrn3oez7exb
+https://open.qobuz.com/album/rnkpzum5nv0tc
+https://play.qobuz.com/album/mj4gr985z5tia
+
+# Handel
+https://www.qobuz.com/nz-en/album/handel-messiah-hwv-56-john-nelson-the-english-concert/o4hxf25t6nbdc
+https://www.qobuz.com/us-en/album/handel-messiah-kiri-te-kanawa-chicago-symphony-chorus-chicago-symphony-orchestra-sir-georg-solti/0002894143962
+https://www.qobuz.com/us-en/album/handel-messiah-emmanuelle-haim/0825646240524
+https://play.qobuz.com/album/0002894342972
+https://www.qobuz.com/gb-en/album/handel-messiah-hwv-56-ton-koopman-amsterdam-baroque-orchestra-the-sixteen/l0e0e9idsu9oc
+https://www.qobuz.com/us-en/album/handel-messiah-irish-baroque-orchestra-irish-baroque-choir-peter-whelan-hilary-cronin-helen-charlston-alexander-chance-nathan-mercieca-guy-cutting-frederick-long-and-edward-grint/wrz5imk2qqjvz
+
+# Tchaikovsky and Rachmaninoff
+https://www.qobuz.com/us-en/album/tchaikovsky-piano-concerto-no-1-rachmaninoff-piano-concerto-no-2-van-cliburn/vpwmr8k6vhuoa
+https://play.qobuz.com/album/0002894794884
+https://www.qobuz.com/au-en/album/rachmaninov-piano-concerto-no3-tchaikovsky-piano-concerto-no1-martha-argerich-radio-symphonie-orchester-berlin-riccardo-chailly-symphonieorchester-des-bayerischen-rundfunks-kyril-kondrashin/0002894466732
+https://open.qobuz.com/album/0002894211812
+https://www.qobuz.com/us-en/album/tchaikovsky-piano-concerto-no1-rachmaninov-preludes-sviatoslav-richter-wiener-symphoniker-herbert-von-karajan/0002894190682
+https://play.qobuz.com/album/i59fb6m9emafc
+https://www.qobuz.com/us-en/album/rachmaninoff-piano-concertos-1-4-leonard-pennario/mez0fhe2qdstc
+
+# Haydn
+https://www.qobuz.com/us-en/album/haydn-string-quartets-op-76-nos-1-3-franz-joseph-haydn/0730099531429
+https://www.qobuz.com/us-en/album/haydn-string-quartets-op76-nos-1-2-3-lindsay-string-quartet/0074362510762
+https://play.qobuz.com/album/z8f5nl7samp8a
+https://www.qobuz.com/us-en/album/haydn-the-string-quartets-collection-part-1-kaiser-franz-joseph-haydn-wiener-konzerthausquartett/wp2q4lz3q9txa
+https://www.qobuz.com/gb-en/album/haydn-string-quartets-op-20-no-4-op-74-no-3-the-horseman-guarneri-quartet/z3ofzo6syr39b
+https://www.qobuz.com/us-en/album/haydn-string-quartets-op-64-no-4-5-6-orlando-quartet/wq6s74jxfm15a
+https://play.qobuz.com/album/p9abx4eu967na
+https://open.qobuz.com/album/m3hz7dwrzcxoc
+https://www.qobuz.com/us-en/album/joseph-haydn-the-complete-string-quartets-played-on-period-instruments-festetics-quartet/b72sb67lxpnqa
+
+# Monteverdi and Purcell
+https://www.qobuz.com/ie-en/album/purcell-hail-bright-cecilia-z-328-ode-to-saint-cecilia-monteverdi-choir-english-baroque-soloists-john-eliot-gardiner/x3112va8f1gxc
+https://play.qobuz.com/album/0724356241657
+https://www.qobuz.com/no-en/album/purcell-king-arthur-z-628-john-eliot-gardiner/xgczlpd4r33fb
+https://www.qobuz.com/us-en/album/monteverdi-sacred-vocal-music-david-thomas-emma-kirkby-ian-partridge-peter-holman-roy-goodman-the-parley-of-instruments/gjrrhqkqub5zb
+
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://www.qobuz.com/us-en/album/monteverdi-orfeo-charles-medlam/0724348207050
+
+# Sibelius and Nielsen
+https://play.qobuz.com/album/d9p0ovsug2bra
+https://www.qobuz.com/ie-en/album/nielsen-complete-symphonies-london-symphony-orchestra-ole-schmidt/5055354425059
+https://www.qobuz.com/us-en/album/nielsen-symphony-no-1-sibelius-symphony-no-7-carl-nielsen-jean-sibelius/4011222205070
+https://www.qobuz.com/fi-en/album/sibelius-symphonies-nos-1-7-en-saga-finlandia-night-ride-and-sunrise-kurt-sanderling-berlin-symphony-orchestra/0782124205928
+https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy
+not a link at all
+https://play.qobuz.com/album/5099997360056
+https://www.qobuz.com/us-en/album/the-sibelius-edition-symphonies-1-7-sir-john-barbirolli/0724356729957
+https://www.qobuz.com/us-en/album/sibelius-symphonies-1-7-tapiola-3-late-fragments-oslo-philharmonic-orchestra-klaus-makela/qzo39sqmjui3a
+https://www.qobuz.com/us-en/album/nielsen-symphonies-nos-1-3-danish-national-symphony-orchestra/yqgoxkd1pkkec
