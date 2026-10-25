@@ -530,6 +530,28 @@ async fn a_long_mixed_list_keeps_only_qobuz_links_in_their_order() {
     );
 }
 
+/// The list of docs/demo, which the screenshots of the README import: real links to classical
+/// albums, a few comments, and links to other sites.
+#[tokio::test]
+async fn the_demo_list_of_classical_albums_is_read_whole() {
+    let app = TestApp::start().await;
+    app.catalogue.client.end_session();
+    let browser = app.browser();
+    let list = include_str!("../docs/demo/classical-links.txt");
+
+    let answer = browser.post_text("/api/downloads/import", list).await;
+
+    assert_eq!(answer.status, 200);
+    let counts = answer.json();
+    assert_eq!(counts["added"], 141);
+    assert_eq!(counts["duplicates"], 0);
+    // The youtube and spotify links, and the line that is not a link
+    assert_eq!(counts["invalid"], 10);
+    let queue = queue_of(&browser).await;
+    assert_eq!(queue.len(), 141);
+    assert!(queue.iter().all(|item| item["kind"] == "album"));
+}
+
 #[tokio::test]
 async fn the_queue_sent_to_the_page_leaves_out_what_only_the_server_needs() {
     let app = TestApp::start().await;
