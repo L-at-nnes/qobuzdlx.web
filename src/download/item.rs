@@ -87,6 +87,9 @@ pub struct QueueItem {
     pub downloaded: u32,
     pub skipped: u32,
     pub failures: Vec<FailedTrack>,
+    /// What the files written weigh, in bytes: it tells how heavy an item of this kind usually is.
+    #[serde(default)]
+    pub bytes: u64,
     /// The files of a playlist already in place, kept from one "retry the failures" to the next so
     /// that the final `.m3u8` lists them all.
     pub playlist_entries: Vec<PlaylistEntry>,
@@ -120,6 +123,7 @@ impl QueueItem {
             downloaded: 0,
             skipped: 0,
             failures: Vec::new(),
+            bytes: 0,
             playlist_entries: Vec::new(),
             only_track_ids: None,
         }
@@ -134,6 +138,7 @@ impl QueueItem {
     pub fn reset_outcome(&mut self) {
         self.downloaded = 0;
         self.skipped = 0;
+        self.bytes = 0;
         self.failures.clear();
         self.playlist_entries.clear();
         self.only_track_ids = None;

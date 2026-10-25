@@ -71,6 +71,7 @@ async fn an_album_asked_for_is_downloaded() {
     assert_eq!(queue[0]["label"], "Kind of Blue");
     assert_eq!(queue[0]["sub_label"], "Miles Davis");
     assert_eq!(queue[0]["downloaded"], 2);
+    assert!(queue[0]["bytes"].as_u64().unwrap() > 0, "{}", queue[0]);
     assert!(
         app.music
             .path()

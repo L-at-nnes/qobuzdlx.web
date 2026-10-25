@@ -103,6 +103,8 @@ export interface QueueItem {
 	finished_at: number | null;
 	downloaded: number;
 	skipped: number;
+	/** What the files written weigh. */
+	bytes: number;
 	failures: FailedTrack[];
 }
 

@@ -169,6 +169,7 @@ pub struct ItemView<'a> {
     pub finished_at: Option<u64>,
     pub downloaded: u32,
     pub skipped: u32,
+    pub bytes: u64,
     pub failures: &'a [FailedTrack],
 }
 
@@ -189,6 +190,7 @@ impl<'a> From<&'a QueueItem> for ItemView<'a> {
             finished_at: item.finished_at,
             downloaded: item.downloaded,
             skipped: item.skipped,
+            bytes: item.bytes,
             failures: &item.failures,
         }
     }

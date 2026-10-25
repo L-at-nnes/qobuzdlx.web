@@ -157,6 +157,9 @@ impl Reporter for ItemReporter {
     fn track_saved(&self, saved: TrackSaved) {
         let bytes = std::fs::metadata(&saved.path).map_or(0, |file| file.len());
         self.inner.count_saved(&saved.album_id, bytes);
+        if let Some(item) = locked(&self.inner.state).queue.get_mut(&self.item_id) {
+            item.bytes = item.bytes.saturating_add(bytes);
+        }
         self.folders
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

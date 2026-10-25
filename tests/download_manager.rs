@@ -615,6 +615,38 @@ async fn something_queued_while_paused_waits_for_the_resume() {
     );
 }
 
+/// Every file with this extension below `folder`, and what they weigh together.
+fn weight_of(folder: &std::path::Path, extension: &str) -> u64 {
+    let mut total = 0;
+    for entry in std::fs::read_dir(folder).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            total += weight_of(&path, extension);
+        } else if path.extension().is_some_and(|found| found == extension) {
+            total += entry.metadata().unwrap().len();
+        }
+    }
+    total
+}
+
+#[tokio::test]
+async fn an_item_keeps_what_the_files_it_wrote_weigh() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A"), (22, 2, "B")]);
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    finished(&manager, &album_url("one")).await;
+
+    let item = item_of(&manager, &album_url("one"));
+
+    assert_eq!(item.downloaded, 2);
+    assert!(item.bytes > 0);
+    assert_eq!(item.bytes, weight_of(rig.music.path(), "flac"));
+}
+
 #[tokio::test]
 async fn a_pause_survives_a_restart_until_it_is_lifted() {
     let rig = Rig::new().await;
