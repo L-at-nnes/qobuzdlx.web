@@ -26,7 +26,7 @@ I rewrote it because I was not happy with the interface or with the language it 
 - **Made for large libraries.** Several tracks of an album download at once (1 to 6, 3 by default): Qobuz serves each file at a modest speed, so this is what turns weeks into days. A queue of thousands of albums stays light in the interface, an album already on disk is gone through with one request, and the queue stops by itself, with a notice, when the disk is full instead of failing every item.
 - **Import a list.** A text file with one Qobuz link per line (`play.qobuz.com`, `open.qobuz.com`, `www.qobuz.com` store links, with or without `https://`); blank lines, lines starting with `#` and links to other sites are skipped. The whole list is read, then queued in one step, in order, and the queue goes through it one item at a time: lists of several thousand links are expected.
 - **Signing out does not lose the queue.** Sign out, or let the session expire: the running item goes back to waiting instead of failing, and everything resumes by itself once you sign in again, with this account or another one. The queue can also be paused and resumed by hand.
-- **Anti rate-limit.** Random waits between tracks and between albums, a long break every so many items, and a cooldown that doubles when Qobuz answers "too many requests", so that a queue of thousands of links does not look like a machine going as fast as it can. See [Importing thousands of links](#importing-thousands-of-links).
+- **Anti rate-limit.** Random waits between tracks and between albums, a long break as soon as the tracks, albums or megabytes downloaded reach a limit you set, and a cooldown that doubles when Qobuz answers "too many requests", so that a queue of thousands of links does not look like a machine going as fast as it can. See [Importing thousands of links](#importing-thousands-of-links).
 - **Resilient transfers.** The Qobuz CDN cuts connections after a few megabytes; a download goes on from where it stopped. Every FLAC file is decoded after the transfer to be sure it is whole, and a damaged file is fetched again.
 - **Tags and covers.** Vorbis comments and ID3v2.4 with every tag switchable, embedded and saved covers at a size you choose, parental advisory markers, optional repair of the missing FLAC checksum.
 - **Naming you control.** Templates with more than thirty variables for artist, album, track, compilation, playlist and disc folders, tried live on an invented release, with the problems of each template pointed out. A template can never leave the download folder.
@@ -130,18 +130,79 @@ Import the file from the Downloads page. Every line is read first, then the vali
 
 **Qobuz publishes no rate limit, and none has been measured for this project.** What follows is advice drawn from how such services usually behave, not a guarantee: a very large queue downloaded flat out is the pattern most likely to be slowed down (HTTP 429) or looked at. The *Anti rate-limit* section of the settings gives three starting points that you can adjust:
 
-| Profile | Before a track | Between albums | Long break | Tracks at once | After "too many requests" |
-|---|---|---|---|---|---|
-| Light (a few albums) | 0.5 – 1.5 s | 3 – 8 s | none | 3 | 60 s |
-| Careful (hundreds of links) | 1 – 4 s | 8 – 20 s | 2 – 5 min every 25 items | 2 | 120 s |
-| Patient (thousands of links) | 2 – 6 s | 20 – 60 s | 5 – 15 min every 20 items | 1 | 300 s |
+| Profile | Before a track | Between albums | Long break, after any of | Break length | Tracks at once | After "too many requests" |
+|---|---|---|---|---|---|---|
+| Light (a few albums, the default) | 0.5 – 1.5 s | 3 – 8 s | 10 albums, 150 tracks, 3 GB | 2 – 5 min | 3 | 60 s |
+| Careful (hundreds of links) | 1 – 4 s | 8 – 20 s | 6 albums, 100 tracks, 2 GB | 3 – 8 min | 2 | 120 s |
+| Patient (thousands of links) | 2 – 6 s | 20 – 60 s | 4 albums, 60 tracks, 1 GB | 5 – 15 min | 1 | 300 s |
 
+- The **long break** has three conditions, each of which can be switched off: tracks downloaded, albums downloaded, data downloaded (in megabytes, a megabyte being a million bytes). As soon as **any one** is reached since the last break, the queue rests for a length drawn between the two bounds you give in minutes, then the count starts again. A track already on the disk does not count, an album counts once it has written its first file, and the break comes between two albums, never in the middle of one, including between the albums of an artist or a label.
 - Every wait is **drawn at random** between its two bounds, each time: a fixed pause is a pattern, a drawn one is not.
 - A track already on the disk costs no wait, and an album that found everything in place only waits the shortest value: going through a list again is quick.
 - When Qobuz answers 429 even after the client's own retries, the item is **not failed**: it goes back to its place, the queue waits the cooldown (doubled each time it happens again, up to 64 times, one hour at most) and tries again by itself. The Downloads page and the log say when.
 - The number of tracks downloaded at once (Advanced) is the setting that most changes how many requests per minute Qobuz receives. For a long queue, use 1 or 2.
 - A queue left to run overnight is gentler than the same queue run in a hurry. If you still meet 429, move to the next profile; if you never do, you can move back.
 - Signing out, or a session that expires, pauses the queue without failing anything. Sign in again and it goes on. *Pause* in the Downloads page does the same by hand.
+
+## A tour with a queue of 2,400 albums
+
+Everything below is the real interface, filled with fake data: the account, the progress and the queue are simulated, nothing talks to Qobuz. The queue holds 2,400 albums built from the 141 real Qobuz links of classical music in [`docs/demo/classical-links.txt`](docs/demo/classical-links.txt), repeated in a shuffled order, with covers drawn from the title.
+
+The list is a good one to try the import with: it mixes the spellings of a link (`play.qobuz.com`, `open.qobuz.com`, `www.qobuz.com` with its country and title), comments, blank lines, a YouTube and a Spotify link and a line that is not a link at all. 141 are kept, 10 lines are reported as ignored. A test (`the_demo_list_of_classical_albums_is_read_whole`) keeps that true.
+
+### The queue
+
+<p align="center">
+  <img src="docs/screenshots/queue-thousands-dark.png" alt="2232 albums to go: the album in progress with three tracks downloading at once, then the finished items" width="880">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/queue-waiting-dark.png" alt="The waiting items, with the button that shows the 2131 others" width="430">
+  <img src="docs/screenshots/queue-log-dark.png" alt="The log, with the waits between albums and the answer of Qobuz asking to slow down" width="430">
+</p>
+
+Only the first hundred waiting items are drawn, and the last twenty finished ones: a queue of thousands stays light, and a button shows more.
+
+### Import
+
+<p align="center">
+  <img src="docs/screenshots/import-list-light.png" alt="After importing the file: 141 added, 10 lines ignored" width="880">
+</p>
+
+### Waits, breaks and pauses
+
+<p align="center">
+  <img src="docs/screenshots/queue-break-light.png" alt="The queue takes a long break and says until when" width="430">
+  <img src="docs/screenshots/queue-rate-limited-light.png" alt="Qobuz asked to slow down: the queue waits, then tries again by itself" width="430">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/queue-paused-dark.png" alt="The queue paused by hand, what is waiting is kept" width="430">
+  <img src="docs/screenshots/queue-phone.png" alt="The queue on a phone" width="240">
+</p>
+
+### The Anti rate-limit settings
+
+<p align="center">
+  <img src="docs/screenshots/rate-limit-light.png" alt="The starting points, the short waits and the three conditions of a long break" width="880">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/rate-limit-patient-dark.png" alt="The Patient starting point chosen: a break every 4 albums, 60 tracks or 1 GB" width="430">
+  <img src="docs/screenshots/rate-limit-phone.png" alt="The starting points on a phone" width="240">
+</p>
+
+### Search
+
+<p align="center">
+  <img src="docs/screenshots/search-goldberg-dark.png" alt="Ten recordings of the Goldberg Variations, with their quality" width="880">
+</p>
+
+### Making these screenshots again
+
+1. Start the server on another port than the usual one, with throwaway folders: `CONFIG_PATH=/tmp/demo/config DOWNLOADS_PATH=/tmp/demo/music BIND=127.0.0.1:8091 cargo run`.
+2. Start the interface in development, in `web/`: `npm run dev`.
+3. With Playwright, run [`docs/demo/mock-api.js`](docs/demo/mock-api.js) on a page (it answers the account, the catalogue, the queue and the log, and forwards the settings and the import to the server of step 1), then open `http://localhost:5173/downloads?scene=break`. The scene is one of `queue` (the default), `break`, `rate_limited`, `paused` or `empty`.
 
 ## Extensions
 
