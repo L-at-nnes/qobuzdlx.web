@@ -25,8 +25,9 @@ I rewrote it because I was not happy with the interface or with the language it 
 - **A queue that runs unattended.** It survives a restart: what was waiting resumes, files already on disk are recognised, and the saved Qobuz session is opened again. Reorder, skip an album, cancel an item, retry only the tracks that failed.
 - **Made for large libraries.** Several tracks of an album download at once (1 to 6, 3 by default): Qobuz serves each file at a modest speed, so this is what turns weeks into days. A queue of thousands of albums stays light in the interface, an album already on disk is gone through with one request, and the queue stops by itself, with a notice, when the disk is full instead of failing every item.
 - **Import a list.** A text file with one Qobuz link per line (`play.qobuz.com`, `open.qobuz.com`, `www.qobuz.com` store links, with or without `https://`); blank lines, lines starting with `#` and links to other sites are skipped. The whole list is read, then queued in one step, in order, and the queue goes through it one item at a time: lists of several thousand links are expected.
-- **Signing out does not lose the queue.** Sign out, or let the session expire: the running item goes back to waiting instead of failing, and everything resumes by itself once you sign in again, with this account or another one. The queue can also be paused and resumed by hand.
+- **Signing out does not lose the queue.** Sign out, or let the session expire: the running item goes back to waiting instead of failing, and everything resumes by itself once you sign in again, with this account or another one. The queue can also be paused and resumed by hand, and a pause lasts until you lift it, a restart of the server included.
 - **Anti rate-limit.** Random waits between tracks and between albums, a long break as soon as the tracks, albums or megabytes downloaded reach a limit you set, and a cooldown that doubles when Qobuz answers "too many requests", so that a queue of thousands of links does not look like a machine going as fast as it can. See [Importing thousands of links](#importing-thousands-of-links).
+- **Time left.** A queue of thousands of albums says how long it still needs, as a range and a finishing time, learned from the albums it has finished (albums of ten tracks and of five hundred alike), and counting the waits and long breaks of the settings. See [Time left](#time-left).
 - **Resilient transfers.** The Qobuz CDN cuts connections after a few megabytes; a download goes on from where it stopped. Every FLAC file is decoded after the transfer to be sure it is whole, and a damaged file is fetched again.
 - **Tags and covers.** Vorbis comments and ID3v2.4 with every tag switchable, embedded and saved covers at a size you choose, parental advisory markers, optional repair of the missing FLAC checksum.
 - **Naming you control.** Templates with more than thirty variables for artist, album, track, compilation, playlist and disc folders, tried live on an invented release, with the problems of each template pointed out. A template can never leave the download folder.
@@ -142,7 +143,23 @@ Import the file from the Downloads page. Every line is read first, then the vali
 - When Qobuz answers 429 even after the client's own retries, the item is **not failed**: it goes back to its place, the queue waits the cooldown (doubled each time it happens again, up to 64 times, one hour at most) and tries again by itself. The Downloads page and the log say when.
 - The number of tracks downloaded at once (Advanced) is the setting that most changes how many requests per minute Qobuz receives. For a long queue, use 1 or 2.
 - A queue left to run overnight is gentler than the same queue run in a hurry. If you still meet 429, move to the next profile; if you never do, you can move back.
-- Signing out, or a session that expires, pauses the queue without failing anything. Sign in again and it goes on. *Pause* in the Downloads page does the same by hand.
+- Signing out, or a session that expires, pauses the queue without failing anything. Sign in again and it goes on. *Pause* in the Downloads page does the same by hand, and it is remembered across restarts (`queue-state.json` next to `queue.json`) until you press *Go on*.
+- A 24-bit album weighs about a gigabyte: with the default 3 GB, the data condition is the one that triggers first on a hi-res queue, every three albums or so. Raise it, or switch it off, if the breaks come too often for you.
+
+## Time left
+
+The Downloads page tells how long the queue still needs, once three albums have been finished:
+
+> Time left: **about 3 d 3 h** · between 3 d 1 h and 3 d 4 h · done around Sat 3:02 PM
+
+A queue mixes albums of ten tracks and albums of five hundred, and nothing says which is which before they run, so the figure is worked out, not read:
+
+- **What an album costs** is learned from the latest finished albums of the queue (they are kept with their duration, their number of tracks and their weight): seconds per written track, which includes the speed of the transfers and the wait before each track, and the average number of tracks per album. An album that was interrupted by a pause is recognised by its duration and left out. Albums that were found already on the disk count for what they cost, which is little, so going through an old list again gives a short estimate.
+- **What the settings add** is counted for what it is, album after album as the worker will go through them: the wait between two albums, and a long break, of the average length, whenever tracks, albums or megabytes reach their limit (the weight of an album is learned too). The album in progress counts only for what it has left.
+- **The range** is where eight outcomes in ten should fall. It comes from how much the size of the albums varies, and from how steady the time per track has been, and it **narrows as more albums wait**: for a few albums it is wide, for thousands it is a few hours.
+- **Not counted**: items whose size cannot be guessed (a discography, a label, a playlist, the favourites), which the page says; a refusal from Qobuz, a pause, a sign-out. The figure is hidden while the queue is paused, and starts again from what has been learned.
+
+The code is `web/src/lib/eta.ts`, a function of the queue, the progress and the settings, with its own tests.
 
 ## A tour with a queue of 2,400 albums
 
@@ -167,6 +184,12 @@ Only the first hundred waiting items are drawn, and the last twenty finished one
 
 <p align="center">
   <img src="docs/screenshots/import-list-light.png" alt="After importing the file: 141 added, 10 lines ignored" width="880">
+</p>
+
+### Time left
+
+<p align="center">
+  <img src="docs/screenshots/queue-estimate-dark.png" alt="The time left with its range and finishing time, and the explanation of how it is worked out" width="880">
 </p>
 
 ### Waits, breaks and pauses
