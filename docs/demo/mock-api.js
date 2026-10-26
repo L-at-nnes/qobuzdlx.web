@@ -215,10 +215,15 @@ async (page) => {
 		const done = finishedIn(scene);
 		const running = scene === 'queue' ? FINISHED : -1;
 		const items = [];
+		// Finished albums took what their tracks needed, so that the estimate has something to learn from
+		let clock = now() - 5400;
 		for (let index = 0; index < (empty ? 0 : TOTAL); index++) {
 			const album = catalogue[order[index]];
 			const status = index < done ? 'completed' : index === running ? 'running' : 'pending';
 			const failed = status === 'completed' && index % 41 === 7;
+			const took = Math.round(album.tracks_count * (1.8 + draw() * 1.4));
+			const startedAt = clock;
+			if (status === 'completed') clock += took + 6;
 			items.push({
 				id: `q${String(index).padStart(5, '0')}`,
 				url: album.url,
@@ -230,10 +235,11 @@ async (page) => {
 				status: failed ? 'failed' : status,
 				error: failed ? 'Qobuz does not offer this album for download in your country.' : null,
 				enqueued_at: now() - 7200,
-				started_at: status === 'pending' ? null : now() - 5400 + index * 25,
-				finished_at: status === 'completed' || failed ? now() - 5400 + index * 25 + 22 : null,
+				started_at: status === 'pending' ? null : startedAt,
+				finished_at: status === 'completed' || failed ? startedAt + took : null,
 				downloaded: status === 'completed' && !failed ? album.tracks_count : status === 'running' ? 7 : 0,
 				skipped: 0,
+				bytes: status === 'completed' && !failed ? album.tracks_count * (album.bit_depth === 24 ? 41_000_000 : 29_000_000) : 0,
 				failures: []
 			});
 		}
