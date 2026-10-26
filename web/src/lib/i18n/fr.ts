@@ -457,6 +457,25 @@ export const fr: Record<Key, Message> = {
 	'delay.unit.seconds': 'secondes',
 	'delay.unit.minutes': 'minutes',
 	'delay.reversed': 'La première valeur ne peut pas dépasser la seconde.',
+	'eta.label': 'Temps restant :',
+	'eta.about': 'environ {time}',
+	'eta.range': 'entre {low} et {high}',
+	'eta.done': 'fini vers {time}',
+	'eta.how': 'Comment c\'est calculé',
+	'eta.basis':
+		"Appris sur les {albums} derniers albums terminés : {seconds} s par piste, {tracks} pistes par album, {breaks}. Les albums de dix pistes et ceux de cinq cents ne se distinguent qu'une fois lancés : le chiffre est donc la moyenne de ce qui a été fait, et la fourchette est l'endroit où huit résultats sur dix devraient tomber ; elle se resserre quand plus d'albums attendent. Les attentes et pauses des réglages sont comptées ; un refus de Qobuz, une pause ou une déconnexion ne le sont pas.",
+	'eta.breaks': {
+		one: '{count} longue pause prévue',
+		other: '{count} longues pauses prévues'
+	},
+	'eta.uncounted': {
+		one: "{count} élément en attente n'est pas compté : sa taille ne peut pas être devinée (une discographie, une playlist…).",
+		other: '{count} éléments en attente ne sont pas comptés : leur taille ne peut pas être devinée (discographies, playlists…).'
+	},
+	'eta.lessThanMinute': "moins d'une minute",
+	'eta.unit.min': 'min',
+	'eta.unit.h': 'h',
+	'eta.unit.d': 'j',
 	'downloads.wait.between_albums': "Attente avant l'album suivant, jusqu'à {time}.",
 	'downloads.wait.break': "Pause en cours, jusqu'à {time}.",
 	'downloads.wait.rate_limited': 'Qobuz a demandé de ralentir. Nouvel essai à {time}.',

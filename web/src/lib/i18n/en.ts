@@ -444,6 +444,25 @@ export const en = {
 	'delay.unit.seconds': 'seconds',
 	'delay.unit.minutes': 'minutes',
 	'delay.reversed': 'The first value cannot be larger than the second.',
+	'eta.label': 'Time left:',
+	'eta.about': 'about {time}',
+	'eta.range': 'between {low} and {high}',
+	'eta.done': 'done around {time}',
+	'eta.how': 'How this is worked out',
+	'eta.basis':
+		'Learned from the last {albums} finished albums: {seconds} s per track, {tracks} tracks per album, {breaks}. Albums of ten tracks and of five hundred are told apart only once they run, so the figure is the average of what was done, and the range is where eight outcomes in ten should fall: it narrows as more albums wait. The waits and breaks of the settings are counted; a refusal from Qobuz, a pause or a sign-out are not.',
+	'eta.breaks': {
+		one: '{count} long break planned',
+		other: '{count} long breaks planned'
+	},
+	'eta.uncounted': {
+		one: '{count} waiting item is not counted: its size cannot be guessed (a discography, a playlist…).',
+		other: '{count} waiting items are not counted: their size cannot be guessed (discographies, playlists…).'
+	},
+	'eta.lessThanMinute': 'less than a minute',
+	'eta.unit.min': 'min',
+	'eta.unit.h': 'h',
+	'eta.unit.d': 'd',
 	'downloads.wait.between_albums': 'Waiting before the next album, until {time}.',
 	'downloads.wait.break': 'Taking a break, until {time}.',
 	'downloads.wait.rate_limited': 'Qobuz asked to slow down. Trying again at {time}.',

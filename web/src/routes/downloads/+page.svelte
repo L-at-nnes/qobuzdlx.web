@@ -6,6 +6,7 @@
 	import ImportList from '#lib/components/ImportList.svelte';
 	import LogPanel from '#lib/components/LogPanel.svelte';
 	import NowDownloading from '#lib/components/NowDownloading.svelte';
+	import QueueEstimate from '#lib/components/QueueEstimate.svelte';
 	import QueueRow from '#lib/components/QueueRow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import { locale, t } from '#lib/i18n/index.svelte.ts';
@@ -137,6 +138,8 @@
 					/>
 				</div>
 			</div>
+
+			<QueueEstimate />
 
 			{#if shown.hiddenFinished > 0}
 				<div class="more">
