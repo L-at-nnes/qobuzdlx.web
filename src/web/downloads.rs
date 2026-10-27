@@ -4,7 +4,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::sse::{Event as Sse, KeepAlive};
 use axum::response::{IntoResponse, Response};
@@ -15,10 +15,12 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::sync::broadcast::error::RecvError;
 
-use super::dto::{ItemView, SnapshotView};
+use super::dto::{ItemView, QueueView, SnapshotView};
 use super::error::{ApiError, ApiResult};
 use super::state::AppState;
-use crate::download::{Display, EnqueuedCounts, Event, Manager, Progress, Snapshot, parse_list};
+use crate::download::{
+    Display, EnqueuedCounts, Event, Manager, Progress, Snapshot, UrlState, Window, parse_list,
+};
 
 /// The largest list that is read: some 100 000 lines.
 const IMPORT_LIMIT: usize = 16 * 1024 * 1024;
@@ -31,6 +33,7 @@ pub fn routes() -> Router<AppState> {
             post(import).layer(DefaultBodyLimit::max(IMPORT_LIMIT)),
         )
         .route("/downloads/events", get(events))
+        .route("/downloads/states", post(states))
         .route("/downloads/cancel", post(cancel))
         .route("/downloads/skip", post(skip))
         .route("/downloads/pause", post(pause))
@@ -45,8 +48,48 @@ pub fn routes() -> Router<AppState> {
         .route("/log/export", get(export_log))
 }
 
-async fn snapshot(State(state): State<AppState>) -> Response {
-    Json(SnapshotView::from(&state.downloads.snapshot())).into_response()
+/// How much of the queue a page asks for. Left out, it is what a page shows at first.
+#[derive(Deserialize)]
+struct WindowQuery {
+    pending: Option<usize>,
+    finished: Option<usize>,
+}
+
+impl WindowQuery {
+    fn window(&self) -> Window {
+        let usual = Window::default();
+        Window {
+            pending: self.pending.unwrap_or(usual.pending),
+            finished: self.finished.unwrap_or(usual.finished),
+        }
+    }
+}
+
+async fn snapshot(State(state): State<AppState>, Query(query): Query<WindowQuery>) -> Response {
+    Json(SnapshotView::from(&state.downloads.view(query.window()))).into_response()
+}
+
+#[derive(Deserialize)]
+struct StatesRequest {
+    urls: Vec<String>,
+}
+
+/// The most addresses asked about at once: a page of results has a few dozen.
+const STATES_LIMIT: usize = 1000;
+
+/// What each address stands for in the queue, so that a list of results can tick what is done and
+/// grey out what is waiting, without being given the queue.
+async fn states(
+    State(state): State<AppState>,
+    Json(request): Json<StatesRequest>,
+) -> ApiResult<Json<std::collections::HashMap<String, UrlState>>> {
+    if request.urls.len() > STATES_LIMIT {
+        return Err(ApiError::bad_request(
+            "too_many_addresses",
+            "too many addresses at once",
+        ));
+    }
+    Ok(Json(state.downloads.url_states(&request.urls)))
 }
 
 #[derive(Deserialize)]
@@ -238,12 +281,14 @@ async fn export_log(State(state): State<AppState>) -> Response {
 /// missed.
 async fn events(
     State(state): State<AppState>,
+    Query(query): Query<WindowQuery>,
 ) -> axum::response::Sse<impl Stream<Item = Result<Sse, Infallible>>> {
     let manager = state.downloads.clone();
     let mut receiver = manager.subscribe();
+    let window = query.window();
 
     let stream = async_stream::stream! {
-        let first = manager.snapshot();
+        let first = manager.view(window);
         yield Ok(queue_event(&first));
         yield Ok(progress_event(&first.progress));
 
@@ -261,11 +306,11 @@ async fn events(
 
             // What changed is told once for a burst of changes: with a thousand albums waiting, a
             // download changes something many times a second
-            let window = tokio::time::sleep(COALESCE);
-            tokio::pin!(window);
+            let burst = tokio::time::sleep(COALESCE);
+            tokio::pin!(burst);
             loop {
                 tokio::select! {
-                    () = &mut window => break,
+                    () = &mut burst => break,
                     next = receiver.recv() => match held.absorb(next) {
                         Absorbed::Send(event) => yield Ok(event),
                         Absorbed::Held => {}
@@ -276,7 +321,7 @@ async fn events(
                     },
                 }
             }
-            for event in held.take(&manager) {
+            for event in held.take(&manager, window) {
                 yield Ok(event);
             }
         }
@@ -334,10 +379,10 @@ impl Held {
     }
 
     /// What is to be told now, and forgets it. The whole queue says what an item's counts say.
-    fn take(&mut self, manager: &Manager) -> Vec<Sse> {
+    fn take(&mut self, manager: &Manager, window: Window) -> Vec<Sse> {
         let mut events = Vec::new();
         if self.queue {
-            events.push(queue_event(&manager.snapshot()));
+            events.push(queue_event(&manager.view(window)));
         } else {
             for id in &self.items {
                 if let Some(item) = manager.item(id) {
@@ -361,18 +406,7 @@ fn json_event<T: Serialize>(name: &str, value: &T) -> Sse {
 }
 
 fn queue_event(snapshot: &Snapshot) -> Sse {
-    #[derive(Serialize)]
-    struct Queue<'a> {
-        queue: Vec<ItemView<'a>>,
-        remaining: usize,
-    }
-    json_event(
-        "queue",
-        &Queue {
-            queue: snapshot.queue.iter().map(ItemView::from).collect(),
-            remaining: snapshot.remaining,
-        },
-    )
+    json_event("queue", &QueueView::from(snapshot))
 }
 
 fn progress_event(progress: &Progress) -> Sse {

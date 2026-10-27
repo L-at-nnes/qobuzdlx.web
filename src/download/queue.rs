@@ -1,4 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+use serde::Serialize;
 
 use super::item::{Display, ItemKind, ItemStatus, QueueItem, now};
 use super::url::QobuzUrl;
@@ -24,6 +26,84 @@ pub struct EnqueuedCounts {
     pub added: u32,
     pub requeued: u32,
     pub already_queued: u32,
+}
+
+/// How much of the queue a listener asks to be given: the queue can hold many thousands of waiting
+/// items, and a page shows a hundred of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Window {
+    /// How many waiting items, from the first one.
+    pub pending: usize,
+    /// How many finished items, the latest ones.
+    pub finished: usize,
+}
+
+impl Window {
+    /// Everything.
+    pub const ALL: Self = Self {
+        pending: usize::MAX,
+        finished: usize::MAX,
+    };
+}
+
+impl Default for Window {
+    fn default() -> Self {
+        Self {
+            pending: 100,
+            finished: 20,
+        }
+    }
+}
+
+/// How many items the queue holds, by what they are doing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Counts {
+    pub pending: usize,
+    pub running: usize,
+    pub finished: usize,
+}
+
+/// What a finished album cost, for guessing what the next ones will.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Sample {
+    pub downloaded: u32,
+    pub skipped: u32,
+    /// From its start to its end, when both are known.
+    pub seconds: Option<u64>,
+    pub bytes: u64,
+}
+
+/// What is waiting, as far as its size can be guessed: an album is an album, a discography is not.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Work {
+    pub albums: usize,
+    pub tracks: usize,
+    /// Items that give no idea of their size (artists, labels, playlists, favourites).
+    pub uncounted: usize,
+}
+
+/// The finished albums looked at to guess the cost of the next ones.
+const HISTORY: usize = 200;
+
+/// A part of the queue, with what the rest of it comes to.
+#[derive(Debug, Clone, Default)]
+pub struct View {
+    /// The waiting items asked for, the one running, and the finished items asked for, in the order
+    /// of the queue.
+    pub items: Vec<QueueItem>,
+    pub hidden_pending: usize,
+    pub hidden_finished: usize,
+    pub counts: Counts,
+    pub history: Vec<Sample>,
+    pub work: Work,
+}
+
+/// What an address stands for in the queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UrlState {
+    Queued,
+    Done,
 }
 
 /// The download queue and the rules that govern it. Pure data: the worker and the locking live in
@@ -292,6 +372,98 @@ impl Queue {
         item.requeue();
         self.items.push(item);
         true
+    }
+
+    /// A part of the queue and what the whole of it comes to, in one go through it.
+    #[must_use]
+    pub fn view(&self, window: Window) -> View {
+        let mut counts = Counts::default();
+        let mut work = Work::default();
+        for item in &self.items {
+            match item.status {
+                ItemStatus::Pending => {
+                    counts.pending += 1;
+                    match item.kind {
+                        ItemKind::Album => work.albums += 1,
+                        ItemKind::Track => work.tracks += 1,
+                        _ => work.uncounted += 1,
+                    }
+                }
+                ItemStatus::Running => counts.running += 1,
+                _ => counts.finished += 1,
+            }
+        }
+
+        let skipped_finished = counts.finished.saturating_sub(window.finished);
+        let (mut pending_seen, mut finished_seen) = (0, 0);
+        let items = self
+            .items
+            .iter()
+            .filter(|item| match item.status {
+                ItemStatus::Running => true,
+                ItemStatus::Pending => {
+                    pending_seen += 1;
+                    pending_seen <= window.pending
+                }
+                _ => {
+                    finished_seen += 1;
+                    finished_seen > skipped_finished
+                }
+            })
+            .cloned()
+            .collect();
+
+        let mut history: Vec<Sample> = self
+            .items
+            .iter()
+            .rev()
+            .filter(|item| {
+                item.kind == ItemKind::Album
+                    && item.status == ItemStatus::Completed
+                    && item.downloaded + item.skipped > 0
+            })
+            .take(HISTORY)
+            .map(|item| Sample {
+                downloaded: item.downloaded,
+                skipped: item.skipped,
+                seconds: item
+                    .started_at
+                    .zip(item.finished_at)
+                    .map(|(start, end)| end.saturating_sub(start)),
+                bytes: item.bytes,
+            })
+            .collect();
+        // Oldest first, as the queue is
+        history.reverse();
+
+        View {
+            items,
+            hidden_pending: counts.pending.saturating_sub(window.pending),
+            hidden_finished: skipped_finished,
+            counts,
+            history,
+            work,
+        }
+    }
+
+    /// What each of these addresses stands for: waiting or running, or downloaded. The others are
+    /// not in the answer.
+    #[must_use]
+    pub fn states(&self, urls: &[String]) -> HashMap<String, UrlState> {
+        let wanted: HashSet<String> = urls.iter().map(|url| url.to_ascii_lowercase()).collect();
+        let mut states: HashMap<String, UrlState> = HashMap::new();
+        for item in &self.items {
+            let url = item.url.to_ascii_lowercase();
+            if !wanted.contains(&url) {
+                continue;
+            }
+            if !item.is_finished() {
+                states.insert(url, UrlState::Queued);
+            } else if item.status == ItemStatus::Completed {
+                states.entry(url).or_insert(UrlState::Done);
+            }
+        }
+        states
     }
 
     /// Items that are waiting or running: what the badge of the menu counts.
@@ -756,5 +928,204 @@ mod tests {
         assert!(queue.is_done("A"));
         assert!(!queue.is_done("b"), "a failure is not a success");
         assert!(queue.has_pending());
+    }
+
+    /// Ten finished items, the running one, then `waiting` waiting ones.
+    fn long_queue(waiting: usize) -> Queue {
+        let mut queue = Queue::default();
+        let total = 10 + 1 + waiting;
+        for number in 0..total {
+            queue.enqueue(
+                &format!("https://play.qobuz.com/album/{number}"),
+                ItemKind::Album,
+                &number.to_string(),
+                Display::default(),
+            );
+        }
+        for _ in 0..10 {
+            let id = queue.start_next().unwrap().id;
+            queue.finish(&id, ItemStatus::Completed, None);
+        }
+        queue.start_next().unwrap();
+        queue
+    }
+
+    #[test]
+    fn a_window_holds_the_first_waiting_items_the_last_finished_ones_and_the_running_one() {
+        let queue = long_queue(50);
+
+        let view = queue.view(Window {
+            pending: 5,
+            finished: 3,
+        });
+
+        let statuses: Vec<ItemStatus> = view.items.iter().map(|item| item.status).collect();
+        assert_eq!(statuses.len(), 3 + 1 + 5);
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|s| **s == ItemStatus::Running)
+                .count(),
+            1
+        );
+        // The latest three of the ten finished, in order
+        assert_eq!(view.items[0].url, "https://play.qobuz.com/album/7");
+        assert_eq!(view.items[3].status, ItemStatus::Running);
+        assert_eq!(view.items[4].url, "https://play.qobuz.com/album/11");
+        assert_eq!((view.hidden_finished, view.hidden_pending), (7, 45));
+        assert_eq!(
+            view.counts,
+            Counts {
+                pending: 50,
+                running: 1,
+                finished: 10
+            }
+        );
+    }
+
+    #[test]
+    fn asking_for_everything_gives_the_whole_queue() {
+        let queue = long_queue(30);
+
+        let view = queue.view(Window::ALL);
+
+        assert_eq!(view.items.len(), queue.items().len());
+        assert_eq!((view.hidden_finished, view.hidden_pending), (0, 0));
+    }
+
+    #[test]
+    fn a_window_larger_than_the_queue_hides_nothing() {
+        let view = long_queue(3).view(Window {
+            pending: 100,
+            finished: 20,
+        });
+
+        assert_eq!(view.items.len(), 14);
+        assert_eq!((view.hidden_finished, view.hidden_pending), (0, 0));
+    }
+
+    #[test]
+    fn what_waits_is_counted_by_how_well_its_size_is_known() {
+        let mut queue = Queue::default();
+        queue.enqueue(
+            "https://play.qobuz.com/album/a",
+            ItemKind::Album,
+            "a",
+            Display::default(),
+        );
+        queue.enqueue(
+            "https://play.qobuz.com/album/b",
+            ItemKind::Album,
+            "b",
+            Display::default(),
+        );
+        queue.enqueue(
+            "https://play.qobuz.com/track/1",
+            ItemKind::Track,
+            "1",
+            Display::default(),
+        );
+        queue.enqueue(
+            "https://play.qobuz.com/artist/2",
+            ItemKind::Artist,
+            "2",
+            Display::default(),
+        );
+        queue.enqueue(
+            "https://play.qobuz.com/playlist/3",
+            ItemKind::Playlist,
+            "3",
+            Display::default(),
+        );
+
+        let work = queue.view(Window::default()).work;
+
+        assert_eq!(
+            work,
+            Work {
+                albums: 2,
+                tracks: 1,
+                uncounted: 2
+            }
+        );
+    }
+
+    #[test]
+    fn the_history_is_the_latest_finished_albums_with_what_they_cost() {
+        let mut queue = long_queue(2);
+        for (number, item) in queue.items.iter_mut().take(10).enumerate() {
+            item.downloaded = 10 + u32::try_from(number).unwrap();
+            item.started_at = Some(1000);
+            item.finished_at = Some(1020);
+            item.bytes = 5;
+        }
+        // One that is not an album, one that wrote nothing and saw nothing
+        queue.items[0].kind = ItemKind::Playlist;
+        queue.items[1].downloaded = 0;
+
+        let history = queue.view(Window::default()).history;
+
+        assert_eq!(history.len(), 8);
+        assert_eq!(
+            history[0],
+            Sample {
+                downloaded: 12,
+                skipped: 0,
+                seconds: Some(20),
+                bytes: 5
+            }
+        );
+        assert_eq!(history.last().unwrap().downloaded, 19, "oldest first");
+    }
+
+    #[test]
+    fn the_history_is_bounded() {
+        let mut queue = long_queue(0);
+        queue.items.iter_mut().for_each(|item| item.downloaded = 3);
+        for number in 0..(HISTORY + 20) {
+            let url = format!("https://play.qobuz.com/album/extra{number}");
+            queue.enqueue(&url, ItemKind::Album, "x", Display::default());
+            let id = queue
+                .items()
+                .iter()
+                .find(|item| item.url == url)
+                .unwrap()
+                .id
+                .clone();
+            queue.get_mut(&id).unwrap().downloaded = 3;
+            queue.finish(&id, ItemStatus::Completed, None);
+        }
+
+        assert_eq!(queue.view(Window::default()).history.len(), HISTORY);
+    }
+
+    #[test]
+    fn addresses_are_told_apart_by_what_became_of_them() {
+        let mut queue = long_queue(2);
+        let urls: Vec<String> = [3, 10, 11, 12, 99]
+            .iter()
+            .map(|number| format!("https://PLAY.qobuz.com/album/{number}"))
+            .collect();
+
+        let states = queue.states(&urls);
+
+        assert_eq!(states.len(), 4);
+        assert_eq!(states["https://play.qobuz.com/album/3"], UrlState::Done);
+        assert_eq!(states["https://play.qobuz.com/album/10"], UrlState::Queued);
+        assert_eq!(states["https://play.qobuz.com/album/11"], UrlState::Queued);
+        assert_eq!(states["https://play.qobuz.com/album/12"], UrlState::Queued);
+        assert!(!states.contains_key("https://play.qobuz.com/album/99"));
+
+        // Done, then queued again: queued wins
+        queue.enqueue(
+            "https://play.qobuz.com/album/3",
+            ItemKind::Album,
+            "3",
+            Display::default(),
+        );
+        assert_eq!(
+            queue.states(&urls[..1])["https://play.qobuz.com/album/3"],
+            UrlState::Queued
+        );
     }
 }

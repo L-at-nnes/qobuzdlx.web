@@ -5,6 +5,7 @@ mod quota;
 mod reporter;
 mod worker;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -18,7 +19,7 @@ use super::artwork::Covers;
 use super::item::{Display, QueueItem};
 use super::log::{Log, LogEvent, LogLine};
 use super::progress::{Halt, Progress};
-use super::queue::{Enqueued, EnqueuedCounts, Queue};
+use super::queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, Window, Work};
 use super::store::QueueStore;
 use super::track::{Environment, TEMP_PREFIX, Tuning};
 use super::transfer::Fetcher;
@@ -53,10 +54,17 @@ pub enum Event {
 /// The queue and what is going on, at one moment.
 #[derive(Debug, Clone, Serialize)]
 pub struct Snapshot {
+    /// The part of the queue that was asked for.
     pub queue: Vec<QueueItem>,
     pub progress: Progress,
     /// Items waiting or running: what the badge of the menu counts.
     pub remaining: usize,
+    /// What the part leaves out, and what the whole queue comes to.
+    pub hidden_pending: usize,
+    pub hidden_finished: usize,
+    pub counts: Counts,
+    pub history: Vec<Sample>,
+    pub work: Work,
 }
 
 /// The address is not one that can be downloaded.
@@ -224,12 +232,31 @@ impl Manager {
 
     #[must_use]
     pub fn snapshot(&self) -> Snapshot {
+        self.view(Window::ALL)
+    }
+
+    /// The queue as far as `window` goes: with thousands of waiting items, a listener asks for
+    /// those it shows.
+    #[must_use]
+    pub fn view(&self, window: Window) -> Snapshot {
         let state = locked(&self.inner.state);
+        let view = state.queue.view(window);
         Snapshot {
-            queue: state.queue.items().to_vec(),
+            queue: view.items,
             progress: state.progress.clone(),
-            remaining: state.queue.remaining(),
+            remaining: view.counts.pending + view.counts.running,
+            hidden_pending: view.hidden_pending,
+            hidden_finished: view.hidden_finished,
+            counts: view.counts,
+            history: view.history,
+            work: view.work,
         }
+    }
+
+    /// What each of these addresses stands for in the queue.
+    #[must_use]
+    pub fn url_states(&self, urls: &[String]) -> HashMap<String, UrlState> {
+        locked(&self.inner.state).queue.states(urls)
     }
 
     /// An item of the queue, as it is now.

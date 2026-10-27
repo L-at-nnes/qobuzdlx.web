@@ -6,7 +6,8 @@
 use serde::Serialize;
 
 use crate::download::{
-    FailedTrack, ItemKind, ItemStatus, Progress, QueueItem, Snapshot, canonical_url,
+    Counts, FailedTrack, ItemKind, ItemStatus, Progress, QueueItem, Sample, Snapshot, Work,
+    canonical_url,
 };
 use crate::qobuz::{Album, Artist, Playlist, Track};
 
@@ -196,20 +197,45 @@ impl<'a> From<&'a QueueItem> for ItemView<'a> {
     }
 }
 
+/// The part of the queue that was asked for, and what the whole of it comes to.
+#[derive(Debug, Serialize)]
+pub struct QueueView<'a> {
+    pub queue: Vec<ItemView<'a>>,
+    pub remaining: usize,
+    pub hidden_pending: usize,
+    pub hidden_finished: usize,
+    pub counts: Counts,
+    pub history: &'a [Sample],
+    pub work: Work,
+}
+
+impl<'a> From<&'a Snapshot> for QueueView<'a> {
+    fn from(snapshot: &'a Snapshot) -> Self {
+        Self {
+            queue: snapshot.queue.iter().map(ItemView::from).collect(),
+            remaining: snapshot.remaining,
+            hidden_pending: snapshot.hidden_pending,
+            hidden_finished: snapshot.hidden_finished,
+            counts: snapshot.counts,
+            history: &snapshot.history,
+            work: snapshot.work,
+        }
+    }
+}
+
 /// The queue and what is going on, as the page reads them.
 #[derive(Debug, Serialize)]
 pub struct SnapshotView<'a> {
-    pub queue: Vec<ItemView<'a>>,
+    #[serde(flatten)]
+    pub queue: QueueView<'a>,
     pub progress: &'a Progress,
-    pub remaining: usize,
 }
 
 impl<'a> From<&'a Snapshot> for SnapshotView<'a> {
     fn from(snapshot: &'a Snapshot) -> Self {
         Self {
-            queue: snapshot.queue.iter().map(ItemView::from).collect(),
+            queue: QueueView::from(snapshot),
             progress: &snapshot.progress,
-            remaining: snapshot.remaining,
         }
     }
 }

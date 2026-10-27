@@ -27,7 +27,7 @@ pub use list::{AddressList, parse_list};
 pub use log::{Log, LogEvent, LogLine};
 pub use manager::{Event, InvalidAddress, Manager, ManagerConfig, Snapshot};
 pub use progress::{AlbumCard, Halt, Progress, ProgressScope, TrackProgress, Wait, WaitReason};
-pub use queue::{Enqueued, EnqueuedCounts, Queue};
+pub use queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, View, Window, Work};
 pub use report::{Outcome, Reporter, StepTrack};
 pub use store::QueueStore;
 pub use track::{Context, Environment, TEMP_PREFIX, TrackError, TrackRequest, TrackResult, Tuning};

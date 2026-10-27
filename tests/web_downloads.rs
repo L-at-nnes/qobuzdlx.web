@@ -26,8 +26,12 @@ async fn eventually(what: &str, mut condition: impl AsyncFnMut() -> bool) {
     panic!("timed out waiting for: {what}");
 }
 
+/// The whole queue: a page asks for a part of it, the tests want all of it.
 async fn queue_of(browser: &Browser) -> Vec<Value> {
-    browser.get("/api/downloads").await.json()["queue"]
+    browser
+        .get("/api/downloads?pending=100000000&finished=100000000")
+        .await
+        .json()["queue"]
         .as_array()
         .unwrap()
         .clone()
@@ -353,6 +357,127 @@ async fn the_log_can_be_emptied() {
 }
 
 // ─── Live ───
+
+// ─── A part of the queue ───
+
+#[tokio::test]
+async fn a_page_is_given_the_part_of_the_queue_it_asks_for_and_what_the_rest_comes_to() {
+    let app = TestApp::start().await;
+    app.catalogue.client.end_session();
+    let browser = app.browser();
+    let list: String = (0..300)
+        .map(|number| {
+            format!(
+                "https://play.qobuz.com/album/{number:013}
+"
+            )
+        })
+        .collect();
+    browser.post_text("/api/downloads/import", &list).await;
+
+    let usual = browser.get("/api/downloads").await.json();
+    let asked = browser
+        .get("/api/downloads?pending=7&finished=0")
+        .await
+        .json();
+    let everything = browser.get("/api/downloads?pending=1000").await.json();
+
+    // What a page shows at first: a hundred waiting items
+    assert_eq!(usual["queue"].as_array().unwrap().len(), 100);
+    assert_eq!(usual["hidden_pending"], 200);
+    assert_eq!(asked["queue"].as_array().unwrap().len(), 7);
+    assert_eq!(asked["hidden_pending"], 293);
+    assert_eq!(
+        asked["queue"][0]["url"],
+        "https://play.qobuz.com/album/0000000000000"
+    );
+    // The whole queue is counted whatever part is given
+    assert_eq!(asked["counts"]["pending"], 300);
+    assert_eq!(asked["remaining"], 300);
+    assert_eq!(everything["queue"].as_array().unwrap().len(), 300);
+    assert_eq!(everything["hidden_pending"], 0);
+    assert_eq!(everything["work"]["albums"], 300);
+}
+
+#[tokio::test]
+async fn the_live_view_starts_with_the_part_that_was_asked_for() {
+    let app = TestApp::start().await;
+    app.catalogue.client.end_session();
+    let list: String = (0..40)
+        .map(|number| {
+            format!(
+                "https://play.qobuz.com/album/{number:013}
+"
+            )
+        })
+        .collect();
+    app.browser()
+        .post_text("/api/downloads/import", &list)
+        .await;
+
+    let mut stream = reqwest::get(format!("{}/api/downloads/events?pending=3", app.base))
+        .await
+        .unwrap();
+    let mut seen = String::new();
+    read_until(&mut stream, &mut seen, "event: progress").await;
+
+    assert!(seen.contains("\"hidden_pending\":37"), "{seen}");
+    assert!(seen.contains("0000000000002"), "{seen}");
+    assert!(!seen.contains("0000000000003"), "{seen}");
+}
+
+#[tokio::test]
+async fn what_the_queue_does_with_some_addresses_is_told_without_giving_the_queue() {
+    let app = TestApp::start().await;
+    add_one(&app);
+    let browser = app.browser();
+    browser
+        .post(
+            "/api/downloads",
+            json!({ "items": [{ "url": album_url("alb") }] }),
+        )
+        .await;
+    finished(&browser).await;
+    app.catalogue.client.end_session();
+    browser
+        .post_text(
+            "/api/downloads/import",
+            &format!(
+                "{}
+",
+                album_url("other")
+            ),
+        )
+        .await;
+
+    let answer = browser
+        .post(
+            "/api/downloads/states",
+            json!({ "urls": [album_url("alb"), album_url("other"), album_url("unknown")] }),
+        )
+        .await;
+
+    assert_eq!(answer.status, 200);
+    let states = answer.json();
+    assert_eq!(states[album_url("alb")], "done");
+    assert_eq!(states[album_url("other")], "queued");
+    assert!(states.get(album_url("unknown")).is_none(), "{states}");
+}
+
+#[tokio::test]
+async fn too_many_addresses_at_once_are_refused() {
+    let app = TestApp::start().await;
+    let urls: Vec<String> = (0..1001)
+        .map(|number| album_url(&number.to_string()))
+        .collect();
+
+    let answer = app
+        .browser()
+        .post("/api/downloads/states", json!({ "urls": urls }))
+        .await;
+
+    assert_eq!(answer.status, 400);
+}
 
 /// The text of a stream of events, read until `wanted` appears in it.
 async fn read_until(response: &mut reqwest::Response, seen: &mut String, wanted: &str) {
