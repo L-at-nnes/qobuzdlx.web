@@ -32,6 +32,16 @@ use crate::settings::SettingsStore;
 /// long list added, many short items in a row) is one write, not one each.
 const SAVE_AFTER: Duration = Duration::from_millis(500);
 
+/// What each item of the queue adds to that wait: the whole queue is written each time, and on a
+/// slow disk a long one would otherwise be written all the time. 3.5 s for ten thousand items, half
+/// a minute for a hundred thousand.
+const SAVE_PER_ITEM: Duration = Duration::from_micros(300);
+
+/// How long a change waits before the queue, which holds `items`, is written.
+fn save_delay(items: usize) -> Duration {
+    SAVE_AFTER + SAVE_PER_ITEM * u32::try_from(items).unwrap_or(u32::MAX)
+}
+
 /// How often the progress of a file in transfer is announced at most.
 const PROGRESS_EVERY: Duration = Duration::from_millis(200);
 
@@ -567,7 +577,7 @@ async fn keep_saved(inner: Arc<Inner>) {
         }
         tokio::select! {
             () = inner.shutdown.cancelled() => break,
-            () = tokio::time::sleep(SAVE_AFTER) => {}
+            () = tokio::time::sleep(save_delay(locked(&inner.state).queue.items().len())) => {}
         }
         inner.save_queue();
     }
@@ -599,5 +609,23 @@ async fn watch_session(inner: Arc<Inner>) {
             Err(broadcast::error::RecvError::Lagged(_)) => {}
             Err(broadcast::error::RecvError::Closed) => return,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_small_queue_is_written_soon_and_a_huge_one_rarely() {
+        assert_eq!(save_delay(0), Duration::from_millis(500));
+        assert_eq!(save_delay(10), Duration::from_millis(503));
+        assert_eq!(save_delay(10_000), Duration::from_millis(3500));
+        assert_eq!(save_delay(100_000), Duration::from_millis(30_500));
+    }
+
+    #[test]
+    fn the_delay_of_an_absurd_queue_does_not_overflow() {
+        assert!(save_delay(usize::MAX) > Duration::from_secs(3600));
     }
 }
