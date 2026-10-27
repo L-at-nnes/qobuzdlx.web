@@ -12,12 +12,10 @@
 	import { locale, t } from '#lib/i18n/index.svelte.ts';
 	import { downloads } from '#lib/state/downloads.svelte.ts';
 
-	/** How many rows are drawn at first, and added by each "show more": a queue can hold thousands. */
+	/** How many rows each "show more" adds: the server is asked for them, a queue can hold thousands. */
 	const PAGE = 100;
-	const FINISHED_AT_FIRST = 20;
-
-	let pendingLimit = $state(PAGE);
-	let finishedLimit = $state(FINISHED_AT_FIRST);
+	/** Beyond this many waiting items, "show all" is not offered: the page would be drawing them all. */
+	const SHOW_ALL_UP_TO = 3000;
 
 	const queue = $derived(downloads.queue);
 
@@ -36,25 +34,8 @@
 		downloads.progress.wait ? Math.max(0, Math.ceil(downloads.progress.wait.until - tick / 1000)) : 0
 	);
 
-	/** The rows to draw: the oldest finished items and the last waiting ones are kept behind a button. */
-	const shown = $derived.by(() => {
-		const done = (status: string) => status !== 'pending' && status !== 'running';
-		const finishedTotal = queue.filter((item) => done(item.status)).length;
-		const pendingTotal = queue.filter((item) => item.status === 'pending').length;
-		const hiddenFinished = Math.max(0, finishedTotal - finishedLimit);
-		let finishedSeen = 0;
-		let pendingSeen = 0;
-		const rows = queue.filter((item) => {
-			if (done(item.status)) return ++finishedSeen > hiddenFinished;
-			if (item.status === 'pending') return ++pendingSeen <= pendingLimit;
-			return true;
-		});
-		return { rows, hiddenFinished, hiddenPending: Math.max(0, pendingTotal - pendingLimit) };
-	});
 	const pendingIds = $derived(queue.filter((item) => item.status === 'pending').map((item) => item.id));
-	const hasFinished = $derived(
-		queue.some((item) => item.status !== 'pending' && item.status !== 'running')
-	);
+	const hiddenPending = $derived(downloads.hiddenPending);
 </script>
 
 <svelte:head>
@@ -125,7 +106,7 @@
 						question={t('downloads.confirmClearPending')}
 						confirmLabel={t('downloads.confirm')}
 						icon="trash"
-						disabled={pendingIds.length === 0}
+						disabled={downloads.counts.pending === 0}
 						onconfirm={() => api.clearPending()}
 					/>
 					<ConfirmButton
@@ -133,7 +114,7 @@
 						question={t('downloads.confirmClearFinished')}
 						confirmLabel={t('downloads.confirm')}
 						icon="trash"
-						disabled={!hasFinished}
+						disabled={downloads.counts.finished === 0}
 						onconfirm={() => api.clearFinished()}
 					/>
 				</div>
@@ -141,27 +122,44 @@
 
 			<QueueEstimate />
 
-			{#if shown.hiddenFinished > 0}
+			{#if downloads.hiddenFinished > 0}
 				<div class="more">
-					<Button variant="ghost" size="sm" onclick={() => (finishedLimit += PAGE)}>
-						{t('downloads.showEarlier', { count: shown.hiddenFinished })}
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() => downloads.show({ finished: downloads.window.finished + PAGE })}
+					>
+						{t('downloads.showEarlier', { count: Math.min(PAGE, downloads.hiddenFinished) })}
 					</Button>
 				</div>
 			{/if}
 			<ul class="queue">
-				{#each shown.rows as item (item.id)}
+				{#each queue as item (item.id)}
 					<QueueRow
 						{item}
 						first={pendingIds[0] === item.id}
-						last={pendingIds.at(-1) === item.id}
+						last={hiddenPending === 0 && pendingIds.at(-1) === item.id}
 					/>
 				{/each}
 			</ul>
-			{#if shown.hiddenPending > 0}
+			{#if hiddenPending > 0}
 				<div class="more">
-					<Button variant="ghost" size="sm" onclick={() => (pendingLimit += PAGE)}>
-						{t('downloads.showMoreWaiting', { count: shown.hiddenPending })}
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() => downloads.show({ pending: downloads.window.pending + PAGE })}
+					>
+						{t('downloads.showMoreWaiting', { count: Math.min(PAGE, hiddenPending) })}
 					</Button>
+					{#if hiddenPending > PAGE && downloads.counts.pending <= SHOW_ALL_UP_TO}
+						<Button
+							variant="ghost"
+							size="sm"
+							onclick={() => downloads.show({ pending: downloads.counts.pending })}
+						>
+							{t('downloads.showAllWaiting', { count: downloads.counts.pending })}
+						</Button>
+					{/if}
 				</div>
 			{/if}
 		</section>

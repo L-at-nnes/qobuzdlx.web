@@ -125,6 +125,9 @@ export const api = {
 		post<Enqueued>('/api/downloads', { items }),
 	/** A text with one address per line, as the file chosen by the user holds it. */
 	importList: (text: string) => post<Enqueued>('/api/downloads/import', text),
+	/** What each address stands for in the queue: only those that are waiting, running or done. */
+	urlStates: (urls: string[]) =>
+		post<Record<string, 'queued' | 'done'>>('/api/downloads/states', { urls }),
 	pause: () => post<void>('/api/downloads/pause'),
 	resume: () => post<void>('/api/downloads/resume'),
 	cancel: () => post<void>('/api/downloads/cancel'),

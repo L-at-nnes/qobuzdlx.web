@@ -200,6 +200,7 @@ export const fr: Record<Key, Message> = {
 		one: "Afficher {count} élément terminé plus ancien",
 		other: 'Afficher {count} éléments terminés plus anciens'
 	},
+	'downloads.showAllWaiting': 'Tout afficher ({count})',
 	'downloads.showMoreWaiting': {
 		one: "Afficher {count} élément en attente de plus",
 		other: "Afficher {count} éléments en attente de plus"
@@ -461,9 +462,10 @@ export const fr: Record<Key, Message> = {
 	'eta.about': 'environ {time}',
 	'eta.range': 'entre {low} et {high}',
 	'eta.done': 'fini vers {time}',
+	'eta.rough': "approximatif : peu d'albums pour l'instant",
 	'eta.how': 'Comment c\'est calculé',
 	'eta.basis':
-		"Appris sur les {albums} derniers albums terminés : {seconds} s par piste, {tracks} pistes par album, {breaks}. Les albums de dix pistes et ceux de cinq cents ne se distinguent qu'une fois lancés : le chiffre est donc la moyenne de ce qui a été fait, et la fourchette est l'endroit où huit résultats sur dix devraient tomber ; elle se resserre quand plus d'albums attendent. Les attentes et pauses des réglages sont comptées ; un refus de Qobuz, une pause ou une déconnexion ne le sont pas.",
+		"Appris sur les {albums} derniers albums terminés : {seconds} s par piste, {tracks} pistes par album, {breaks}. Les albums de dix pistes et ceux de cinq cents ne se distinguent qu'une fois lancés : les albums en attente sont donc tirés au hasard parmi ceux déjà faits, et la file est rejouée de nombreuses fois comme le worker la parcourra. Le chiffre est la moyenne de ces essais, et la fourchette est l'endroit où huit sur dix tombent ; elle se resserre quand plus d'albums attendent. Les attentes et pauses des réglages sont comptées ; un refus de Qobuz, une pause ou une déconnexion ne le sont pas.",
 	'eta.breaks': {
 		one: '{count} longue pause prévue',
 		other: '{count} longues pauses prévues'

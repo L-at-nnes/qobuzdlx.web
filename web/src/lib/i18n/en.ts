@@ -196,6 +196,7 @@ export const en = {
 		one: 'Show {count} earlier finished item',
 		other: 'Show {count} earlier finished items'
 	},
+	'downloads.showAllWaiting': 'Show all {count}',
 	'downloads.showMoreWaiting': {
 		one: 'Show {count} more waiting item',
 		other: 'Show {count} more waiting items'
@@ -448,9 +449,10 @@ export const en = {
 	'eta.about': 'about {time}',
 	'eta.range': 'between {low} and {high}',
 	'eta.done': 'done around {time}',
+	'eta.rough': 'rough: few albums to go by so far',
 	'eta.how': 'How this is worked out',
 	'eta.basis':
-		'Learned from the last {albums} finished albums: {seconds} s per track, {tracks} tracks per album, {breaks}. Albums of ten tracks and of five hundred are told apart only once they run, so the figure is the average of what was done, and the range is where eight outcomes in ten should fall: it narrows as more albums wait. The waits and breaks of the settings are counted; a refusal from Qobuz, a pause or a sign-out are not.',
+		'Learned from the last {albums} finished albums: {seconds} s per track, {tracks} tracks per album, {breaks}. Albums of ten tracks and of five hundred are told apart only once they run, so the albums that wait are drawn from the ones already done, and the queue is played through many times as the worker will go through it. The figure is the mean of those runs, and the range is where eight of ten fall: it narrows as more albums wait. The waits and breaks of the settings are counted; a refusal from Qobuz, a pause or a sign-out are not.',
 	'eta.breaks': {
 		one: '{count} long break planned',
 		other: '{count} long breaks planned'

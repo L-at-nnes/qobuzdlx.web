@@ -108,6 +108,40 @@ export interface QueueItem {
 	failures: FailedTrack[];
 }
 
+/** How many items the queue holds, by what they are doing. */
+export interface Counts {
+	pending: number;
+	running: number;
+	finished: number;
+}
+
+/** What a finished album cost, for guessing what the next ones will. */
+export interface Sample {
+	downloaded: number;
+	skipped: number;
+	/** From its start to its end, when both are known. */
+	seconds: number | null;
+	bytes: number;
+}
+
+/** What waits, counted by how well its size is known. */
+export interface Work {
+	albums: number;
+	tracks: number;
+	uncounted: number;
+}
+
+/** The part of the queue that was asked for, and what the whole of it comes to. */
+export interface QueueView {
+	queue: QueueItem[];
+	remaining: number;
+	hidden_pending: number;
+	hidden_finished: number;
+	counts: Counts;
+	history: Sample[];
+	work: Work;
+}
+
 export interface AlbumCard {
 	title: string;
 	artist: string;
