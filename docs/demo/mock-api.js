@@ -308,6 +308,40 @@ async (page) => {
 		return lines;
 	};
 
+	/** The part of the queue that was asked for, as the server gives it, and what the whole comes to. */
+	const view = (scene, url) => {
+		const items = queue(scene);
+		const pendingLimit = Number(url.searchParams.get('pending') ?? 100);
+		const finishedLimit = Number(url.searchParams.get('finished') ?? 20);
+		const counts = { pending: 0, running: 0, finished: 0 };
+		for (const item of items) {
+			if (item.status === 'pending') counts.pending++;
+			else if (item.status === 'running') counts.running++;
+			else counts.finished++;
+		}
+		const skipFinished = Math.max(0, counts.finished - finishedLimit);
+		let pendingSeen = 0;
+		let finishedSeen = 0;
+		const shown = items.filter((item) => {
+			if (item.status === 'running') return true;
+			if (item.status === 'pending') return ++pendingSeen <= pendingLimit;
+			return ++finishedSeen > skipFinished;
+		});
+		const history = items
+			.filter((item) => item.status === 'completed' && item.downloaded + item.skipped > 0)
+			.slice(-200)
+			.map((item) => ({ downloaded: item.downloaded, skipped: item.skipped, seconds: item.finished_at - item.started_at, bytes: item.bytes }));
+		return {
+			queue: shown,
+			remaining: counts.pending + counts.running,
+			hidden_pending: Math.max(0, counts.pending - pendingLimit),
+			hidden_finished: skipFinished,
+			counts,
+			history,
+			work: { albums: counts.pending, tracks: 0, uncounted: 0 }
+		};
+	};
+
 	const results = (url) => {
 		const query = (url.searchParams.get('q') ?? '').toLowerCase();
 		const words = query.split(/\s+/).filter(Boolean);
@@ -332,12 +366,17 @@ async (page) => {
 			});
 		}
 		if (path === '/api/downloads' && method === 'GET') {
-			const items = queue(scene);
-			return json(route, { queue: items, progress: progress(scene), remaining: items.filter((i) => i.status === 'pending' || i.status === 'running').length });
+			return json(route, { ...view(scene, url), progress: progress(scene) });
+		}
+		if (path === '/api/downloads/states' && method === 'POST') {
+			// Every album of the demo is in the queue
+			const asked = JSON.parse(route.request().postData() ?? '{}').urls ?? [];
+			const known = new Set(catalogue.map((album) => album.url));
+			return json(route, Object.fromEntries(asked.filter((address) => known.has(address)).map((address) => [address, 'queued'])));
 		}
 		if (path === '/api/downloads/events') {
 			const body =
-				`retry: 3600000\n\nevent: queue\ndata: ${JSON.stringify({ queue: queue(scene) })}\n\n` +
+				`retry: 3600000\n\nevent: queue\ndata: ${JSON.stringify(view(scene, url))}\n\n` +
 				`event: progress\ndata: ${JSON.stringify(progress(scene))}\n\n`;
 			return route.fulfill({ status: 200, contentType: 'text/event-stream', body });
 		}
