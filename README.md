@@ -9,6 +9,14 @@ A self-hosted web application that searches Qobuz and downloads what your subscr
   <img src="docs/screenshots/search-light.png" alt="Searching Beethoven symphonies, results as rows with their quality" width="880">
 </p>
 
+<p align="center">
+  <video src="docs/qobuzdlx-tour.mp4" controls muted width="880">
+    <a href="docs/qobuzdlx-tour.mp4">Watch the 50 second tour</a>
+  </video>
+</p>
+
+A 50 second tour of what the download engine does with a queue of thousands of albums: import, selection, tracks in parallel, resuming, verifying, waits, time left. It is made from the screenshots of this README, whose data is simulated.
+
 > Qobuz is a trademark of its owner. This project is not affiliated with Qobuz. It downloads what an active subscription is entitled to: use it for your own library and respect the terms of the service.
 
 ## Where it comes from
