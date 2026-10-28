@@ -15,7 +15,9 @@
 	const result = $derived(
 		app.settings && !downloads.progress.halt
 			? estimate({
-					queue: downloads.queue,
+					history: downloads.history,
+					work: downloads.work,
+					running: downloads.queue.find((item) => item.status === 'running') ?? null,
 					progress: downloads.progress,
 					limits: app.settings.rate_limit
 				})
@@ -61,6 +63,7 @@
 			<span class="muted figures">
 				· {t('eta.range', { low: span(result.low), high: span(result.high) })}
 				· {t('eta.done', { time: finishes })}
+				{#if result.rough}· {t('eta.rough')}{/if}
 			</span>
 		</p>
 		<details>
