@@ -9,6 +9,10 @@ A self-hosted web application that searches Qobuz and downloads what your subscr
   <img src="docs/screenshots/search-light.png" alt="Searching Beethoven symphonies, results as rows with their quality" width="880">
 </p>
 
+https://github.com/user-attachments/assets/ebbc6989-e24c-49a2-a0ab-a7ee5b4c7470
+
+<br>
+
 > Qobuz is a trademark of its owner. This project is not affiliated with Qobuz. It downloads what an active subscription is entitled to: use it for your own library and respect the terms of the service.
 
 ## Where it comes from
