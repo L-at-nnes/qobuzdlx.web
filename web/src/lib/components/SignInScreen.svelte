@@ -26,6 +26,8 @@
 				return t('signin.missing');
 			case 'qobuz_identifiers_unavailable':
 				return t('signin.identifiers');
+			case 'qobuz_blocked':
+				return t('signin.blocked');
 			default:
 				return t('signin.unavailable');
 		}

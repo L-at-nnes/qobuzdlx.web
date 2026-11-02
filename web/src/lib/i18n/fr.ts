@@ -64,6 +64,8 @@ export const fr: Record<Key, Message> = {
 	'signin.missing': 'Renseignez les deux champs.',
 	'signin.identifiers':
 		'Les identifiants du lecteur web de Qobuz sont introuvables. Réessayez plus tard.',
+	'signin.blocked':
+		'Qobuz refuse les requêtes de ce réseau, avant même de regarder le compte. Un VPN ou un serveur hébergé en est la cause habituelle : connectez-vous depuis une autre connexion.',
 	'signin.unavailable': 'Qobuz est injoignable. Réessayez dans un instant.',
 	'signin.expired': 'La session Qobuz a expiré. Reconnectez-vous.',
 	'signin.signedInAs': 'Connecté en tant que {name}',

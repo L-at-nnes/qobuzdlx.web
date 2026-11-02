@@ -149,31 +149,37 @@ impl Client {
     /// Finds an app id and secret that Qobuz accepts, before anyone signs in, so that a login is
     /// attempted once with credentials already known to work: a 401 then means the user's own
     /// credentials are wrong. Returns `None` when no pair is accepted.
-    pub async fn resolve_app_credentials(&self) -> Option<AppCredentials> {
+    ///
+    /// An error means Qobuz could not be asked (the network is down, or its edge refuses this
+    /// address): every other pair would meet the same answer, so the search stops at the first one
+    /// instead of knocking again and again on a door that is closed.
+    pub async fn resolve_app_credentials(&self) -> Result<Option<AppCredentials>> {
         match self.credentials_from_bundle().await {
-            Ok(Some(credentials)) => return Some(credentials),
+            Ok(Some(credentials)) => return Ok(Some(credentials)),
             Ok(None) => tracing::warn!(
                 "no app secret of the Qobuz bundle was accepted, trying the known pairs"
             ),
+            Err(error) if error.is_blocked() => return Err(error),
             Err(error) => {
                 tracing::warn!(%error, "could not read the Qobuz bundle, trying the known pairs");
             }
         }
 
         for (app_id, app_secret) in FALLBACK_PAIRS {
-            if self.accepts(app_id, app_secret).await {
-                return Some(AppCredentials {
+            if self.accepts(app_id, app_secret).await? {
+                return Ok(Some(AppCredentials {
                     app_id: app_id.to_owned(),
                     app_secret: app_secret.to_owned(),
-                });
+                }));
             }
         }
-        None
+        Ok(None)
     }
 
     /// Whether Qobuz accepts the app pair: it answers 200 to a correctly signed request, and refuses
-    /// anything else (a wrong app id is refused before the signature is even looked at).
-    pub async fn app_credentials_are_valid(&self, credentials: &AppCredentials) -> bool {
+    /// anything else (a wrong app id is refused before the signature is even looked at). An error
+    /// when Qobuz could not be asked, which says nothing about the pair.
+    pub async fn app_credentials_are_valid(&self, credentials: &AppCredentials) -> Result<bool> {
         self.accepts(&credentials.app_id, &credentials.app_secret)
             .await
     }
@@ -194,7 +200,7 @@ impl Client {
         };
 
         for secret in candidate_secrets(&bundle) {
-            if self.accepts(&app_id, &secret).await {
+            if self.accepts(&app_id, &secret).await? {
                 return Ok(Some(AppCredentials {
                     app_id,
                     app_secret: secret,
@@ -204,7 +210,7 @@ impl Client {
         Ok(None)
     }
 
-    async fn accepts(&self, app_id: &str, secret: &str) -> bool {
+    async fn accepts(&self, app_id: &str, secret: &str) -> Result<bool> {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_secs());
@@ -219,9 +225,14 @@ impl Client {
             ("intent", "stream".to_owned()),
         ];
 
-        self.get_text_once("track/getFileUrl", &params, Auth::App { app_id })
+        match self
+            .get_text_once("track/getFileUrl", &params, Auth::App { app_id })
             .await
-            .is_ok()
+        {
+            Ok(_) => Ok(true),
+            Err(error) if error.is_unreachable() => Err(error),
+            Err(_) => Ok(false),
+        }
     }
 }
 

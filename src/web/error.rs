@@ -95,6 +95,10 @@ impl From<qobuz::Error> for ApiError {
             qobuz::Error::Api { status, .. } if status.as_u16() == 404 => {
                 Self::not_found("qobuz_not_found", error.to_string())
             }
+            // Named apart from an outage: waiting does not lift it, changing network does
+            qobuz::Error::Blocked { .. } => {
+                Self::new(StatusCode::BAD_GATEWAY, "qobuz_blocked", error.to_string())
+            }
             _ => Self::new(
                 StatusCode::BAD_GATEWAY,
                 "qobuz_unavailable",

@@ -474,7 +474,12 @@ async fn the_app_pair_is_found_in_the_bundle_and_proven_against_the_api() {
         }
     });
 
-    let credentials = server.client().resolve_app_credentials().await.unwrap();
+    let credentials = server
+        .client()
+        .resolve_app_credentials()
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(
         credentials,
@@ -498,7 +503,12 @@ async fn the_known_pairs_are_the_last_resort() {
     });
     // A signature check would need the real secret: accept by app id alone for this scenario
 
-    let credentials = server.client().resolve_app_credentials().await.unwrap();
+    let credentials = server
+        .client()
+        .resolve_app_credentials()
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(credentials.app_id, "798273057");
 }
@@ -508,7 +518,31 @@ async fn no_pair_is_returned_when_none_is_accepted() {
     let server = FakeServer::start().await;
     server.on("/api/track/getFileUrl", |_| Reply::error(401, "no"));
 
-    assert!(server.client().resolve_app_credentials().await.is_none());
+    let found = server.client().resolve_app_credentials().await.unwrap();
+
+    assert!(found.is_none());
+    assert_eq!(
+        server.count("/api/track/getFileUrl"),
+        4,
+        "every known pair was tried"
+    );
+}
+
+#[tokio::test]
+async fn a_network_the_edge_refuses_stops_the_search_at_the_first_pair() {
+    let server = FakeServer::start().await;
+    server.on("/api/track/getFileUrl", |_| {
+        Reply::text("<HTML><TITLE>Access Denied</TITLE></HTML>").with_status(403)
+    });
+
+    let error = server.client().resolve_app_credentials().await.unwrap_err();
+
+    assert!(error.is_blocked());
+    assert_eq!(
+        server.count("/api/track/getFileUrl"),
+        1,
+        "the other pairs would be refused the same way"
+    );
 }
 
 #[tokio::test]
@@ -521,8 +555,14 @@ async fn a_pair_is_valid_only_when_qobuz_answers_200() {
     };
 
     server.on_json("/api/track/getFileUrl", json!({ "url": "x" }));
-    assert!(client.app_credentials_are_valid(&pair).await);
+    assert!(client.app_credentials_are_valid(&pair).await.unwrap());
 
     server.on("/api/track/getFileUrl", |_| Reply::error(401, "no"));
-    assert!(!client.app_credentials_are_valid(&pair).await);
+    assert!(!client.app_credentials_are_valid(&pair).await.unwrap());
+
+    server.on("/api/track/getFileUrl", |_| Reply::status(503));
+    assert!(
+        client.app_credentials_are_valid(&pair).await.is_err(),
+        "an outage says nothing about the pair"
+    );
 }

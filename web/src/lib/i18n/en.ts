@@ -61,6 +61,8 @@ export const en = {
 	'signin.missing': 'Fill in both fields.',
 	'signin.identifiers':
 		'The identifiers of the Qobuz web player could not be found. Try again later.',
+	'signin.blocked':
+		'Qobuz refuses the requests of this network, before it even looks at the account. A VPN or a hosted server is the usual cause: sign in from another connection.',
 	'signin.unavailable': 'Qobuz could not be reached. Try again in a moment.',
 	'signin.expired': 'The Qobuz session expired. Sign in again.',
 	'signin.signedInAs': 'Signed in as {name}',

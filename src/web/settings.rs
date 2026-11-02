@@ -187,10 +187,10 @@ async fn session_checks(state: &AppState) -> (Verdict, Verdict) {
         SessionCheck::Rejected => Verdict::error("session", "rejected", None),
         SessionCheck::Unreachable => Verdict::error("session", "unreachable", None),
     };
-    let credentials_verdict = if state.client.app_credentials_are_valid(&session.app).await {
-        Verdict::ok("credentials", "accepted", None)
-    } else {
-        Verdict::error("credentials", "refused", None)
+    let credentials_verdict = match state.client.app_credentials_are_valid(&session.app).await {
+        Ok(true) => Verdict::ok("credentials", "accepted", None),
+        Ok(false) => Verdict::error("credentials", "refused", None),
+        Err(_) => Verdict::error("credentials", "unreachable", None),
     };
     (session_verdict, credentials_verdict)
 }

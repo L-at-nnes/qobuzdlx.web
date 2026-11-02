@@ -105,6 +105,27 @@ async fn the_password_never_comes_back_in_an_error() {
 }
 
 #[tokio::test]
+async fn a_network_the_edge_refuses_is_not_a_wrong_password() {
+    let app = TestApp::start().await;
+    let browser = app.browser();
+    browser.post("/api/session/logout", json!({})).await;
+    app.catalogue.server.on("/api/user/login", |_| {
+        Reply::text("<HTML><TITLE>Access Denied</TITLE></HTML>").with_status(403)
+    });
+
+    let answer = browser
+        .post(
+            "/api/session/login",
+            json!({ "email": "ada@example.com", "password": "p@ss" }),
+        )
+        .await;
+
+    assert_eq!(answer.status, 502);
+    assert_eq!(answer.json()["error"], "qobuz_blocked");
+    assert!(!answer.text.contains("Access Denied"));
+}
+
+#[tokio::test]
 async fn a_token_from_the_web_player_is_checked_before_it_is_kept() {
     let app = TestApp::start().await;
     let browser = app.browser();

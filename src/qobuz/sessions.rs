@@ -78,7 +78,7 @@ impl Sessions {
         let found = self
             .client
             .resolve_app_credentials()
-            .await
+            .await?
             .ok_or(SignInError::NoCredentials)?;
         *self.credentials() = Some(found.clone());
         Ok(found)
