@@ -17,8 +17,8 @@ pub enum SessionCheck {
     Valid(Account),
     /// Qobuz refuses the token: it expired or was revoked.
     Rejected,
-    /// Qobuz could not be asked (network down, timeout). Says nothing about the token: it should be
-    /// kept rather than signing the user out at every hiccup.
+    /// Qobuz could not be asked (network down, timeout, an address its edge refuses). Says nothing
+    /// about the token: it should be kept rather than signing the user out at every hiccup.
     Unreachable,
 }
 

@@ -85,6 +85,12 @@ impl Reply {
         }
     }
 
+    /// The same answer with another status.
+    pub fn with_status(mut self, code: u16) -> Self {
+        self.status = StatusCode::from_u16(code).unwrap();
+        self
+    }
+
     /// Makes the server take this long to answer.
     pub fn after(mut self, delay: Duration) -> Self {
         self.delay = delay;

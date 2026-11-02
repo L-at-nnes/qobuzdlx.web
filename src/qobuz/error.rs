@@ -13,6 +13,15 @@ pub enum Error {
     #[error("{message}")]
     Api { status: StatusCode, message: String },
 
+    /// What stands in front of the API refused the request before Qobuz saw it: a 403 whose body is
+    /// not a Qobuz error. This is what an address Qobuz does not serve (a VPN, a datacenter) gets,
+    /// for every call, whatever the account. It says nothing about the session or the credentials.
+    #[error(
+        "Qobuz refuses the requests of this network (HTTP {}): a VPN or a datacenter address is the usual cause",
+        .status.as_u16()
+    )]
+    Blocked { status: StatusCode },
+
     /// The request never got an answer: network down, timeout, TLS failure.
     #[error("could not reach Qobuz: {}", crate::cause::describe(.0))]
     Network(reqwest::Error),
@@ -40,6 +49,11 @@ impl From<reqwest::Error> for Error {
 impl Error {
     /// Builds the error for a failed response from its status and raw body.
     pub(super) fn from_response(status: StatusCode, body: &str) -> Self {
+        // The API always answers in JSON, its refusals included: a 403 that is anything else comes
+        // from the edge in front of it
+        if status == StatusCode::FORBIDDEN && !is_json_object(body) {
+            return Self::Blocked { status };
+        }
         Self::Api {
             status,
             message: describe(status, body),
@@ -65,7 +79,25 @@ impl Error {
         self.is_unauthorized() || matches!(self, Self::NotSignedIn)
     }
 
-    /// The HTTP status of an API error.
+    /// Qobuz could not be asked at all: the network is down, the edge refuses this address or
+    /// answers with a gateway error. Nothing was decided about what was asked, and asking again
+    /// later is the only thing to do.
+    #[must_use]
+    pub fn is_unreachable(&self) -> bool {
+        match self {
+            Self::Network(_) | Self::Blocked { .. } => true,
+            Self::Api { status, .. } => is_gateway_status(*status),
+            _ => false,
+        }
+    }
+
+    /// The edge in front of Qobuz refuses this network.
+    #[must_use]
+    pub fn is_blocked(&self) -> bool {
+        matches!(self, Self::Blocked { .. })
+    }
+
+    /// The HTTP status of an API error. An answer of the edge is not one.
     #[must_use]
     pub fn status(&self) -> Option<StatusCode> {
         match self {
@@ -79,7 +111,7 @@ impl Error {
     #[must_use]
     pub fn is_transient(&self) -> bool {
         match self {
-            Self::Network(_) => true,
+            Self::Network(_) | Self::Blocked { .. } => true,
             Self::Api { status, .. } => is_transient_status(*status),
             _ => false,
         }
@@ -89,13 +121,18 @@ impl Error {
 /// Statuses worth retrying: Qobuz answers 429 when asked too much, and its edge briefly answers
 /// 502/503/504 now and then. Anything else (401, 404, 500...) will answer the same way again.
 pub(super) fn is_transient_status(status: StatusCode) -> bool {
+    status == StatusCode::TOO_MANY_REQUESTS || is_gateway_status(status)
+}
+
+fn is_gateway_status(status: StatusCode) -> bool {
     matches!(
         status,
-        StatusCode::TOO_MANY_REQUESTS
-            | StatusCode::BAD_GATEWAY
-            | StatusCode::SERVICE_UNAVAILABLE
-            | StatusCode::GATEWAY_TIMEOUT
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT
     )
+}
+
+fn is_json_object(body: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(body).is_ok_and(|json| json.is_object())
 }
 
 fn describe(status: StatusCode, body: &str) -> String {
@@ -187,16 +224,55 @@ mod tests {
     }
 
     #[test]
+    fn a_403_that_is_not_from_the_api_is_the_edge_refusing_the_network() {
+        let page = "<HTML><HEAD><TITLE>Access Denied</TITLE></HEAD><BODY>...</BODY></HTML>";
+        let blocked = Error::from_response(StatusCode::FORBIDDEN, page);
+
+        assert!(blocked.is_blocked());
+        assert!(blocked.is_unreachable());
+        assert_eq!(blocked.status(), None, "not an answer of the API");
+        assert!(!blocked.is_session_gone());
+        assert!(blocked.to_string().contains("403"));
+        assert!(!blocked.to_string().contains("Access Denied"));
+
+        assert!(Error::from_response(StatusCode::FORBIDDEN, "").is_blocked());
+    }
+
+    #[test]
+    fn a_403_of_the_api_is_an_answer_like_any_other() {
+        let refused = Error::from_response(
+            StatusCode::FORBIDDEN,
+            r#"{"status":"error","code":403,"message":"Not allowed"}"#,
+        );
+
+        assert!(!refused.is_blocked());
+        assert!(!refused.is_unreachable());
+        assert_eq!(refused.status(), Some(StatusCode::FORBIDDEN));
+    }
+
+    #[test]
+    fn a_gateway_error_is_unreachable_and_a_refusal_is_not() {
+        for status in [502, 503, 504] {
+            let error = Error::from_response(StatusCode::from_u16(status).unwrap(), "");
+            assert!(error.is_unreachable(), "{status}");
+        }
+        for status in [400, 401, 404, 429, 500] {
+            let error = Error::from_response(StatusCode::from_u16(status).unwrap(), "");
+            assert!(!error.is_unreachable(), "{status}");
+        }
+    }
+
+    #[test]
     fn only_401_means_the_session_was_refused() {
         assert!(Error::from_response(StatusCode::UNAUTHORIZED, "").is_unauthorized());
-        assert!(!Error::from_response(StatusCode::FORBIDDEN, "").is_unauthorized());
+        assert!(!Error::from_response(StatusCode::FORBIDDEN, "{}").is_unauthorized());
     }
 
     #[test]
     fn a_missing_session_is_as_good_as_a_refused_one() {
         assert!(Error::NotSignedIn.is_session_gone());
         assert!(Error::from_response(StatusCode::UNAUTHORIZED, "").is_session_gone());
-        assert!(!Error::from_response(StatusCode::FORBIDDEN, "").is_session_gone());
+        assert!(!Error::from_response(StatusCode::FORBIDDEN, "{}").is_session_gone());
         assert!(!Error::NotSignedIn.is_unauthorized());
     }
 

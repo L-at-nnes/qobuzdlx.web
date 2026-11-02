@@ -166,6 +166,40 @@ async fn an_unreachable_qobuz_does_not_sign_anyone_out() {
     assert!(saved(&directory).exists(), "kept for later");
 }
 
+/// What the edge in front of Qobuz answers to an address it does not serve (a VPN, a datacenter).
+fn access_denied() -> Reply {
+    Reply::text("<HTML><HEAD><TITLE>Access Denied</TITLE></HEAD><BODY></BODY></HTML>")
+        .with_status(403)
+}
+
+#[tokio::test]
+async fn a_network_the_edge_refuses_does_not_sign_anyone_out() {
+    let (server, directory) = with_a_saved_session().await;
+    server.on("/api/user/get", |_| access_denied());
+    let next_run = sessions(&server, &directory);
+
+    let restored = next_run.restore(2, Duration::ZERO).await;
+
+    assert_eq!(restored, Restored::Unreachable);
+    assert!(
+        saved(&directory).exists(),
+        "the refusal is about the network, not about the token"
+    );
+}
+
+#[tokio::test]
+async fn a_403_of_the_api_itself_still_forgets_the_session() {
+    let (server, directory) = with_a_saved_session().await;
+    server.on("/api/user/get", |_| Reply::error(403, "Forbidden"));
+
+    let restored = sessions(&server, &directory)
+        .restore(2, Duration::ZERO)
+        .await;
+
+    assert_eq!(restored, Restored::Refused);
+    assert!(!saved(&directory).exists());
+}
+
 #[tokio::test]
 async fn an_outage_that_ends_lets_the_restoration_succeed() {
     let (server, directory) = with_a_saved_session().await;
