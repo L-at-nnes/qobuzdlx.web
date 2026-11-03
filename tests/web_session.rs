@@ -16,6 +16,7 @@ async fn the_session_tells_who_is_signed_in() {
 
     assert_eq!(answer.status, 200);
     assert_eq!(answer.json()["signed_in"], true);
+    assert_eq!(answer.json()["restoring"], false);
 }
 
 #[tokio::test]

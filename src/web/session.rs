@@ -22,6 +22,8 @@ pub fn routes() -> Router<AppState> {
 struct Current {
     signed_in: bool,
     account: Option<Account>,
+    /// A saved session waits for Qobuz to answer: it opens by itself when Qobuz does.
+    restoring: bool,
 }
 
 async fn current(State(state): State<AppState>) -> Json<Current> {
@@ -29,6 +31,7 @@ async fn current(State(state): State<AppState>) -> Json<Current> {
     Json(Current {
         signed_in: account.is_some(),
         account,
+        restoring: state.sessions.is_restoring(),
     })
 }
 

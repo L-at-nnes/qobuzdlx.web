@@ -55,7 +55,12 @@
 </script>
 
 <AuthLayout title={t('signin.title')} lead={t('signin.lead')}>
-	{#if app.sessionExpired}
+	{#if app.restoring}
+		<p class="notice" role="status">
+			<Icon name="clock" size={17} />
+			<span>{t('signin.restoring')}</span>
+		</p>
+	{:else if app.sessionExpired}
 		<p class="notice" role="status">
 			<Icon name="info" size={17} />
 			<span>{t('signin.expired')}</span>

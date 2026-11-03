@@ -14,6 +14,8 @@ import { downloads } from './downloads.svelte';
 export type Phase = 'booting' | 'unreachable' | 'locked' | 'signed-out' | 'ready';
 
 const RETRY_MS = 3000;
+/** How often the session is asked about while nobody is signed in. */
+const WATCH_MS = 5000;
 
 class AppState {
 	phase = $state<Phase>('booting');
@@ -22,8 +24,11 @@ class AppState {
 	settings = $state<Settings | null>(null);
 	/** Set when Qobuz refused a session that was working, to explain the sign-in screen. */
 	sessionExpired = $state(false);
+	/** A saved session waits for Qobuz to answer: the sign-in screen says it will open by itself. */
+	restoring = $state(false);
 
 	private retry: ReturnType<typeof setTimeout> | undefined;
+	private watch: ReturnType<typeof setInterval> | undefined;
 
 	constructor() {
 		// What the server answers anywhere can change what is shown: the lock, a refused session
@@ -61,7 +66,9 @@ class AppState {
 
 		if (!session.signed_in) {
 			this.account = null;
+			this.restoring = session.restoring;
 			this.phase = 'signed-out';
+			this.watchSession();
 			return;
 		}
 		this.account = session.account;
@@ -82,7 +89,33 @@ class AppState {
 		this.access = await api.access().catch(() => this.access);
 	}
 
+	/**
+	 * While nobody is signed in, the server may open a session by itself: the one it had saved, once
+	 * Qobuz answers again, or one opened from another device. The page follows without a reload.
+	 */
+	private watchSession() {
+		clearInterval(this.watch);
+		this.watch = setInterval(() => void this.followSession(), WATCH_MS);
+	}
+
+	private async followSession() {
+		if (this.phase !== 'signed-out') {
+			clearInterval(this.watch);
+			return;
+		}
+		try {
+			const session = await api.session();
+			this.restoring = session.restoring;
+			if (session.signed_in && session.account && this.phase === 'signed-out') {
+				await this.signedIn(session.account);
+			}
+		} catch {
+			// The next round asks again
+		}
+	}
+
 	private lockLocally() {
+		clearInterval(this.watch);
 		downloads.disconnect();
 		this.settings = null;
 		this.phase = 'locked';
@@ -90,8 +123,10 @@ class AppState {
 
 	/** Qobuz accepted a sign-in: the application can be used. */
 	async signedIn(account: Account) {
+		clearInterval(this.watch);
 		this.account = account;
 		this.sessionExpired = false;
+		this.restoring = false;
 		this.phase = 'ready';
 		downloads.connect();
 	}
@@ -100,7 +135,9 @@ class AppState {
 		await api.signOut();
 		this.account = null;
 		this.sessionExpired = false;
+		this.restoring = false;
 		this.phase = 'signed-out';
+		this.watchSession();
 	}
 
 	private expireSession() {
@@ -108,6 +145,7 @@ class AppState {
 		this.account = null;
 		this.sessionExpired = true;
 		this.phase = 'signed-out';
+		this.watchSession();
 	}
 
 	/** Keeps what the server holds, after the settings page saved it. */

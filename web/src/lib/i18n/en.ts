@@ -65,6 +65,8 @@ export const en = {
 		'Qobuz refuses the requests of this network, before it even looks at the account. A VPN or a hosted server is the usual cause: sign in from another connection.',
 	'signin.unavailable': 'Qobuz could not be reached. Try again in a moment.',
 	'signin.expired': 'The Qobuz session expired. Sign in again.',
+	'signin.restoring':
+		'The saved session is waiting for Qobuz to answer. It will open by itself as soon as Qobuz can be reached: nothing to type.',
 	'signin.signedInAs': 'Signed in as {name}',
 
 	// ─── Search ───

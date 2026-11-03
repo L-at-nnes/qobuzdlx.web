@@ -19,6 +19,8 @@ export interface AccessStatus {
 export interface SessionInfo {
 	signed_in: boolean;
 	account: Account | null;
+	/** A saved session waits for Qobuz to answer: it opens by itself when Qobuz does. */
+	restoring: boolean;
 }
 
 // ─── Catalogue ───

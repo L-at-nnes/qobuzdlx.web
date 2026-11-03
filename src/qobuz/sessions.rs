@@ -1,6 +1,7 @@
 //! Signing in and out, and remembering the session across restarts.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
@@ -39,6 +40,8 @@ pub struct Sessions {
     client: Client,
     file: JsonFile,
     credentials: Mutex<Option<AppCredentials>>,
+    /// A saved session waits for Qobuz to answer about it.
+    restoring: AtomicBool,
 }
 
 impl Sessions {
@@ -48,6 +51,7 @@ impl Sessions {
             client,
             file: JsonFile::new(config_dir.join(FILE_NAME), Access::OwnerOnly),
             credentials: Mutex::new(None),
+            restoring: AtomicBool::new(false),
         }
     }
 
@@ -68,6 +72,13 @@ impl Sessions {
     #[must_use]
     pub fn account(&self) -> Option<Account> {
         self.client.session().map(|session| session.account)
+    }
+
+    /// Whether a saved session is still waiting for Qobuz to say if it accepts it: nobody is signed
+    /// in yet, and nobody has to sign in again if Qobuz ends up answering.
+    #[must_use]
+    pub fn is_restoring(&self) -> bool {
+        self.restoring.load(Ordering::SeqCst) && !self.client.is_signed_in()
     }
 
     /// The identifiers of the web player, found once and kept.
@@ -116,6 +127,7 @@ impl Sessions {
 
     /// Removes the saved session.
     fn forget(&self) {
+        self.restoring.store(false, Ordering::SeqCst);
         match std::fs::remove_file(self.file.path()) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -130,17 +142,21 @@ impl Sessions {
     /// times, `delay` apart.
     pub async fn restore(&self, attempts: u32, delay: Duration) -> Restored {
         let Some(session) = self.file.load::<Session>() else {
+            self.restoring.store(false, Ordering::SeqCst);
             return Restored::Nothing;
         };
+        self.restoring.store(true, Ordering::SeqCst);
 
         for attempt in 1..=attempts {
             if self.client.is_signed_in() {
                 // Someone signed in from the interface in the meantime
+                self.restoring.store(false, Ordering::SeqCst);
                 return Restored::Resumed;
             }
             match self.client.verify_session(&session).await {
                 SessionCheck::Valid(account) => {
                     self.client.start_session(Session { account, ..session });
+                    self.restoring.store(false, Ordering::SeqCst);
                     tracing::info!("the saved Qobuz session is open again");
                     return Restored::Resumed;
                 }

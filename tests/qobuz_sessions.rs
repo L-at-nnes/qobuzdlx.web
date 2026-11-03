@@ -150,6 +150,7 @@ async fn a_refused_session_is_forgotten() {
     assert_eq!(restored, Restored::Refused);
     assert_eq!(next_run.account(), None);
     assert!(!saved(&directory).exists());
+    assert!(!next_run.is_restoring());
     assert_eq!(server.count("/api/user/get"), 1, "no point asking again");
 }
 
@@ -164,6 +165,12 @@ async fn an_unreachable_qobuz_does_not_sign_anyone_out() {
     assert_eq!(restored, Restored::Unreachable);
     assert_eq!(server.count("/api/user/get"), 3);
     assert!(saved(&directory).exists(), "kept for later");
+    assert!(next_run.is_restoring(), "and still to be tried");
+
+    // Qobuz answers again: the next series of attempts opens the session
+    server.on_json("/api/user/get", json!({ "id": 7 }));
+    assert_eq!(next_run.restore(3, Duration::ZERO).await, Restored::Resumed);
+    assert!(!next_run.is_restoring());
 }
 
 /// What the edge in front of Qobuz answers to an address it does not serve (a VPN, a datacenter).

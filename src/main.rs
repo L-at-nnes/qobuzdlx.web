@@ -17,9 +17,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// How long a connection to the CDN may stay silent before the transfer is given up.
 const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// How often a saved session is tried again when Qobuz cannot be reached at start-up.
+/// How often a saved session is tried again when Qobuz cannot be reached at start-up, and how long
+/// the pause is before the next series: a server that starts before its network does, or behind an
+/// address Qobuz refuses for a while, must end up signed in without anyone coming back to it.
 const RESTORE_ATTEMPTS: u32 = 10;
 const RESTORE_DELAY: Duration = Duration::from_secs(30);
+const RESTORE_PAUSE: Duration = Duration::from_secs(10 * 60);
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -120,15 +123,21 @@ fn restore_session(state: &AppState) {
     tokio::spawn(async move { watcher.sessions.forget_when_refused().await });
 
     tokio::spawn(async move {
-        match state
-            .sessions
-            .restore(RESTORE_ATTEMPTS, RESTORE_DELAY)
-            .await
-        {
-            Restored::Unreachable => {
-                tracing::warn!("Qobuz could not be reached: sign in again when it can");
+        loop {
+            match state
+                .sessions
+                .restore(RESTORE_ATTEMPTS, RESTORE_DELAY)
+                .await
+            {
+                Restored::Unreachable => {
+                    tracing::warn!(
+                        "Qobuz could not be reached: the saved session is kept and tried again in {} minutes",
+                        RESTORE_PAUSE.as_secs() / 60
+                    );
+                    tokio::time::sleep(RESTORE_PAUSE).await;
+                }
+                Restored::Nothing | Restored::Resumed | Restored::Refused => return,
             }
-            Restored::Nothing | Restored::Resumed | Restored::Refused => {}
         }
     });
 }
