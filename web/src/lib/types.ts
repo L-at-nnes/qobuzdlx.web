@@ -171,7 +171,10 @@ export interface Progress {
 	/** Why the queue stopped by itself, when it did. */
 	halt: 'storage_full' | 'signed_out' | 'paused' | null;
 	/** The queue holds back on purpose, until the given Unix time in seconds. */
-	wait: { reason: 'between_albums' | 'break' | 'rate_limited'; until: number } | null;
+	wait: {
+		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable';
+		until: number;
+	} | null;
 }
 
 export interface Enqueued {

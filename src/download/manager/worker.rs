@@ -15,7 +15,7 @@ use crate::extensions::{self, ItemFinished};
 use crate::settings::LogDetail;
 
 /// What the worker does between an item and the next, as the end of the item decides it.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Pace {
     /// The item did not end (paused, signed out, the application stops): nothing to space.
     None,
@@ -24,6 +24,8 @@ enum Pace {
     Spaced { wrote: bool },
     /// Qobuz asked to slow down.
     Cooldown,
+    /// Qobuz could not be reached, for the reason given.
+    Unreachable { reason: String },
 }
 
 /// Goes through the queue, one item at a time, whenever there is something to do and a session to
@@ -141,6 +143,7 @@ impl Inner {
 
         let interrupted = self.interrupt.swap(false, Ordering::SeqCst);
         let mut cooldown = false;
+        let mut unreachable = None;
         // `None`: the item did not end, it waits again
         let ended = match result {
             Ok(()) => Some((ItemStatus::Completed, None)),
@@ -153,6 +156,13 @@ impl Inner {
             Err(JobError::RateLimited) => {
                 self.strikes.fetch_add(1, Ordering::SeqCst);
                 cooldown = true;
+                None
+            }
+            // The network is down or Qobuz refuses this address: the item keeps its place, and so do
+            // those after it, which would all end the same way
+            Err(JobError::Unreachable(reason)) => {
+                self.strikes.fetch_add(1, Ordering::SeqCst);
+                unreachable = Some(reason);
                 None
             }
             // Paused, or signed out: the item is not given up, nothing about it failed
@@ -209,6 +219,8 @@ impl Inner {
         }
         let pace = if cooldown {
             Pace::Cooldown
+        } else if let Some(reason) = unreachable {
+            Pace::Unreachable { reason }
         } else if finished.is_some() {
             Pace::Spaced {
                 wrote: outcome.downloaded > 0,
@@ -246,34 +258,50 @@ impl Inner {
     }
 
     /// The wait between an item and the next one: a pause between albums, a long break every so
-    /// many, or the cooldown after Qobuz asked to slow down.
+    /// many, or the cooldown after Qobuz asked to slow down or could not be reached. That last wait
+    /// doubles each time it happens again, like the cooldown it shares its length with.
     async fn rest(&self, pace: Pace) {
         let limits = self.settings.get().rate_limit;
-        let (reason, duration) = match pace {
+        let (reason, duration, unreachable) = match pace {
             Pace::None => return,
             Pace::Cooldown => (
                 WaitReason::RateLimited,
                 limits.cooldown(self.strikes.load(Ordering::SeqCst)),
+                None,
+            ),
+            Pace::Unreachable { reason } => (
+                WaitReason::Unreachable,
+                limits.cooldown(self.strikes.load(Ordering::SeqCst)),
+                Some(reason),
             ),
             Pace::Spaced { wrote } => {
                 if !locked(&self.state).queue.has_pending() {
                     return;
                 }
                 if let Some(duration) = self.break_due() {
-                    (WaitReason::Break, duration)
+                    (WaitReason::Break, duration, None)
                 } else if wrote {
-                    (WaitReason::BetweenAlbums, limits.between_albums.pick())
+                    (
+                        WaitReason::BetweenAlbums,
+                        limits.between_albums.pick(),
+                        None,
+                    )
                 } else {
                     // Nothing was fetched but a listing: the shortest pause is enough
-                    (WaitReason::BetweenAlbums, limits.between_albums.shortest())
+                    (
+                        WaitReason::BetweenAlbums,
+                        limits.between_albums.shortest(),
+                        None,
+                    )
                 }
             }
         };
-        self.hold_back(reason, duration).await;
+        self.hold_back(reason, duration, unreachable).await;
     }
 
     /// Waits and says so, until the time is up, or the queue is paused, signed out or stopped.
-    async fn hold_back(&self, reason: WaitReason, duration: Duration) {
+    /// `unreachable` is why Qobuz could not be asked, when that is the reason of the wait.
+    async fn hold_back(&self, reason: WaitReason, duration: Duration, unreachable: Option<String>) {
         if duration.is_zero() {
             return;
         }
@@ -288,6 +316,10 @@ impl Inner {
         let seconds = u64::try_from(duration.as_millis().div_ceil(1000)).unwrap_or(u64::MAX);
         self.log(match reason {
             WaitReason::RateLimited => LogEvent::RateLimited { seconds },
+            WaitReason::Unreachable => LogEvent::QobuzUnreachable {
+                error: unreachable.unwrap_or_default(),
+                seconds,
+            },
             WaitReason::Break => LogEvent::BreakStarted { seconds },
             WaitReason::BetweenAlbums => LogEvent::BetweenAlbums { seconds },
         });

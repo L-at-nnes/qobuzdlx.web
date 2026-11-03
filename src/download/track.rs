@@ -111,7 +111,9 @@ impl TrackError {
     fn is_final(&self) -> bool {
         match self {
             Self::Cancelled | Self::PreviewOnly => true,
-            Self::Api(error) => error.is_session_gone() || error.is_rate_limited(),
+            Self::Api(error) => {
+                error.is_session_gone() || error.is_rate_limited() || error.is_blocked()
+            }
             _ => self.is_storage_full(),
         }
     }

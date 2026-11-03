@@ -483,7 +483,11 @@ export const fr: Record<Key, Message> = {
 	'downloads.wait.between_albums': "Attente avant l'album suivant, jusqu'à {time}.",
 	'downloads.wait.break': "Pause en cours, jusqu'à {time}.",
 	'downloads.wait.rate_limited': 'Qobuz a demandé de ralentir. Nouvel essai à {time}.',
+	'downloads.wait.unreachable':
+		"Qobuz est injoignable. Rien n'est mis en échec : nouvel essai à {time}.",
 	'log.rate_limited': 'Qobuz a demandé de ralentir : attente de {seconds} s, puis nouvel essai.',
+	'log.qobuz_unreachable':
+		"{error}. Rien n'est mis en échec : nouvel essai dans {seconds} s.",
 	'log.break_started': 'Pause de {seconds} s.',
 	'log.between_albums': "Attente de {seconds} s avant l'album suivant.",
 

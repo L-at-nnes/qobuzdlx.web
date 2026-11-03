@@ -38,6 +38,10 @@ pub enum JobError {
     /// Qobuz keeps answering "too many requests": the item waits and is tried again after a pause.
     #[error("Qobuz asked to slow down")]
     RateLimited,
+    /// Qobuz could not be asked: the network is down, or its edge refuses this address. Nothing
+    /// about the item failed, and every item after it would meet the same wall: it waits.
+    #[error("{0}")]
+    Unreachable(String),
     /// An address whose identifier is not what its kind needs.
     #[error("not a valid Qobuz address")]
     InvalidAddress,
@@ -55,6 +59,8 @@ impl From<qobuz::Error> for JobError {
             Self::SessionExpired
         } else if error.is_rate_limited() {
             Self::RateLimited
+        } else if error.is_unreachable() {
+            Self::Unreachable(error.to_string())
         } else {
             Self::Api(error)
         }
@@ -67,6 +73,7 @@ impl From<TrackError> for JobError {
             TrackError::Cancelled => Self::Cancelled,
             TrackError::Api(api) if api.is_session_gone() => Self::SessionExpired,
             TrackError::Api(api) if api.is_rate_limited() => Self::RateLimited,
+            TrackError::Api(api) if api.is_unreachable() => Self::Unreachable(api.to_string()),
             full if full.is_storage_full() => Self::StorageFull(full.to_string()),
             other => Self::Track(other),
         }

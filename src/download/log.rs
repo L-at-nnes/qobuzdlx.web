@@ -84,6 +84,11 @@ pub enum LogEvent {
     RateLimited {
         seconds: u64,
     },
+    /// Qobuz could not be reached: the item waits and the queue tries again later.
+    QobuzUnreachable {
+        error: String,
+        seconds: u64,
+    },
     /// The long break taken every so many albums.
     BreakStarted {
         seconds: u64,
@@ -147,6 +152,7 @@ impl LogEvent {
             | Self::Error { .. }
             | Self::SessionExpired
             | Self::RateLimited { .. }
+            | Self::QobuzUnreachable { .. }
             | Self::TrackFailed { .. }
             | Self::AlbumFailed { .. }
             | Self::ArtistFailed { .. }
@@ -245,6 +251,10 @@ impl fmt::Display for LogEvent {
             Self::RateLimited { seconds } => write!(
                 formatter,
                 "Qobuz asked to slow down: waiting {seconds} s before trying again."
+            ),
+            Self::QobuzUnreachable { error, seconds } => write!(
+                formatter,
+                "{error}. Nothing is failed: trying again in {seconds} s."
             ),
             Self::BreakStarted { seconds } => {
                 write!(formatter, "Taking a break of {seconds} s.")

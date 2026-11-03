@@ -938,6 +938,101 @@ async fn when_qobuz_says_to_slow_down_the_item_is_not_lost() {
     );
 }
 
+#[tokio::test]
+async fn when_qobuz_cannot_be_reached_nothing_is_failed_and_the_queue_waits() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    pace(&rig, |limits| limits.cooldown_ms = 300);
+    // The edge in front of Qobuz refuses this network twice, then lets it through
+    let refused = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let albums = rig.catalogue.albums.clone();
+    rig.catalogue.server.on("/api/album/get", {
+        let refused = refused.clone();
+        move |call| {
+            if refused.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 2 {
+                return Reply::text("<HTML><TITLE>Access Denied</TITLE></HTML>").with_status(403);
+            }
+            let key = call.param("album_id").to_owned();
+            Reply::json(albums.lock().unwrap().get(&key).unwrap().clone())
+        }
+    });
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+
+    eventually("the wait for Qobuz", || {
+        waiting_for(&manager) == Some(WaitReason::Unreachable)
+    })
+    .await;
+    for url in [album_url("one"), album_url("two")] {
+        let item = item_of(&manager, &url);
+        assert_eq!(item.status, ItemStatus::Pending, "{url}");
+        assert_eq!(item.error, None, "{url}");
+    }
+    assert!(
+        manager
+            .log_lines()
+            .iter()
+            .any(|line| matches!(line.event, LogEvent::QobuzUnreachable { .. }))
+    );
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn a_gateway_error_that_outlasts_the_retries_is_waited_out_too() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.cooldown_ms = 300);
+    // Three attempts of the client meet a 503, the next request is served
+    let refused = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let albums = rig.catalogue.albums.clone();
+    rig.catalogue.server.on("/api/album/get", {
+        let refused = refused.clone();
+        move |call| {
+            if refused.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 3 {
+                return Reply::status(503);
+            }
+            let key = call.param("album_id").to_owned();
+            Reply::json(albums.lock().unwrap().get(&key).unwrap().clone())
+        }
+    });
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the wait for Qobuz", || {
+        waiting_for(&manager) == Some(WaitReason::Unreachable)
+    })
+    .await;
+    assert_eq!(
+        item_of(&manager, &album_url("one")).status,
+        ItemStatus::Pending
+    );
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+}
+
 // ─── Waiting and resuming ───
 
 #[tokio::test]

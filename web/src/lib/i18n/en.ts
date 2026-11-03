@@ -470,7 +470,10 @@ export const en = {
 	'downloads.wait.between_albums': 'Waiting before the next album, until {time}.',
 	'downloads.wait.break': 'Taking a break, until {time}.',
 	'downloads.wait.rate_limited': 'Qobuz asked to slow down. Trying again at {time}.',
+	'downloads.wait.unreachable':
+		'Qobuz cannot be reached. Nothing is failed: trying again at {time}.',
 	'log.rate_limited': 'Qobuz asked to slow down: waiting {seconds} s, then trying again.',
+	'log.qobuz_unreachable': '{error}. Nothing is failed: trying again in {seconds} s.',
 	'log.break_started': 'Taking a break of {seconds} s.',
 	'log.between_albums': 'Waiting {seconds} s before the next album.',
 

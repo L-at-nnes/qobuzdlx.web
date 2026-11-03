@@ -126,6 +126,8 @@ pub enum WaitReason {
     Break,
     /// Qobuz asked to slow down.
     RateLimited,
+    /// Qobuz could not be reached: the network is down, or its edge refuses this address.
+    Unreachable,
 }
 
 /// Why the queue stopped by itself.
