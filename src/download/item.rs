@@ -134,6 +134,13 @@ impl QueueItem {
         self.status.is_finished()
     }
 
+    /// Whether the queue may drop the item once it holds enough finished ones: it ended, and nothing
+    /// about it is left to retry. An item that failed, or that left tracks behind, is kept.
+    #[must_use]
+    pub fn can_be_forgotten(&self) -> bool {
+        self.is_finished() && self.status != ItemStatus::Failed && self.failures.is_empty()
+    }
+
     /// Forgets what was counted, before the whole item is processed again.
     pub fn reset_outcome(&mut self) {
         self.downloaded = 0;

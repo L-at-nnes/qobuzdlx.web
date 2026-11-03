@@ -16,8 +16,10 @@ pub enum Enqueued {
     AlreadyQueued,
 }
 
-/// How many finished items are kept. The oldest go first; waiting and running items never do. Without
-/// a bound, a queue that processes thousands of albums would hold, show and save all of them.
+/// How many items that ended well are kept. The oldest go first; waiting and running items never do,
+/// and neither does an item that failed or left tracks behind: it stays until it is retried and
+/// succeeds, or is removed by hand. Without a bound, a queue that processes thousands of albums
+/// would hold, show and save all of them.
 pub const MAX_FINISHED: usize = 500;
 
 /// What queuing several addresses at once did, counted by outcome.
@@ -121,19 +123,19 @@ impl Queue {
         queue
     }
 
-    /// Drops the oldest finished items beyond `MAX_FINISHED`.
+    /// Drops the oldest items that ended well beyond `MAX_FINISHED`.
     fn forget_old_finished(&mut self) {
         let mut excess = self
             .items
             .iter()
-            .filter(|item| item.is_finished())
+            .filter(|item| item.can_be_forgotten())
             .count()
             .saturating_sub(MAX_FINISHED);
         if excess == 0 {
             return;
         }
         self.items.retain(|item| {
-            if excess > 0 && item.is_finished() {
+            if excess > 0 && item.can_be_forgotten() {
                 excess -= 1;
                 return false;
             }
@@ -579,6 +581,51 @@ mod tests {
         assert_eq!(queue.items().len(), MAX_FINISHED + 1);
         assert_eq!(queue.items()[0].url, "https://play.qobuz.com/album/a3");
         assert!(queue.has_pending());
+    }
+
+    #[test]
+    fn an_item_that_failed_is_never_forgotten_until_it_succeeds() {
+        let mut queue = Queue::default();
+        let failed = "https://play.qobuz.com/album/failed";
+        let incomplete = "https://play.qobuz.com/album/incomplete";
+        queue.enqueue(failed, ItemKind::Album, "f", Display::default());
+        queue.enqueue(incomplete, ItemKind::Album, "i", Display::default());
+        let failed_id = finished(&mut queue, failed, ItemStatus::Failed);
+        let incomplete_id = id_of(&queue, incomplete);
+        queue
+            .get_mut(&incomplete_id)
+            .unwrap()
+            .failures
+            .push(FailedTrack {
+                track_id: 7,
+                title: "Track".into(),
+                error: "restricted".into(),
+            });
+        queue.finish(&incomplete_id, ItemStatus::Completed, None);
+
+        for number in 0..MAX_FINISHED + 10 {
+            let url = format!("https://play.qobuz.com/album/a{number}");
+            queue.enqueue(&url, ItemKind::Album, "x", Display::default());
+            finished(&mut queue, &url, ItemStatus::Completed);
+        }
+
+        assert!(queue.get(&failed_id).is_some(), "a failure is kept");
+        assert!(
+            queue.get(&incomplete_id).is_some(),
+            "so is an item that left tracks behind"
+        );
+        assert_eq!(queue.items().len(), MAX_FINISHED + 2);
+
+        // Retried, and well this time: it is an item like the others again
+        assert!(queue.retry(&failed_id));
+        queue.finish(&failed_id, ItemStatus::Completed, None);
+        for number in 0..MAX_FINISHED {
+            let url = format!("https://play.qobuz.com/album/b{number}");
+            queue.enqueue(&url, ItemKind::Album, "x", Display::default());
+            finished(&mut queue, &url, ItemStatus::Completed);
+        }
+        assert!(queue.get(&failed_id).is_none(), "forgotten once it is done");
+        assert!(queue.get(&incomplete_id).is_some());
     }
 
     #[test]
