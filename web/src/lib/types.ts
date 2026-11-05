@@ -115,6 +115,8 @@ export interface Counts {
 	pending: number;
 	running: number;
 	finished: number;
+	/** Among the finished ones, those with something left to try again. */
+	failed: number;
 }
 
 /** What a finished album cost, for guessing what the next ones will. */

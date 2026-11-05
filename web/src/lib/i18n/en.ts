@@ -191,6 +191,10 @@ export const en = {
 		one: '{count} remaining',
 		other: '{count} remaining'
 	},
+	'downloads.retryFailed': {
+		one: 'Retry the failure',
+		other: 'Retry the {count} failures'
+	},
 	'downloads.clearPending': 'Clear the waiting items',
 	'downloads.clearFinished': 'Clear the finished items',
 	'downloads.confirmClearPending': 'Remove all waiting items?',

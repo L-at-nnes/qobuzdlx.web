@@ -39,7 +39,7 @@ class DownloadsState {
 	/** Items waiting or running: what the badge of the menu counts. */
 	remaining = $state(0);
 	/** What the whole queue holds, and what the part leaves out. */
-	counts = $state<Counts>({ pending: 0, running: 0, finished: 0 });
+	counts = $state<Counts>({ pending: 0, running: 0, finished: 0, failed: 0 });
 	hiddenPending = $state(0);
 	hiddenFinished = $state(0);
 	/** What the finished albums cost and what waits, for the time left. */

@@ -234,6 +234,42 @@ async fn finished_items_are_cleared_and_can_be_retried() {
 }
 
 #[tokio::test]
+async fn everything_that_failed_is_retried_with_one_request() {
+    let app = TestApp::start().await;
+    let browser = app.browser();
+    // Neither album exists yet: both items fail
+    browser
+        .post(
+            "/api/downloads",
+            json!({ "items": [{ "url": album_url("alb") }, { "url": album_url("other") }] }),
+        )
+        .await;
+    finished(&browser).await;
+    let counts = browser.get("/api/downloads").await.json()["counts"].clone();
+    assert_eq!(counts["failed"], 2);
+
+    add_one(&app);
+    let answer = browser.post("/api/downloads/retry-failed", json!({})).await;
+
+    assert_eq!(answer.status, 200);
+    assert_eq!(answer.json()["items"], 2);
+    finished(&browser).await;
+    let queue = queue_of(&browser).await;
+    let status_of = |url: String| {
+        queue
+            .iter()
+            .find(|item| item["url"] == url)
+            .map(|item| item["status"].clone())
+    };
+    assert_eq!(status_of(album_url("alb")), Some(json!("completed")));
+    assert_eq!(status_of(album_url("other")), Some(json!("failed")));
+    assert_eq!(
+        browser.get("/api/downloads").await.json()["counts"]["failed"],
+        1
+    );
+}
+
+#[tokio::test]
 async fn cancel_and_skip_are_accepted_when_nothing_runs() {
     let app = TestApp::start().await;
     let browser = app.browser();

@@ -40,6 +40,7 @@ pub fn routes() -> Router<AppState> {
         .route("/downloads/resume", post(resume))
         .route("/downloads/clear-pending", post(clear_pending))
         .route("/downloads/clear-finished", post(clear_finished))
+        .route("/downloads/retry-failed", post(retry_all_failed))
         .route("/downloads/{id}", delete(remove))
         .route("/downloads/{id}/retry", post(retry))
         .route("/downloads/{id}/retry-failures", post(retry_failures))
@@ -195,6 +196,19 @@ async fn clear_pending(State(state): State<AppState>) -> StatusCode {
 async fn clear_finished(State(state): State<AppState>) -> StatusCode {
     state.downloads.clear_finished();
     StatusCode::NO_CONTENT
+}
+
+#[derive(Serialize)]
+struct Retried {
+    /// How many items go again.
+    items: usize,
+}
+
+/// Everything that failed, tried again at once.
+async fn retry_all_failed(State(state): State<AppState>) -> Json<Retried> {
+    Json(Retried {
+        items: state.downloads.retry_all_failed(),
+    })
 }
 
 async fn remove(State(state): State<AppState>, Path(id): Path<String>) -> StatusCode {

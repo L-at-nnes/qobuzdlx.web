@@ -141,6 +141,14 @@ impl QueueItem {
         self.is_finished() && self.status != ItemStatus::Failed && self.failures.is_empty()
     }
 
+    /// Whether something of the item is left to try again: it failed, or it ended with tracks that
+    /// did. An item the user cancelled is left alone.
+    #[must_use]
+    pub fn is_to_retry(&self) -> bool {
+        self.status == ItemStatus::Failed
+            || (self.status == ItemStatus::Completed && !self.failures.is_empty())
+    }
+
     /// Forgets what was counted, before the whole item is processed again.
     pub fn reset_outcome(&mut self) {
         self.downloaded = 0;
@@ -160,6 +168,19 @@ impl QueueItem {
         if self.only_track_ids.is_none() {
             self.reset_outcome();
         }
+    }
+
+    /// Makes a finished item wait again for the tracks that failed only: it keeps what it had
+    /// already achieved, which its counters and playlist files build on.
+    pub(super) fn requeue_failures(&mut self) {
+        self.only_track_ids = Some(
+            self.failures
+                .iter()
+                .map(|failure| failure.track_id)
+                .collect(),
+        );
+        self.failures.clear();
+        self.requeue();
     }
 
     /// Puts the item back at the start of its life, as if it had just been queued.

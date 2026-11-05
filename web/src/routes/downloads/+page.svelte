@@ -101,6 +101,11 @@
 					>
 						{t('downloads.pause')}
 					</Button>
+					{#if downloads.counts.failed > 0}
+						<Button size="sm" variant="quiet" icon="retry" onclick={() => api.retryFailed()}>
+							{t('downloads.retryFailed', { count: downloads.counts.failed })}
+						</Button>
+					{/if}
 					<ConfirmButton
 						label={t('downloads.clearPending')}
 						question={t('downloads.confirmClearPending')}

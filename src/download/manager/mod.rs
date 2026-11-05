@@ -449,6 +449,17 @@ impl Manager {
         self.inner.changed_if(changed);
     }
 
+    /// Tries again everything that failed: whole items that did, and the failed tracks of those
+    /// that ended with some. Returns how many items go again.
+    pub fn retry_all_failed(&self) -> usize {
+        let count = locked(&self.inner.state).queue.retry_all_failed();
+        if count > 0 {
+            self.inner.wake.notify_one();
+        }
+        self.inner.changed_if(count > 0);
+        count
+    }
+
     /// Processes again only the tracks of a finished item that failed.
     pub fn retry_failures(&self, id: &str) {
         let changed = locked(&self.inner.state).queue.retry_failures(id);

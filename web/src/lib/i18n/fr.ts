@@ -196,6 +196,10 @@ export const fr: Record<Key, Message> = {
 		one: '{count} restant',
 		other: '{count} restants'
 	},
+	'downloads.retryFailed': {
+		one: "Relancer l'échec",
+		other: 'Relancer les {count} échecs'
+	},
 	'downloads.clearPending': 'Vider les éléments en attente',
 	'downloads.clearFinished': 'Vider les éléments terminés',
 	'downloads.confirmClearPending': 'Retirer tous les éléments en attente ?',

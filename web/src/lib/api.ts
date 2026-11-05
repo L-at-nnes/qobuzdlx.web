@@ -134,6 +134,8 @@ export const api = {
 	skip: () => post<void>('/api/downloads/skip'),
 	clearPending: () => post<void>('/api/downloads/clear-pending'),
 	clearFinished: () => post<void>('/api/downloads/clear-finished'),
+	/** Tries again everything that failed, at once. */
+	retryFailed: () => post<{ items: number }>('/api/downloads/retry-failed'),
 	remove: (id: string) => del<void>(`/api/downloads/${id}`),
 	retry: (id: string) => post<void>(`/api/downloads/${id}/retry`),
 	retryFailures: (id: string) => post<void>(`/api/downloads/${id}/retry-failures`),

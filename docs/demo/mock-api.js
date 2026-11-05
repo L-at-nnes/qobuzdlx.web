@@ -313,7 +313,7 @@ async (page) => {
 		const items = queue(scene);
 		const pendingLimit = Number(url.searchParams.get('pending') ?? 100);
 		const finishedLimit = Number(url.searchParams.get('finished') ?? 20);
-		const counts = { pending: 0, running: 0, finished: 0 };
+		const counts = { pending: 0, running: 0, finished: 0, failed: 0 };
 		for (const item of items) {
 			if (item.status === 'pending') counts.pending++;
 			else if (item.status === 'running') counts.running++;

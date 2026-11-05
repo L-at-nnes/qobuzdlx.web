@@ -63,6 +63,9 @@ pub struct Counts {
     pub pending: usize,
     pub running: usize,
     pub finished: usize,
+    /// Among the finished ones, those with something left to try again: they failed, or ended with
+    /// tracks that did.
+    pub failed: usize,
 }
 
 /// What a finished album cost, for guessing what the next ones will.
@@ -364,16 +367,30 @@ impl Queue {
         };
 
         let mut item = self.items.remove(position);
-        item.only_track_ids = Some(
-            item.failures
-                .iter()
-                .map(|failure| failure.track_id)
-                .collect(),
-        );
-        item.failures.clear();
-        item.requeue();
+        item.requeue_failures();
         self.items.push(item);
         true
+    }
+
+    /// Tries again everything that has something left to try: an item that failed is processed from
+    /// scratch, one that ended with failed tracks only for those. They go to the end of the queue in
+    /// the order they had. Returns how many there were.
+    pub fn retry_all_failed(&mut self) -> usize {
+        let (mut again, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.items)
+            .into_iter()
+            .partition(QueueItem::is_to_retry);
+        self.items = kept;
+        for item in &mut again {
+            if item.status == ItemStatus::Failed {
+                item.reset_outcome();
+                item.requeue();
+            } else {
+                item.requeue_failures();
+            }
+        }
+        let count = again.len();
+        self.items.extend(again);
+        count
     }
 
     /// A part of the queue and what the whole of it comes to, in one go through it.
@@ -392,7 +409,12 @@ impl Queue {
                     }
                 }
                 ItemStatus::Running => counts.running += 1,
-                _ => counts.finished += 1,
+                _ => {
+                    counts.finished += 1;
+                    if item.is_to_retry() {
+                        counts.failed += 1;
+                    }
+                }
             }
         }
 
@@ -626,6 +648,47 @@ mod tests {
         }
         assert!(queue.get(&failed_id).is_none(), "forgotten once it is done");
         assert!(queue.get(&incomplete_id).is_some());
+    }
+
+    #[test]
+    fn everything_that_failed_is_tried_again_at_once_each_in_its_own_way() {
+        let mut queue = queue_with(&["failed", "incomplete", "done", "cancelled", "waiting"]);
+        let failed = finished(&mut queue, "failed", ItemStatus::Failed);
+        let incomplete = id_of(&queue, "incomplete");
+        {
+            let item = queue.get_mut(&incomplete).unwrap();
+            item.downloaded = 9;
+            item.failures.push(FailedTrack {
+                track_id: 7,
+                title: "Track".into(),
+                error: "restricted".into(),
+            });
+        }
+        queue.finish(&incomplete, ItemStatus::Completed, None);
+        finished(&mut queue, "done", ItemStatus::Completed);
+        finished(&mut queue, "cancelled", ItemStatus::Cancelled);
+        assert_eq!(queue.view(Window::ALL).counts.failed, 2);
+
+        assert_eq!(queue.retry_all_failed(), 2);
+
+        assert_eq!(
+            order(&queue),
+            ["done", "cancelled", "waiting", "failed", "incomplete"]
+        );
+        let whole = queue.get(&failed).unwrap();
+        assert_eq!(
+            (whole.status, whole.error.as_deref(), &whole.only_track_ids),
+            (ItemStatus::Pending, None, &None)
+        );
+        let partial = queue.get(&incomplete).unwrap();
+        assert_eq!(partial.status, ItemStatus::Pending);
+        assert_eq!(partial.downloaded, 9, "what it achieved is kept");
+        assert_eq!(
+            partial.only_track_ids,
+            Some(std::collections::BTreeSet::from([7]))
+        );
+        assert_eq!(queue.view(Window::ALL).counts.failed, 0);
+        assert_eq!(queue.retry_all_failed(), 0, "nothing left to try again");
     }
 
     #[test]
@@ -1025,7 +1088,8 @@ mod tests {
             Counts {
                 pending: 50,
                 running: 1,
-                finished: 10
+                finished: 10,
+                failed: 0
             }
         );
     }
