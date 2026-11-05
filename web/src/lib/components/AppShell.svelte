@@ -53,6 +53,19 @@
 
 	<main id="main" tabindex="-1">
 		<div class="content">
+			{#if app.phase === 'signed-out'}
+				<p class="signed-out" role="status">
+					<Icon name={app.restoring ? 'clock' : 'info'} size={18} />
+					<span>
+						{app.restoring
+							? t('signin.restoring')
+							: app.sessionExpired
+								? t('signin.expired')
+								: t('shell.signedOut')}
+					</span>
+					<Button size="sm" variant="quiet" href="/">{t('signin.submit')}</Button>
+				</p>
+			{/if}
 			{@render children()}
 		</div>
 	</main>
@@ -88,6 +101,22 @@
 
 	.skip:focus {
 		top: var(--space-3);
+	}
+
+	.signed-out {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3);
+		margin-bottom: var(--space-5);
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+	}
+
+	.signed-out span {
+		flex: 1 1 18rem;
 	}
 
 	.shell {

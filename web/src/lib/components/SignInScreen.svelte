@@ -110,6 +110,11 @@
 	>
 		{withToken ? t('signin.withPassword') : t('signin.withToken')}
 	</Button>
+
+	<nav class="elsewhere" aria-label={t('nav.label')}>
+		<Button variant="ghost" size="sm" icon="queue" href="/downloads">{t('nav.downloads')}</Button>
+		<Button variant="ghost" size="sm" icon="settings" href="/settings">{t('nav.settings')}</Button>
+	</nav>
 </AuthLayout>
 
 <style>
@@ -130,5 +135,14 @@
 
 	.notice :global(svg) {
 		margin-top: 2px;
+	}
+
+	.elsewhere {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: var(--space-2);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--line-soft);
 	}
 </style>

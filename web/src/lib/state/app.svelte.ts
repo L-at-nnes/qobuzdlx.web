@@ -63,6 +63,8 @@ class AppState {
 		const [session, settings] = await Promise.all([api.session(), api.settings()]);
 		this.settings = settings;
 		if (settings.language) locale.set(settings.language);
+		// The queue is followed signed in or not: it waits for a session, and says so
+		downloads.connect();
 
 		if (!session.signed_in) {
 			this.account = null;
@@ -73,7 +75,6 @@ class AppState {
 		}
 		this.account = session.account;
 		this.phase = 'ready';
-		downloads.connect();
 	}
 
 	async unlock(password: string) {

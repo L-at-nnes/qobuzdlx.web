@@ -9,9 +9,14 @@
 	import { locale, t } from '#lib/i18n/index.svelte.ts';
 	import { app } from '#lib/state/app.svelte.ts';
 	import { theme } from '#lib/state/theme.svelte.ts';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
+
+	// Signed out, the search has nothing to ask Qobuz with: its place is taken by the sign-in. The
+	// queue and the settings need no session and stay where they are.
+	const needsSession = $derived(page.url.pathname === '/');
 
 	onMount(() => {
 		locale.start();
@@ -27,9 +32,9 @@
 
 {#if app.phase === 'locked'}
 	<UnlockScreen />
-{:else if app.phase === 'signed-out'}
+{:else if app.phase === 'signed-out' && needsSession}
 	<SignInScreen />
-{:else if app.phase === 'ready'}
+{:else if app.phase === 'ready' || app.phase === 'signed-out'}
 	<AppShell>{@render children()}</AppShell>
 {:else if app.phase === 'unreachable'}
 	<main class="boot">

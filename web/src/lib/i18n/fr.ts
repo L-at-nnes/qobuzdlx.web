@@ -67,6 +67,8 @@ export const fr: Record<Key, Message> = {
 	'signin.blocked':
 		'Qobuz refuse les requêtes de ce réseau, avant même de regarder le compte. Un VPN ou un serveur hébergé en est la cause habituelle : connectez-vous depuis une autre connexion.',
 	'signin.unavailable': 'Qobuz est injoignable. Réessayez dans un instant.',
+	'shell.signedOut':
+		"Non connecté à Qobuz. Ce qui attend reste dans la file et reprend dès la connexion.",
 	'signin.expired': 'La session Qobuz a expiré. Reconnectez-vous.',
 	'signin.restoring':
 		"La session enregistrée attend la réponse de Qobuz. Elle se rouvrira d'elle-même dès que Qobuz sera joignable : rien à saisir.",
