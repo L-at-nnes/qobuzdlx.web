@@ -1092,15 +1092,47 @@ async fn a_restored_queue_is_resumed_once_signed_in() {
 #[tokio::test]
 async fn partial_files_of_a_killed_run_are_removed_at_start() {
     let rig = Rig::new().await;
-    let temp = rig.config.path().join("qbdlx-temp");
-    std::fs::create_dir_all(&temp).unwrap();
-    std::fs::write(temp.join("qbdlx_downloading-42.flac"), b"half").unwrap();
-    std::fs::write(temp.join("keep-me.txt"), b"not ours").unwrap();
+    // Next to the music, and where earlier versions kept them
+    let folders = [
+        rig.music.path().join(".qobuzdlx-partial"),
+        rig.config.path().join("qbdlx-temp"),
+    ];
+    for folder in &folders {
+        std::fs::create_dir_all(folder).unwrap();
+        std::fs::write(folder.join("qbdlx_downloading-42.flac"), b"half").unwrap();
+        std::fs::write(folder.join("keep-me.txt"), b"not ours").unwrap();
+    }
 
     let _manager = rig.start();
 
-    assert!(!temp.join("qbdlx_downloading-42.flac").exists());
-    assert!(temp.join("keep-me.txt").exists());
+    for folder in &folders {
+        assert!(!folder.join("qbdlx_downloading-42.flac").exists());
+        assert!(folder.join("keep-me.txt").exists());
+    }
+}
+
+#[tokio::test]
+async fn a_track_in_progress_is_written_next_to_the_music_and_leaves_nothing_behind() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("alb"), Display::default())
+        .unwrap();
+
+    assert_eq!(
+        finished(&manager, &album_url("alb")).await,
+        ItemStatus::Completed
+    );
+    let partial = rig.music.path().join(".qobuzdlx-partial");
+    assert!(partial.is_dir(), "on the volume of the music");
+    assert_eq!(std::fs::read_dir(&partial).unwrap().count(), 0);
+    assert!(
+        !rig.config.path().join("qbdlx-temp").exists(),
+        "nothing goes through the configuration folder any more"
+    );
 }
 
 // ─── Retrying ───

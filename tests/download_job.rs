@@ -21,7 +21,6 @@ use tokio_util::sync::CancellationToken;
 struct Rig {
     catalogue: Catalogue,
     music: TempDir,
-    partial: TempDir,
     recorder: Arc<Recorder>,
     cancel: CancellationToken,
     skip: Arc<AtomicBool>,
@@ -41,7 +40,6 @@ impl Rig {
         Self {
             catalogue: Catalogue::new().await,
             music: TempDir::new().unwrap(),
-            partial: TempDir::new().unwrap(),
             recorder: Arc::new(Recorder::default()),
             cancel: CancellationToken::new(),
             skip: Arc::new(AtomicBool::new(false)),
@@ -82,7 +80,6 @@ impl Rig {
                 env: Environment {
                     client: self.client.clone(),
                     fetcher: Fetcher::new(http.clone(), Duration::from_secs(5)),
-                    temp_dir: self.partial.path().to_path_buf(),
                     tuning: Tuning {
                         attempts_per_quality: 2,
                         backoff: Duration::ZERO,

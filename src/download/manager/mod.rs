@@ -21,7 +21,7 @@ use super::log::{Log, LogEvent, LogLine};
 use super::progress::{Halt, Progress};
 use super::queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, Window, Work};
 use super::store::QueueStore;
-use super::track::{Environment, TEMP_PREFIX, Tuning};
+use super::track::{Environment, TEMP_PREFIX, Tuning, partial_dir};
 use super::transfer::Fetcher;
 use super::url::{QobuzUrl, parse};
 use crate::extensions::Extensions;
@@ -87,7 +87,7 @@ pub struct InvalidAddress;
 pub struct ManagerConfig {
     pub client: Client,
     pub settings: SettingsStore,
-    /// Where `queue.json` is kept, and the partial files.
+    /// Where `queue.json` is kept.
     pub config_dir: PathBuf,
     /// Used for the CDN, the covers and the bonus files. It should not have an overall timeout: a
     /// 24-bit album takes as long as it takes. A silent connection is handled by `stall_timeout`.
@@ -162,8 +162,9 @@ impl Manager {
     /// within a Tokio runtime.
     #[must_use]
     pub fn start(config: ManagerConfig) -> Self {
-        let temp_dir = config.config_dir.join("qbdlx-temp");
-        purge_partial_files(&temp_dir);
+        purge_partial_files(&partial_dir(&config.settings.get()));
+        // Where earlier versions kept them
+        purge_partial_files(&config.config_dir.join("qbdlx-temp"));
 
         let store = QueueStore::new(&config.config_dir);
         let queue = store.load();
@@ -171,7 +172,6 @@ impl Manager {
         let env = Environment {
             client: config.client.clone(),
             fetcher: Fetcher::new(config.http.clone(), config.stall_timeout),
-            temp_dir,
             tuning: config.tuning,
         };
         let (events, _) = broadcast::channel(256);

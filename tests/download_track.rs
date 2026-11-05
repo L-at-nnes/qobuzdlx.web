@@ -22,7 +22,6 @@ struct Rig {
     server: FakeServer,
     client: Client,
     music: TempDir,
-    partial: TempDir,
     recorder: Recorder,
     cancel: CancellationToken,
     settings: Settings,
@@ -50,14 +49,15 @@ impl Rig {
             "performer": { "id": 1, "name": "Miles Davis" },
         }))
         .unwrap();
+        let music = TempDir::new().unwrap();
         let mut settings = Settings::default();
         settings.download.quality = Quality::Flac16;
+        settings.download.directory = music.path().to_path_buf();
 
         Self {
             server,
             client,
-            music: TempDir::new().unwrap(),
-            partial: TempDir::new().unwrap(),
+            music,
             recorder: Recorder::default(),
             cancel: CancellationToken::new(),
             settings,
@@ -90,7 +90,6 @@ impl Rig {
         let env = Environment {
             client: self.client.clone(),
             fetcher: Fetcher::new(reqwest::Client::new(), Duration::from_secs(5)),
-            temp_dir: self.partial.path().to_path_buf(),
             tuning: Tuning {
                 attempts_per_quality: 5,
                 backoff: Duration::ZERO,
@@ -119,8 +118,10 @@ impl Rig {
         self.music.path().join("01 - So What.flac")
     }
 
+    /// What is left in the folder of the partial files, which lives in the download folder.
     fn partial_files(&self) -> usize {
-        std::fs::read_dir(self.partial.path()).unwrap().count()
+        std::fs::read_dir(qobuzdlx::download::partial_dir(&self.settings))
+            .map_or(0, Iterator::count)
     }
 }
 

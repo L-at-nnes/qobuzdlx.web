@@ -30,7 +30,10 @@ pub use progress::{AlbumCard, Halt, Progress, ProgressScope, TrackProgress, Wait
 pub use queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, View, Window, Work};
 pub use report::{Outcome, Reporter, StepTrack};
 pub use store::QueueStore;
-pub use track::{Context, Environment, TEMP_PREFIX, TrackError, TrackRequest, TrackResult, Tuning};
+pub use track::{
+    Context, Environment, PARTIAL_DIR, TEMP_PREFIX, TrackError, TrackRequest, TrackResult, Tuning,
+    partial_dir,
+};
 pub use transfer::{Error as TransferError, Fetcher, Transfer, Update as TransferUpdate};
 pub use url::{QobuzUrl, canonical as canonical_url, parse as parse_url};
 pub use verify::{Error as VerifyError, fix_md5, verify_flac};

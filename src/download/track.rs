@@ -39,14 +39,23 @@ impl Default for Tuning {
 pub struct Environment {
     pub client: Client,
     pub fetcher: Fetcher,
-    /// Where partial files live until they are complete. Kept apart from the music folder so that
-    /// a library scanner never sees a half-written file.
-    pub temp_dir: PathBuf,
     pub tuning: Tuning,
 }
 
 /// Prefix of the partial files, which is what lets a start-up clean up after a killed process.
 pub const TEMP_PREFIX: &str = "qbdlx_downloading-";
+
+/// The folder of the partial files, inside the download folder. Hidden, so that a library scanner
+/// leaves it alone.
+pub const PARTIAL_DIR: &str = ".qobuzdlx-partial";
+
+/// Where partial files live until they are complete: next to the music, on the same volume. A
+/// finished file then takes its place by being renamed, which either happens or does not: a track
+/// is never half there under its own name, and it is written to the disk once, not twice.
+#[must_use]
+pub fn partial_dir(settings: &Settings) -> PathBuf {
+    settings.download.directory.join(PARTIAL_DIR)
+}
 
 /// Everything a track download works with.
 #[derive(Clone, Copy)]
@@ -186,8 +195,9 @@ impl Context<'_> {
             });
         }
 
-        tokio::fs::create_dir_all(&self.env.temp_dir).await?;
-        let temp = self.env.temp_dir.join(format!(
+        let partial_dir = partial_dir(self.settings);
+        tokio::fs::create_dir_all(&partial_dir).await?;
+        let temp = partial_dir.join(format!(
             "{TEMP_PREFIX}{}{}",
             request.track.id,
             self.settings.download.quality.extension()
@@ -448,12 +458,84 @@ fn free_name(wanted: PathBuf) -> PathBuf {
     }
 }
 
-/// Renames, or copies when the two places are on different volumes (the partial files and the
-/// music are in different Docker volumes).
+/// Renames, or copies when the two places are on different volumes (a folder of the library that is
+/// mounted from elsewhere).
 async fn move_file(from: &Path, to: &Path) -> io::Result<()> {
     if tokio::fs::rename(from, to).await.is_ok() {
         return Ok(());
     }
-    tokio::fs::copy(from, to).await?;
+    copy_into_place(from, to).await?;
     tokio::fs::remove_file(from).await
+}
+
+/// Copies `from` to `to` without `to` ever holding a part of it: the copy is made under another name
+/// next to it, and takes the name once it is whole. A copy cut short (the disk fills up, the process
+/// is stopped) must not be taken for the track the next time, and left as it is for ever.
+async fn copy_into_place(from: &Path, to: &Path) -> io::Result<()> {
+    let mut name = to.file_name().unwrap_or_default().to_os_string();
+    name.push(".part");
+    let partial = to.with_file_name(name);
+
+    let copied = async {
+        tokio::fs::copy(from, &partial).await?;
+        tokio::fs::rename(&partial, to).await
+    }
+    .await;
+    if copied.is_err() {
+        let _ = tokio::fs::remove_file(&partial).await;
+    }
+    copied
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn names_in(folder: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(folder)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[tokio::test]
+    async fn a_copy_takes_its_name_only_once_it_is_whole() {
+        let source = TempDir::new().unwrap();
+        let library = TempDir::new().unwrap();
+        let from = source.path().join("partial.flac");
+        std::fs::write(&from, b"the whole track").unwrap();
+        let to = library.path().join("01 - So What.flac");
+
+        copy_into_place(&from, &to).await.unwrap();
+
+        assert_eq!(std::fs::read(&to).unwrap(), b"the whole track");
+        assert_eq!(names_in(library.path()), ["01 - So What.flac"]);
+    }
+
+    #[tokio::test]
+    async fn a_copy_that_fails_leaves_nothing_under_the_name_of_the_track() {
+        let source = TempDir::new().unwrap();
+        let library = TempDir::new().unwrap();
+        let to = library.path().join("01 - So What.flac");
+
+        let result = copy_into_place(&source.path().join("missing.flac"), &to).await;
+
+        assert!(result.is_err());
+        assert!(names_in(library.path()).is_empty());
+    }
+
+    #[test]
+    fn partial_files_live_in_a_hidden_folder_of_the_download_folder() {
+        let mut settings = Settings::default();
+        settings.download.directory = PathBuf::from("/music");
+
+        assert_eq!(
+            partial_dir(&settings),
+            Path::new("/music").join(".qobuzdlx-partial")
+        );
+    }
 }
