@@ -127,6 +127,20 @@ impl TrackError {
         }
     }
 
+    /// Whether the error says that this quality is not there to be had, as opposed to one that is
+    /// there and could not be fetched this time: Qobuz answered that the request will not work, or
+    /// the CDN that it has no such file. Only then is a lower quality worth taking: a file fetched
+    /// lower because the network hiccuped would be kept for ever in place of the one asked for.
+    fn means_no_such_quality(&self) -> bool {
+        match self {
+            Self::Api(api) => !api.is_transient(),
+            Self::Transfer(TransferError::Status(status)) => {
+                status.is_client_error() && !matches!(status.as_u16(), 408 | 429)
+            }
+            _ => false,
+        }
+    }
+
     /// Whether the disk cannot take any more: it is full, over its quota or read-only. Every other
     /// track would meet the same refusal.
     #[must_use]
@@ -252,7 +266,12 @@ impl Context<'_> {
         })
     }
 
-    /// Downloads the track into `temp`, stepping down the qualities when one keeps failing.
+    /// Downloads the track into `temp`, in the quality asked for, or in the next one down that
+    /// exists when that one does not.
+    ///
+    /// A quality that exists and could not be fetched (the connection kept being cut, the file kept
+    /// arriving damaged) is tried again, then fails the track, which can be retried: it is not
+    /// replaced by a lower one. The log says which quality was taken when it is not the one asked.
     async fn receive_with_fallback(
         &self,
         track: &Track,
@@ -270,15 +289,22 @@ impl Context<'_> {
                 });
             }
 
-            let mut failure = None;
-            let mut unavailable = false;
-            for attempt in 1..=attempts {
+            // `None`: Qobuz has no stream of this quality. An error: it says this one will not come.
+            let mut missing = None;
+            let mut attempt = 0;
+            loop {
+                attempt += 1;
                 match self.receive(track, quality, temp).await {
-                    Ok(Some(received)) => return Ok(received),
-                    Ok(None) => {
-                        unavailable = true;
-                        break;
+                    Ok(Some(received)) => {
+                        if quality != requested {
+                            self.reporter.log(LogEvent::QualityLowered {
+                                number: track.track_number,
+                                quality: received.quality.clone(),
+                            });
+                        }
+                        return Ok(received);
                     }
+                    Ok(None) => break,
                     Err(error) if error.is_final() => return Err(error),
                     Err(error) => {
                         self.reporter.log(LogEvent::AttemptFailed {
@@ -288,32 +314,30 @@ impl Context<'_> {
                             error: error.to_string(),
                         });
                         let _ = tokio::fs::remove_file(temp).await;
-                        // Qobuz answered that this will not work: asking again changes nothing
-                        let hopeless =
-                            matches!(&error, TrackError::Api(api) if !api.is_transient());
-                        failure = Some(error);
-                        if hopeless {
+                        // Asking again changes nothing: the next quality down may exist
+                        if error.means_no_such_quality() {
+                            missing = Some(error);
                             break;
                         }
-                        if attempt < attempts {
-                            self.pause(attempt).await?;
+                        if attempt >= attempts {
+                            self.reporter.log(LogEvent::QualityFailed {
+                                quality: label.to_owned(),
+                                attempts,
+                                error: error.to_string(),
+                            });
+                            return Err(error);
                         }
+                        self.pause(attempt).await?;
                     }
                 }
             }
 
-            if unavailable {
-                self.reporter.log(LogEvent::TrackNotInQuality {
-                    number: track.track_number,
-                    quality: label.to_owned(),
-                });
-            } else if let Some(error) = failure {
-                self.reporter.log(LogEvent::QualityFailed {
-                    quality: label.to_owned(),
-                    attempts,
-                    error: error.to_string(),
-                });
-                last_error = Some(error);
+            self.reporter.log(LogEvent::TrackNotInQuality {
+                number: track.track_number,
+                quality: label.to_owned(),
+            });
+            if missing.is_some() {
+                last_error = missing;
             }
         }
 

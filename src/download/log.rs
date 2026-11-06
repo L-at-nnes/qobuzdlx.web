@@ -42,6 +42,11 @@ pub enum LogEvent {
         number: u32,
         quality: String,
     },
+    /// The quality asked for does not exist for the track: this is the one that was taken instead.
+    QualityLowered {
+        number: u32,
+        quality: String,
+    },
     AttemptFailed {
         attempt: u32,
         attempts: u32,
@@ -191,6 +196,10 @@ impl fmt::Display for LogEvent {
             Self::TrackNotInQuality { number, quality } => {
                 write!(formatter, "Track {number} is not available in {quality}")
             }
+            Self::QualityLowered { number, quality } => write!(
+                formatter,
+                "Track {number} taken in {quality}: the quality asked for does not exist for it."
+            ),
             Self::AttemptFailed {
                 attempt,
                 attempts,

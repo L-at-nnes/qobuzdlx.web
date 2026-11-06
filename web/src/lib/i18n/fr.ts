@@ -251,6 +251,8 @@ export const fr: Record<Key, Message> = {
 	'log.file_exists': 'Le fichier de la piste {number} existe déjà, ignoré.',
 	'log.quality_unavailable': 'Essai en {quality}',
 	'log.track_not_in_quality': "La piste {number} n'est pas disponible en {quality}.",
+	'log.quality_lowered':
+		"Piste {number} prise en {quality} : la qualité demandée n'existe pas pour elle.",
 	'log.attempt_failed': 'Tentative {attempt} sur {attempts} en {quality} échouée : {error}',
 	'log.quality_failed': '{quality} a échoué après {attempts} tentatives : {error}',
 	'log.track_transfer': 'Reçu en {quality}, {megabytes} Mo à {megabytes_per_second} Mo/s',

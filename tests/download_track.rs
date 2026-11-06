@@ -198,37 +198,121 @@ async fn overwrite_mode_replaces_the_file() {
     assert!(std::fs::metadata(rig.expected_file()).unwrap().len() > 1000);
 }
 
-#[tokio::test]
-async fn a_quality_that_keeps_failing_gives_way_to_the_next_one() {
-    let mut rig = Rig::new().await;
-    rig.settings.download.quality = Quality::Flac24Max;
+/// Qobuz points the 24 bit / 192 kHz stream at `/cdn/highest` and the others at a good file.
+fn serve_highest_apart(rig: &Rig) {
     let good = flac_bytes();
     rig.server
         .on("/cdn/good", move |_| Reply::bytes(good.clone()));
     let base = rig.server.url().to_owned();
     rig.server.on("/api/track/getFileUrl", move |call| {
-        // The 24 bit / 192 kHz file is cut by the CDN every time
-        let path = if call.param("format_id") == "27" { "broken" } else { "good" };
+        let path = if call.param("format_id") == "27" { "highest" } else { "good" };
         Reply::json(json!({ "url": format!("{base}/cdn/{path}"), "format_id": 7, "bit_depth": 24, "sampling_rate": 96.0 }))
     });
-    rig.server.on("/cdn/broken", |_| Reply::status(500));
+}
 
-    let result = rig.download().await.unwrap();
+fn formats_asked(rig: &Rig) -> Vec<String> {
+    rig.server
+        .calls_to("/api/track/getFileUrl")
+        .iter()
+        .map(|call| call.param("format_id").to_owned())
+        .collect()
+}
 
-    assert!(result.path.exists());
+#[tokio::test]
+async fn a_quality_that_exists_but_keeps_failing_fails_the_track_instead_of_lowering_it() {
+    let mut rig = Rig::new().await;
+    rig.settings.download.quality = Quality::Flac24Max;
+    serve_highest_apart(&rig);
+    // The file is there, and the CDN cuts it every time
+    rig.server.on("/cdn/highest", |_| Reply::status(500));
+
+    let error = rig.download().await.unwrap_err();
+
+    assert!(matches!(error, TrackError::Transfer(_)), "{error}");
     assert_eq!(
-        rig.server.count("/cdn/broken"),
+        rig.server.count("/cdn/highest"),
         5,
-        "five attempts per quality"
+        "five attempts in the quality asked for"
     );
+    assert_eq!(
+        rig.server.count("/cdn/good"),
+        0,
+        "no lower quality is taken"
+    );
+    assert!(!rig.expected_file().exists());
     assert!(
         rig.recorder
             .has(|event| matches!(event, LogEvent::QualityFailed { attempts: 5, .. }))
     );
+    assert!(
+        !rig.recorder
+            .has(|event| matches!(event, LogEvent::QualityLowered { .. }))
+    );
+}
+
+#[tokio::test]
+async fn a_quality_qobuz_does_not_have_gives_way_to_the_next_one_and_the_log_says_which() {
+    let mut rig = Rig::new().await;
+    rig.settings.download.quality = Quality::Flac24Max;
+    let good = flac_bytes();
+    rig.server
+        .on("/cdn/good", move |_| Reply::bytes(good.clone()));
+    let url = format!("{}/cdn/good", rig.server.url());
+    rig.server.on("/api/track/getFileUrl", move |call| {
+        // No stream above CD quality for this track
+        if call.param("format_id") == "6" {
+            Reply::json(
+                json!({ "url": url, "format_id": 6, "bit_depth": 16, "sampling_rate": 44.1 }),
+            )
+        } else {
+            Reply::json(json!({ "format_id": 0 }))
+        }
+    });
+
+    let result = rig.download().await.unwrap();
+
+    assert!(result.path.exists());
+    assert_eq!(formats_asked(&rig), ["27", "7", "6"], "each asked once");
     assert!(rig.recorder.has(|event| matches!(
         event,
-        LogEvent::QualityUnavailable { quality } if quality == "FLAC 24bit/96kHz"
+        LogEvent::QualityLowered { number: 1, quality } if quality == "FLAC 16bit/44.1kHz"
     )));
+    assert_eq!(
+        rig.recorder
+            .count(|event| matches!(event, LogEvent::TrackNotInQuality { .. })),
+        2
+    );
+}
+
+#[tokio::test]
+async fn a_file_the_cdn_does_not_have_gives_way_to_the_next_quality_too() {
+    let mut rig = Rig::new().await;
+    rig.settings.download.quality = Quality::Flac24Max;
+    serve_highest_apart(&rig);
+    rig.server.on("/cdn/highest", |_| Reply::status(404));
+
+    let result = rig.download().await.unwrap();
+
+    assert!(result.path.exists());
+    assert_eq!(rig.server.count("/cdn/highest"), 1, "not asked again");
+    assert_eq!(formats_asked(&rig), ["27", "7"]);
+    assert!(
+        rig.recorder
+            .has(|event| matches!(event, LogEvent::QualityLowered { .. }))
+    );
+}
+
+#[tokio::test]
+async fn the_quality_asked_for_is_not_reported_as_lowered() {
+    let rig = Rig::new().await;
+    rig.serve(flac_bytes());
+
+    rig.download().await.unwrap();
+
+    assert!(
+        !rig.recorder
+            .has(|event| matches!(event, LogEvent::QualityLowered { .. }))
+    );
 }
 
 #[tokio::test]

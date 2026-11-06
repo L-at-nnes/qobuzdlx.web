@@ -6,8 +6,8 @@ const FLAC_QUALITIES: [Quality; 3] = [Quality::Flac24Max, Quality::Flac24, Quali
 
 /// The qualities to try for a track, starting with the one chosen.
 ///
-/// The CDN sometimes cuts the very high resolutions for an account, so a quality that keeps failing
-/// gives way to the next one down. MP3 is never a fallback for FLAC: the file keeps the extension of
+/// A quality that does not exist for a track gives way to the next one down; one that exists and
+/// could not be fetched does not. MP3 is never a fallback for FLAC: the file keeps the extension of
 /// the format chosen, and an MP3 stream saved as `.flac` could not be tagged.
 #[must_use]
 pub fn fallback_chain(requested: Quality) -> Vec<Quality> {

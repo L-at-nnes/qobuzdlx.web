@@ -246,6 +246,8 @@ export const en = {
 	'log.file_exists': 'Track {number} already exists, skipped.',
 	'log.quality_unavailable': 'Trying {quality}',
 	'log.track_not_in_quality': 'Track {number} is not available in {quality}.',
+	'log.quality_lowered':
+		'Track {number} taken in {quality}: the quality asked for does not exist for it.',
 	'log.attempt_failed': 'Attempt {attempt} of {attempts} in {quality} failed: {error}',
 	'log.quality_failed': '{quality} failed after {attempts} attempts: {error}',
 	'log.track_transfer': 'Received {quality}, {megabytes} MB at {megabytes_per_second} MB/s',
