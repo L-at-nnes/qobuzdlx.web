@@ -20,7 +20,7 @@ use super::track::{Context, Environment, TrackError};
 use crate::extensions::TrackSaved;
 use crate::naming::Namer;
 use crate::qobuz::{self, Album, Playlist, Track};
-use crate::settings::Settings;
+use crate::settings::{ArtworkSize, Settings};
 
 /// How many albums are remembered. The point is to catch neighbours (a playlist often draws several
 /// tracks from one album), not to remember everything: a full cache is simply emptied.
@@ -313,18 +313,14 @@ impl Job {
 
         let mut saved = None;
         let on_disk = folder.join("Cover.jpg");
-        if artwork.save_to_disk && !on_disk.exists() {
-            match self.covers.fetch(album, artwork.saved_size).await {
-                Ok(picture) => {
-                    if let Err(error) = tokio::fs::write(&on_disk, &picture).await {
-                        tracing::warn!(%error, "cover could not be saved");
-                    }
-                    saved = Some(picture);
-                }
-                Err(error) => {
-                    tracing::warn!(%error, "cover could not be downloaded");
-                }
+        if artwork.save_to_disk
+            && !on_disk.exists()
+            && let Some(picture) = self.picture(album, artwork.saved_size).await
+        {
+            if let Err(error) = tokio::fs::write(&on_disk, &picture).await {
+                tracing::warn!(%error, "cover could not be saved");
             }
+            saved = Some(picture);
         }
 
         if !self.settings.tags.cover {
@@ -336,17 +332,27 @@ impl Job {
         let embedded = if artwork.embedded_size == artwork.saved_size && saved.is_some() {
             saved
         } else {
-            match self.covers.fetch(album, artwork.embedded_size).await {
-                Ok(picture) => Some(picture),
-                Err(error) => {
-                    tracing::warn!(%error, "cover could not be downloaded");
-                    None
-                }
-            }
+            self.picture(album, artwork.embedded_size).await
         };
         let embedded = embedded.map(Arc::new);
         self.pictures.insert(album.id.clone(), embedded.clone());
         embedded
+    }
+
+    /// A cover at the given size, or nothing when it cannot be had, or when the item is stopped
+    /// first: a picture is not worth making a cancel or a pause wait.
+    async fn picture(&self, album: &Album, size: ArtworkSize) -> Option<Vec<u8>> {
+        let fetched = tokio::select! {
+            () = self.cancel.cancelled() => return None,
+            fetched = self.covers.fetch(album, size) => fetched,
+        };
+        match fetched {
+            Ok(picture) => Some(picture),
+            Err(error) => {
+                tracing::warn!(%error, "cover could not be downloaded");
+                None
+            }
+        }
     }
 }
 

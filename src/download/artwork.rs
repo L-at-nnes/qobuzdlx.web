@@ -1,5 +1,12 @@
+use std::time::Duration;
+
 use crate::qobuz::Album;
 use crate::settings::ArtworkSize;
+
+/// How long a cover may take, from the request to its last byte. The client that fetches it has no
+/// overall timeout (an album takes as long as it takes), and a picture is a few megabytes at most:
+/// a connection that hangs must cost a cover, not stop the queue for ever.
+const TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The size Qobuz serves for every release, and the one used when another is refused.
 const DEFAULT_WIDTH: u16 = 600;
@@ -44,12 +51,23 @@ fn is_image(bytes: &[u8]) -> bool {
 #[derive(Debug, Clone)]
 pub struct Covers {
     http: reqwest::Client,
+    timeout: Duration,
 }
 
 impl Covers {
     #[must_use]
     pub fn new(http: reqwest::Client) -> Self {
-        Self { http }
+        Self {
+            http,
+            timeout: TIMEOUT,
+        }
+    }
+
+    /// Gives up on a cover after `timeout` instead of the usual minute.
+    #[must_use]
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     /// The cover at the requested size.
@@ -73,7 +91,13 @@ impl Covers {
     }
 
     async fn get(&self, url: &str) -> Result<Vec<u8>, CoverError> {
-        let response = self.http.get(url).send().await?.error_for_status()?;
+        let response = self
+            .http
+            .get(url)
+            .timeout(self.timeout)
+            .send()
+            .await?
+            .error_for_status()?;
         let bytes = response.bytes().await?;
         if is_image(&bytes) {
             Ok(bytes.to_vec())

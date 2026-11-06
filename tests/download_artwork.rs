@@ -65,6 +65,24 @@ async fn without_any_cover_it_is_an_error_not_an_empty_picture() {
 }
 
 #[tokio::test]
+async fn a_cover_that_never_comes_is_given_up() {
+    let server = FakeServer::start().await;
+    server.on("/covers/abc_600.jpg", |_| {
+        Reply::bytes(jpeg("late")).after(std::time::Duration::from_secs(20))
+    });
+    let covers =
+        Covers::new(reqwest::Client::new()).with_timeout(std::time::Duration::from_millis(200));
+    let started = std::time::Instant::now();
+
+    let result = covers
+        .fetch(&album_with_cover(&server), ArtworkSize::Pixels(600))
+        .await;
+
+    assert!(matches!(result, Err(CoverError::Http(_))), "{result:?}");
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+}
+
+#[tokio::test]
 async fn an_error_page_served_as_a_cover_is_not_taken_for_one() {
     let server = FakeServer::start().await;
     server.on("/covers/abc_600.jpg", |_| {

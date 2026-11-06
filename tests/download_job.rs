@@ -112,6 +112,26 @@ const KIND_OF_BLUE: [(u64, u32, &str); 3] = [
 // ─── Album ───
 
 #[tokio::test]
+async fn a_cover_that_hangs_does_not_keep_a_cancel_waiting() {
+    let rig = Rig::new().await;
+    rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    rig.server.on("/cdn/cover", |_| {
+        Reply::bytes(common::TINY_JPEG.to_vec()).after(Duration::from_secs(30))
+    });
+    let cancel = rig.cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        cancel.cancel();
+    });
+    let started = std::time::Instant::now();
+
+    let (result, _) = rig.run(ItemKind::Album, "alb").await;
+
+    assert!(matches!(result, Err(JobError::Cancelled)), "{result:?}");
+    assert!(started.elapsed() < Duration::from_secs(5));
+}
+
+#[tokio::test]
 async fn an_album_gives_its_tracks_and_its_cover_in_the_folder_of_the_artist() {
     let rig = Rig::new().await;
     rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
