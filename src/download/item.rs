@@ -108,7 +108,9 @@ impl QueueItem {
     pub fn new(url: String, kind: ItemKind, ref_id: String, display: Display) -> Self {
         let label = display.label.filter(|label| !label.trim().is_empty());
         Self {
-            id: format!("{:08x}", rand::rng().random::<u32>()),
+            // 64 bits: with 32, a queue of a hundred thousand items held a few pairs of items with
+            // the same id, and what was meant for one (ending, removing) reached the other
+            id: format!("{:016x}", rand::rng().random::<u64>()),
             label: label.unwrap_or_else(|| url.clone()),
             url,
             kind,

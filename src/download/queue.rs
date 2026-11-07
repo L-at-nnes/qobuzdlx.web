@@ -692,6 +692,20 @@ mod tests {
     }
 
     #[test]
+    fn no_two_items_of_a_very_long_queue_share_an_id() {
+        let mut ids = HashSet::new();
+        for number in 0..200_000 {
+            let item = QueueItem::new(
+                format!("https://play.qobuz.com/album/{number}"),
+                ItemKind::Album,
+                number.to_string(),
+                Display::default(),
+            );
+            assert!(ids.insert(item.id), "an id came twice");
+        }
+    }
+
+    #[test]
     fn many_addresses_are_added_in_order_and_counted() {
         let mut queue = queue_with(&["https://play.qobuz.com/album/old"]);
         let counts = queue.enqueue_many([
