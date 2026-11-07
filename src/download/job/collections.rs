@@ -32,6 +32,9 @@ impl Job {
                 failed: u32::try_from(outcome.failures.len()).unwrap_or(u32::MAX),
             });
         }
+        if self.left_out > 0 {
+            return Err(JobError::Incomplete(self.left_out));
+        }
         self.log(LogEvent::Complete);
         Ok(())
     }
@@ -150,6 +153,7 @@ impl Job {
                         artist_id: listed.id,
                         error: error.to_string(),
                     });
+                    self.left_out += 1;
                 }
                 Err(other) => return Err(other),
             }
@@ -158,7 +162,7 @@ impl Job {
     }
 
     /// Albums one after the other, each taking its share of the progress bar. An album that cannot be
-    /// had is reported and the next one goes on.
+    /// had is reported and the next one goes on; the item then ends as failed, not as done.
     async fn each_album(&mut self, album_ids: Vec<String>) -> Result<(), JobError> {
         let total = album_ids.len();
         for (index, album_id) in album_ids.iter().enumerate() {
@@ -186,6 +190,7 @@ impl Job {
                         album_id: album_id.clone(),
                         error: error.to_string(),
                     });
+                    self.left_out += 1;
                 }
                 Err(other) => return Err(other),
             }

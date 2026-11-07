@@ -48,6 +48,11 @@ pub enum JobError {
     /// A track that was asked for on its own could not be downloaded.
     #[error("{0}")]
     Track(TrackError),
+    /// An item made of several albums (a discography, a label, favourites) went through all of them,
+    /// and some could not be had. What could be is in place; the item is not done for all that, and
+    /// saying it is would lose those albums without a word.
+    #[error("{0} of its albums could not be downloaded (the log names them): retry to get them")]
+    Incomplete(u32),
     /// The disk is full (or over its quota, or read-only): nothing more can be written.
     #[error("the disk cannot take any more files: {0}")]
     StorageFull(String),
@@ -146,6 +151,8 @@ pub struct Job {
     /// Set by "retry the failures": only these tracks are processed.
     only: Option<BTreeSet<u64>>,
     outcome: Outcome,
+    /// Albums (or whole artists, among favourites) of the item that could not be had.
+    left_out: u32,
     scope: ProgressScope,
     albums: HashMap<String, Arc<Album>>,
     pictures: HashMap<String, Option<Arc<Vec<u8>>>>,
@@ -170,6 +177,7 @@ impl Job {
             user_id: setup.user_id,
             only: item.only_track_ids.clone(),
             outcome: Outcome::of(item),
+            left_out: 0,
             scope: ProgressScope::FULL,
             albums: HashMap::new(),
             pictures: HashMap::new(),

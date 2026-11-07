@@ -652,7 +652,8 @@ async fn an_artist_gives_every_album_and_the_progress_covers_the_whole_discograp
 }
 
 #[tokio::test]
-async fn an_album_of_an_artist_that_cannot_be_had_is_reported_and_the_next_goes_on() {
+async fn an_album_of_an_artist_that_cannot_be_had_is_reported_the_next_goes_on_and_the_item_fails()
+{
     let rig = Rig::new().await;
     rig.add_album(
         "a2",
@@ -667,11 +668,18 @@ async fn an_album_of_an_artist_that_cannot_be_had_is_reported_and_the_next_goes_
 
     let (result, outcome) = rig.run(ItemKind::Artist, "1").await;
 
-    result.unwrap();
-    assert_eq!(outcome.downloaded, 1);
+    assert!(
+        matches!(result, Err(JobError::Incomplete(1))),
+        "an item that left an album out is not done: {result:?}"
+    );
+    assert_eq!(outcome.downloaded, 1, "what could be had is in place");
     assert!(rig.recorder.has(
         |event| matches!(event, LogEvent::AlbumFailed { album_id, .. } if album_id == "gone")
     ));
+    assert!(
+        !rig.recorder
+            .has(|event| matches!(event, LogEvent::Complete))
+    );
 }
 
 #[tokio::test]
