@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -87,6 +88,7 @@ impl Job {
         cover: Option<&Vec<u8>>,
     ) -> Result<bool, JobError> {
         let total = tracks.len();
+        let suffixes = self.same_name_suffixes(album, tracks, folder);
         let skipped = AtomicBool::new(false);
         let stop = self.cancel.child_token();
         // The counts are held apart from the job while the tracks run: they only read the job
@@ -116,6 +118,7 @@ impl Job {
                         album,
                         listed,
                         folder,
+                        &suffixes[index],
                         cover,
                     ));
                 }
@@ -157,6 +160,29 @@ impl Job {
         Ok(skipped.load(Ordering::SeqCst))
     }
 
+    /// What each track of the album adds to the name of its file so that no two tracks share one:
+    /// nothing, or its id for a track whose name is already taken by an earlier one.
+    ///
+    /// Two tracks get the same name when the templates do not tell them apart: no disc folder on a
+    /// release of several discs, a file name without the track number. The second would otherwise
+    /// find "its" file in place and be skipped, without a word, for ever.
+    fn same_name_suffixes(&self, album: &Album, tracks: &[Track], folder: &Path) -> Vec<String> {
+        let namer = self.namer();
+        let mut taken = HashSet::new();
+        tracks
+            .iter()
+            .map(|track| {
+                let plain = namer.track_path(folder, DownloadKind::Album, album, track, None, "");
+                // Compared the way the least strict filesystem would: without regard to case
+                if taken.insert(plain.to_string_lossy().to_lowercase()) {
+                    String::new()
+                } else {
+                    format!(" ({})", track.id)
+                }
+            })
+            .collect()
+    }
+
     /// A track of an album that downloads beside others: `None` when it was left alone (skipped,
     /// not wanted, or the item has stopped), else its id, its title and how it went.
     async fn one_track(
@@ -165,6 +191,7 @@ impl Job {
         album: &Album,
         listed: &Track,
         folder: &Path,
+        suffix: &str,
         cover: Option<&Vec<u8>>,
     ) -> Option<(u64, String, Result<TrackEnd, JobError>)> {
         if slot.stop.is_cancelled() || slot.skipped.load(Ordering::SeqCst) {
@@ -192,7 +219,7 @@ impl Job {
         };
         let context = self.context_for(&reporter, slot.stop);
         let result = self
-            .album_track(&context, album, listed, folder, cover)
+            .album_track(&context, album, listed, folder, suffix, cover)
             .await;
         self.reporter.track_ended(position);
         Some((listed.id, title, result))
@@ -205,6 +232,7 @@ impl Job {
         album: &Album,
         listed: &Track,
         folder: &Path,
+        suffix: &str,
         cover: Option<&Vec<u8>>,
     ) -> Result<TrackEnd, JobError> {
         // A track already in place is found from the listing of the album, without asking Qobuz for
@@ -212,7 +240,7 @@ impl Job {
         if self.settings.advanced.duplicates == DuplicateMode::Skip {
             let wanted =
                 self.namer()
-                    .track_path(folder, DownloadKind::Album, album, listed, None, "");
+                    .track_path(folder, DownloadKind::Album, album, listed, None, suffix);
             if wanted.exists() {
                 self.log(LogEvent::FileExists {
                     number: listed.track_number,
@@ -242,7 +270,7 @@ impl Job {
                 track: &track,
                 folder,
                 playlist: None,
-                suffix: "",
+                suffix,
                 cover: cover.map(Vec::as_slice),
             })
             .await?;

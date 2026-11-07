@@ -112,6 +112,35 @@ const KIND_OF_BLUE: [(u64, u32, &str); 3] = [
 // ─── Album ───
 
 #[tokio::test]
+async fn two_tracks_the_templates_give_the_same_name_are_both_downloaded() {
+    let mut rig = Rig::new().await;
+    // No track number in the name, and two movements with the same title
+    rig.settings.naming.track = "%TrackTitle%".to_owned();
+    rig.add_album(
+        "alb",
+        "Sonatas",
+        "Artist",
+        &[(31, 1, "Allegro"), (32, 2, "Adagio"), (33, 3, "Allegro")],
+    );
+
+    let (result, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    result.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (3, 0));
+    assert!(rig.file("Artist/Sonatas/Allegro.flac").exists());
+    assert!(rig.file("Artist/Sonatas/Adagio.flac").exists());
+    assert!(
+        rig.file("Artist/Sonatas/Allegro (33).flac").exists(),
+        "the second one of the name takes its id"
+    );
+
+    // Going through the album again finds the three of them in place
+    let (result, outcome) = rig.run(ItemKind::Album, "alb").await;
+    result.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (0, 3));
+}
+
+#[tokio::test]
 async fn a_cover_that_hangs_does_not_keep_a_cancel_waiting() {
     let rig = Rig::new().await;
     rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
