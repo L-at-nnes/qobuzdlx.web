@@ -146,6 +146,32 @@ async fn five_wrong_passwords_close_the_gate_even_to_the_right_one() {
 }
 
 #[tokio::test]
+async fn wrong_passwords_sent_together_count_one_by_one() {
+    let app = protected().await;
+    let browser = app.browser();
+
+    let attempts = (0..30).map(|number| {
+        browser.post(
+            "/api/access/unlock",
+            json!({ "password": format!("wrong guess {number}") }),
+        )
+    });
+    let answers = futures_util::future::join_all(attempts).await;
+
+    let refused = answers.iter().filter(|answer| answer.status == 401).count();
+    let throttled = answers.iter().filter(|answer| answer.status == 429).count();
+    assert_eq!(
+        (refused, throttled),
+        (4, 26),
+        "four are told they are wrong, the fifth closes the gate, and nothing after it is looked at"
+    );
+    // The gate closed once, for its first length: thirty attempts are not six series of five
+    let status = browser.get("/api/access").await.json();
+    let wait = status["locked_out_seconds"].as_u64().unwrap();
+    assert!((1..=30).contains(&wait), "{wait}");
+}
+
+#[tokio::test]
 async fn the_gate_is_shared_by_every_browser() {
     let app = protected().await;
     let attacker = app.browser();

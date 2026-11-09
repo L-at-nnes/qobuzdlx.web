@@ -71,6 +71,22 @@ async fn check(password: String, stored: String) -> bool {
         .unwrap_or(false)
 }
 
+/// Lets through whoever gives the password in force, one attempt at a time: a closed gate is
+/// answered without hashing anything, and a wrong password counts against it before the next
+/// attempt is looked at.
+async fn admit(state: &AppState, password: String, stored: String) -> ApiResult<()> {
+    let _turn = state.gate.turn().await;
+    let now = Instant::now();
+    if state.gate.is_locked_out(now) {
+        return Err(ApiError::throttled(state.gate.remaining_seconds(now)));
+    }
+    if !check(password, stored).await {
+        return Err(refuse(state));
+    }
+    state.gate.register_success();
+    Ok(())
+}
+
 /// Counts a wrong password against the gate and says what to answer.
 fn refuse(state: &AppState) -> ApiError {
     let now = Instant::now();
@@ -92,14 +108,7 @@ async fn unlock(
         // Protection removed in the meantime
         return Ok(Json(Unlocked { redirect }).into_response());
     };
-    let now = Instant::now();
-    if state.gate.is_locked_out(now) {
-        return Err(ApiError::throttled(state.gate.remaining_seconds(now)));
-    }
-    if !check(request.password.clone(), stored).await {
-        return Err(refuse(&state));
-    }
-    state.gate.register_success();
+    admit(&state, request.password.clone(), stored).await?;
 
     // The password is only known here: a hash made with older costs is made again
     let access = state.clone();
@@ -176,15 +185,7 @@ async fn confirm_current(state: &AppState, current: Option<String>) -> ApiResult
     let Some(stored) = state.access.hash() else {
         return Ok(());
     };
-    let now = Instant::now();
-    if state.gate.is_locked_out(now) {
-        return Err(ApiError::throttled(state.gate.remaining_seconds(now)));
-    }
-    if !check(current.unwrap_or_default(), stored).await {
-        return Err(refuse(state));
-    }
-    state.gate.register_success();
-    Ok(())
+    admit(state, current.unwrap_or_default(), stored).await
 }
 
 fn access_error(error: &AccessError) -> ApiError {

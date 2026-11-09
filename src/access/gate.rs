@@ -36,11 +36,23 @@ struct State {
 #[derive(Debug, Default)]
 pub struct Gate {
     state: Mutex<State>,
+    /// Held while a password is checked: see [`Gate::turn`].
+    turn: tokio::sync::Mutex<()>,
 }
 
 impl Gate {
     fn state(&self) -> std::sync::MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Waits for its turn to check a password: one is checked at a time.
+    ///
+    /// Attempts sent together would otherwise all find the gate open before any of them has
+    /// failed, and all be checked: as many guesses per lock as connections, each hashing with tens
+    /// of megabytes of memory. Whoever holds the turn asks whether the gate is closed, checks, and
+    /// counts the failure before the next one looks.
+    pub async fn turn(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.turn.lock().await
     }
 
     #[must_use]
