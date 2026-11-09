@@ -91,9 +91,10 @@
 		},
 		set value(text: string) {
 			const parsed = Number.parseInt(text, 10);
+			// A second at least: without a wait, a refused item would be asked for again at once
 			draft.rate_limit.cooldown_ms = Number.isFinite(parsed)
-				? Math.min(3600, Math.max(0, parsed)) * 1000
-				: 0;
+				? Math.min(3600, Math.max(1, parsed)) * 1000
+				: 1000;
 		}
 	};
 
@@ -212,7 +213,7 @@
 			hint={t('settings.rate.cooldown.hint')}
 			type="number"
 			inputmode="numeric"
-			min="0"
+			min="1"
 			max="3600"
 			step="1"
 			bind:value={cooldown.value}

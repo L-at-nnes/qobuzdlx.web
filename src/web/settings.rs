@@ -66,7 +66,7 @@ async fn save(
     if !settings.rate_limit.is_valid() {
         return Err(ApiError::bad_request(
             "invalid_rate_limit",
-            "a wait goes from its shortest to its longest, within one hour",
+            "a wait goes from its shortest to its longest, within one hour, and the wait after a refusal lasts a second at least",
         ));
     }
     let directory = &settings.download.directory;

@@ -92,6 +92,13 @@ async fn the_waits_of_the_rate_limit_are_checked_and_kept() {
     assert_eq!(reversed.json()["error"], "invalid_rate_limit");
     assert_eq!(too_long.status, 400);
     assert_eq!(fine.status, 200);
+
+    // No wait at all after a refusal would ask Qobuz again at once, in a loop
+    let mut hasty = current(&app).await;
+    hasty["rate_limit"]["cooldown_ms"] = json!(0);
+    let no_cooldown = app.browser().put("/api/settings", hasty).await;
+    assert_eq!(no_cooldown.status, 400);
+    assert_eq!(no_cooldown.json()["error"], "invalid_rate_limit");
     let reread = current(&app).await;
     assert_eq!(reread["rate_limit"]["between_albums"]["max_ms"], 9000);
     assert_eq!(reread["rate_limit"]["break_after_albums"], 100);

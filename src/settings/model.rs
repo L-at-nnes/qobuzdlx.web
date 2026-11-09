@@ -451,6 +451,10 @@ impl RateLimit {
         }
     }
 
+    /// The shortest wait after a refusal. Without one, an item Qobuz refuses would be asked for
+    /// again at once, in a loop, which is the very thing Qobuz is refusing.
+    pub const COOLDOWN_MIN_MS: u32 = 1000;
+
     #[must_use]
     pub const fn is_valid(&self) -> bool {
         self.between_tracks.is_valid()
@@ -459,6 +463,7 @@ impl RateLimit {
             && self.break_after_tracks <= Self::BREAK_TRACKS_LIMIT
             && self.break_after_albums <= Self::BREAK_ALBUMS_LIMIT
             && self.break_after_megabytes <= Self::BREAK_MEGABYTES_LIMIT
+            && self.cooldown_ms >= Self::COOLDOWN_MIN_MS
             && self.cooldown_ms <= Delay::LIMIT_MS
     }
 
@@ -467,7 +472,13 @@ impl RateLimit {
     #[must_use]
     pub fn cooldown(&self, strikes: u32) -> Duration {
         let doublings = strikes.saturating_sub(1).min(Self::COOLDOWN_DOUBLINGS);
-        let wait = u64::from(self.cooldown_ms) << doublings;
+        // A file written before the wait had a minimum may hold none at all
+        let base = if self.cooldown_ms == 0 {
+            Self::COOLDOWN_MIN_MS
+        } else {
+            self.cooldown_ms
+        };
+        let wait = u64::from(base) << doublings;
         Duration::from_millis(wait.min(u64::from(Delay::LIMIT_MS)))
     }
 }
