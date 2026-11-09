@@ -50,8 +50,9 @@ impl QueueStore {
         queue
     }
 
+    /// Writes the queue. Blocking, and long for a long queue: run it where blocking is acceptable.
     pub fn save(&self, queue: &Queue) -> io::Result<()> {
-        self.file.save(&queue.items())
+        self.file.save_compact(&queue.items())
     }
 }
 

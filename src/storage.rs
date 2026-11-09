@@ -6,7 +6,7 @@
 //! reads that fail set the faulty file aside and fall back to that backup.
 
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -97,27 +97,68 @@ impl JsonFile {
         }
     }
 
-    /// Writes the value atomically. The previous version, if any, is kept as `<name>.bak`.
+    /// Writes the value atomically, laid out to be read by a person. The previous version, if any,
+    /// is kept as `<name>.bak`.
     pub fn save<T: Serialize>(&self, value: &T) -> io::Result<()> {
+        self.write(value, Layout::Readable)
+    }
+
+    /// Like [`JsonFile::save`], without the line breaks and the indentation: for a file that can
+    /// hold a hundred thousand entries and is written again and again, where they would make half
+    /// of what is written.
+    pub fn save_compact<T: Serialize>(&self, value: &T) -> io::Result<()> {
+        self.write(value, Layout::Compact)
+    }
+
+    fn write<T: Serialize>(&self, value: &T, layout: Layout) -> io::Result<()> {
         if let Some(directory) = self.path.parent() {
             fs::create_dir_all(directory)?;
         }
 
         let temporary = self.sibling(".tmp");
-        let mut file = create_temporary(&temporary, self.access)?;
-        serde_json::to_writer_pretty(&mut file, value).map_err(io::Error::from)?;
-        file.write_all(b"\n")?;
+        // Buffered: the encoder writes a few bytes at a time, and each would be a call to the system
+        let mut writer = BufWriter::new(create_temporary(&temporary, self.access)?);
+        match layout {
+            Layout::Readable => serde_json::to_writer_pretty(&mut writer, value),
+            Layout::Compact => serde_json::to_writer(&mut writer, value),
+        }
+        .map_err(io::Error::from)?;
+        writer.write_all(b"\n")?;
+        let file = writer
+            .into_inner()
+            .map_err(io::IntoInnerError::into_error)?;
         file.sync_all()?;
         drop(file);
 
-        if self.path.exists() {
-            // A failed backup is not worth losing the save for
-            if let Err(error) = fs::copy(&self.path, self.sibling(".bak")) {
-                tracing::warn!(path = %self.path.display(), %error, "could not back the file up");
-            }
-        }
+        self.keep_previous();
         fs::rename(&temporary, &self.path)
     }
+
+    /// Keeps the version about to be replaced as `<name>.bak`. A second name for the same file where
+    /// the filesystem can give one, which costs nothing whatever the size; a copy where it cannot.
+    /// A failed backup is not worth losing the save for.
+    fn keep_previous(&self) {
+        if !self.path.exists() {
+            return;
+        }
+        let backup = self.sibling(".bak");
+        let _ = fs::remove_file(&backup);
+        if fs::hard_link(&self.path, &backup).is_ok() {
+            return;
+        }
+        if let Err(error) = fs::copy(&self.path, &backup) {
+            tracing::warn!(path = %self.path.display(), %error, "could not back the file up");
+        }
+    }
+}
+
+/// How a file is laid out.
+#[derive(Debug, Clone, Copy)]
+enum Layout {
+    /// Indented, one field per line.
+    Readable,
+    /// On one line.
+    Compact,
 }
 
 fn create_temporary(path: &Path, access: Access) -> io::Result<fs::File> {
@@ -200,6 +241,37 @@ mod tests {
             !directory.path().join("sample.json.tmp").exists(),
             "no temporary file is left"
         );
+    }
+
+    #[test]
+    fn a_compact_file_is_read_back_and_keeps_its_previous_version_too() {
+        let directory = TempDir::new().unwrap();
+        let file = file_in(&directory);
+
+        file.save_compact(&sample("first", 1)).unwrap();
+        file.save_compact(&sample("second", 2)).unwrap();
+
+        assert_eq!(file.load::<Sample>(), Some(sample("second", 2)));
+        let written = fs::read_to_string(file.path()).unwrap();
+        assert_eq!(written.lines().count(), 1, "{written}");
+        let backup: Sample = JsonFile::read(&directory.path().join("sample.json.bak")).unwrap();
+        assert_eq!(backup, sample("first", 1));
+    }
+
+    #[test]
+    fn the_backup_is_not_changed_by_the_saves_that_follow_it() {
+        let directory = TempDir::new().unwrap();
+        let file = file_in(&directory);
+
+        for count in 1..=3 {
+            file.save(&sample("version", count)).unwrap();
+        }
+
+        // The backup may share its content with the version it was made from: it must be the one
+        // before the last, not follow the file
+        let backup: Sample = JsonFile::read(&directory.path().join("sample.json.bak")).unwrap();
+        assert_eq!(backup, sample("version", 2));
+        assert_eq!(file.load::<Sample>(), Some(sample("version", 3)));
     }
 
     #[test]

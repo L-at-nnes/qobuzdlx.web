@@ -503,7 +503,7 @@ impl Inner {
         self.emit(Event::Queue);
     }
 
-    /// Writes the queue to disk now.
+    /// Writes the queue to disk now. Blocking: a long queue is tens of megabytes.
     fn save_queue(&self) {
         let _writing = locked(&self.persist);
         let snapshot = locked(&self.state).queue.clone();
@@ -590,9 +590,18 @@ async fn keep_saved(inner: Arc<Inner>) {
             () = inner.shutdown.cancelled() => break,
             () = tokio::time::sleep(save_delay(locked(&inner.state).queue.items().len())) => {}
         }
-        inner.save_queue();
+        save_off_the_async_threads(&inner).await;
     }
-    inner.save_queue();
+    save_off_the_async_threads(&inner).await;
+}
+
+/// Writing the queue takes a thread for as long as the disk needs: one of those that serve the
+/// interface would leave requests waiting behind it.
+async fn save_off_the_async_threads(inner: &Arc<Inner>) {
+    let saver = Arc::clone(inner);
+    if let Err(error) = tokio::task::spawn_blocking(move || saver.save_queue()).await {
+        tracing::warn!(%error, "the download queue could not be saved");
+    }
 }
 
 /// Follows the session: a new one wakes the worker (what was restored waited for it), a refused one
