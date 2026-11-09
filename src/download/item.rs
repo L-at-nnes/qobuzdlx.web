@@ -185,6 +185,22 @@ impl QueueItem {
         self.requeue();
     }
 
+    /// Processes a finished item again from scratch because its address was asked for again, with
+    /// what the interface now knows of it.
+    pub(super) fn queue_again(&mut self, display: Display) {
+        self.reset_outcome();
+        self.requeue();
+        if let Some(label) = display.label.filter(|label| !label.trim().is_empty()) {
+            self.label = label;
+        }
+        if display.sub_label.is_some() {
+            self.sub_label = display.sub_label;
+        }
+        if display.thumbnail.is_some() {
+            self.thumbnail = display.thumbnail;
+        }
+    }
+
     /// Puts the item back at the start of its life, as if it had just been queued.
     pub(super) fn requeue(&mut self) {
         self.status = ItemStatus::Pending;

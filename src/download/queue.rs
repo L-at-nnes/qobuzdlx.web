@@ -191,49 +191,87 @@ impl Queue {
         }
 
         let mut item = self.items.remove(position);
-        item.reset_outcome();
-        item.requeue();
-        if let Some(label) = display.label.filter(|label| !label.trim().is_empty()) {
-            item.label = label;
-        }
-        if display.sub_label.is_some() {
-            item.sub_label = display.sub_label;
-        }
-        if display.thumbnail.is_some() {
-            item.thumbnail = display.thumbnail;
-        }
+        item.queue_again(display);
         self.items.push(item);
         Enqueued::Requeued
     }
 
     /// Adds several addresses, in order. The same as calling `enqueue` for each, without looking
-    /// through the whole queue for each: a list of thousands of addresses is added at once.
+    /// through the whole queue for each: a list of thousands of addresses is added at once, and a
+    /// list that is already in the queue (the same file imported again) is recognised as fast.
     pub fn enqueue_many(
         &mut self,
         wanted: impl IntoIterator<Item = (QobuzUrl, Display)>,
     ) -> EnqueuedCounts {
-        let mut known: HashSet<String> = self
+        /// What an address of the batch puts at the end of the queue.
+        enum Entry {
+            New(QueueItem),
+            /// A finished item, by its address in lower case, to process again.
+            Again(String, Display),
+        }
+
+        // Each address of the queue, and whether its item is finished: looked up, not looked for
+        let mut known: HashMap<String, bool> = self
             .items
             .iter()
-            .map(|item| item.url.to_ascii_lowercase())
+            .map(|item| (item.url.to_ascii_lowercase(), item.is_finished()))
             .collect();
         let mut counts = EnqueuedCounts::default();
+        let mut entries = Vec::new();
         for (address, display) in wanted {
-            // An address that is not in the queue yet is added at the end: no need to look for it
-            if known.insert(address.canonical.to_ascii_lowercase()) {
-                self.items.push(QueueItem::new(
-                    address.canonical,
-                    address.kind,
-                    address.ref_id,
-                    display,
-                ));
-                counts.added += 1;
-                continue;
+            let key = address.canonical.to_ascii_lowercase();
+            match known.get(&key).copied() {
+                None => {
+                    known.insert(key, false);
+                    entries.push(Entry::New(QueueItem::new(
+                        address.canonical,
+                        address.kind,
+                        address.ref_id,
+                        display,
+                    )));
+                    counts.added += 1;
+                }
+                // Waiting or running, or already asked for earlier in this batch
+                Some(false) => counts.already_queued += 1,
+                Some(true) => {
+                    known.insert(key.clone(), false);
+                    entries.push(Entry::Again(key, display));
+                    counts.requeued += 1;
+                }
             }
-            match self.enqueue(&address.canonical, address.kind, &address.ref_id, display) {
-                Enqueued::Added => counts.added += 1,
-                Enqueued::Requeued => counts.requeued += 1,
-                Enqueued::AlreadyQueued => counts.already_queued += 1,
+        }
+
+        // The finished items asked for again leave their place in one pass over the queue
+        let mut again: HashMap<String, QueueItem> = HashMap::new();
+        if counts.requeued > 0 {
+            let asked: HashSet<&str> = entries
+                .iter()
+                .filter_map(|entry| match entry {
+                    Entry::Again(key, _) => Some(key.as_str()),
+                    Entry::New(_) => None,
+                })
+                .collect();
+            let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.items)
+                .into_iter()
+                .partition(|item| {
+                    item.is_finished() && asked.contains(item.url.to_ascii_lowercase().as_str())
+                });
+            self.items = kept;
+            again = taken
+                .into_iter()
+                .map(|item| (item.url.to_ascii_lowercase(), item))
+                .collect();
+        }
+
+        for entry in entries {
+            match entry {
+                Entry::New(item) => self.items.push(item),
+                Entry::Again(key, display) => {
+                    if let Some(mut item) = again.remove(&key) {
+                        item.queue_again(display);
+                        self.items.push(item);
+                    }
+                }
             }
         }
         counts
@@ -766,6 +804,97 @@ mod tests {
             "https://play.qobuz.com/album/done"
         );
         assert_eq!(queue.items().last().unwrap().status, ItemStatus::Pending);
+    }
+
+    #[test]
+    fn a_batch_keeps_its_order_whether_an_address_is_new_or_asked_for_again() {
+        let mut queue = queue_with(&[
+            "https://play.qobuz.com/album/done1",
+            "https://play.qobuz.com/album/waiting",
+            "https://play.qobuz.com/album/done2",
+        ]);
+        for url in [
+            "https://play.qobuz.com/album/done1",
+            "https://play.qobuz.com/album/done2",
+        ] {
+            finished(&mut queue, url, ItemStatus::Completed);
+        }
+        let batch = |ids: &[&str]| -> Vec<(QobuzUrl, Display)> {
+            ids.iter()
+                .map(|id| {
+                    (
+                        address(
+                            &format!("https://play.qobuz.com/album/{id}"),
+                            ItemKind::Album,
+                            id,
+                        ),
+                        Display {
+                            label: Some((*id).to_uppercase()),
+                            ..Display::default()
+                        },
+                    )
+                })
+                .collect()
+        };
+
+        let counts = queue.enqueue_many(batch(&["done2", "new", "waiting", "DONE1", "done2"]));
+
+        assert_eq!(
+            counts,
+            EnqueuedCounts {
+                added: 1,
+                requeued: 2,
+                already_queued: 2
+            }
+        );
+        assert_eq!(
+            order(&queue),
+            [
+                "https://play.qobuz.com/album/waiting",
+                "https://play.qobuz.com/album/done2",
+                "https://play.qobuz.com/album/new",
+                "https://play.qobuz.com/album/done1",
+            ]
+        );
+        assert!(
+            queue
+                .items()
+                .iter()
+                .all(|item| item.status == ItemStatus::Pending)
+        );
+        assert_eq!(queue.items()[1].label, "DONE2", "what is now known is kept");
+    }
+
+    #[test]
+    fn a_long_list_imported_again_is_recognised_without_looking_for_each_address() {
+        let list = |from: usize, to: usize| -> Vec<(QobuzUrl, Display)> {
+            (from..to)
+                .map(|number| {
+                    (
+                        address(
+                            &format!("https://play.qobuz.com/album/a{number}"),
+                            ItemKind::Album,
+                            "x",
+                        ),
+                        Display::default(),
+                    )
+                })
+                .collect()
+        };
+        let mut queue = Queue::default();
+        queue.enqueue_many(list(0, 50_000));
+        let started = std::time::Instant::now();
+
+        let counts = queue.enqueue_many(list(0, 50_000));
+
+        assert_eq!(counts.already_queued, 50_000);
+        assert_eq!(queue.items().len(), 50_000);
+        // Looking for each address in the queue took minutes here; this takes well under a second
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(20),
+            "took {:?}",
+            started.elapsed()
+        );
     }
 
     #[test]
