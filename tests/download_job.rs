@@ -757,6 +757,44 @@ async fn favorites_are_downloaded_by_kind() {
 }
 
 #[tokio::test]
+async fn the_progress_of_favourite_tracks_never_goes_back_to_zero() {
+    let rig = Rig::new().await;
+    rig.add_album(
+        "a1",
+        "Album",
+        "Artist",
+        &[
+            (51, 1, "One"),
+            (52, 2, "Two"),
+            (53, 3, "Three"),
+            (54, 4, "Four"),
+        ],
+    );
+    let tracks: Vec<_> = [51, 52, 53, 54]
+        .iter()
+        .map(|id| rig.tracks.lock().unwrap().get(id).cloned().unwrap())
+        .collect();
+    rig.favorites
+        .lock()
+        .unwrap()
+        .insert("tracks".into(), json!({ "tracks": page(tracks) }));
+
+    let (result, outcome) = rig.run(ItemKind::FavoriteTracks, "").await;
+
+    result.unwrap();
+    assert_eq!(outcome.downloaded, 4);
+    let steps = rig.recorder.steps();
+    assert!(
+        steps.windows(2).all(|pair| pair[0] <= pair[1]),
+        "never goes back: {steps:?}"
+    );
+    assert!(
+        steps.iter().any(|percent| *percent >= 75),
+        "the last track starts at three quarters: {steps:?}"
+    );
+}
+
+#[tokio::test]
 async fn empty_favorites_say_so() {
     let rig = Rig::new().await;
     rig.favorites

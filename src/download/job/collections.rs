@@ -115,7 +115,14 @@ impl Job {
                 }),
             );
 
-            match self.single_track(track.id).await {
+            // Each track reports its own progress from zero: it is given its share of the bar, as
+            // the albums of an artist are, or the bar would start again with every track
+            let outer = self.scope;
+            self.scope = outer.slice(index, total);
+            let result = self.single_track(track.id).await;
+            self.scope = outer;
+
+            match result {
                 Ok(()) => {}
                 Err(error @ (JobError::Track(_) | JobError::Api(_))) => {
                     self.track_failed(track.id, &title, &error.to_string());
