@@ -253,9 +253,13 @@ impl Client {
             return Ok(body);
         }
 
-        // The body is kept for the logs only: it is never part of the error shown to the user
-        tracing::warn!(call = what, status = status.as_u16(), body = %body, "Qobuz answered with an error");
-        Err(Error::from_response(status, &body))
+        // What the user is told goes to the log as it is. The body is for whoever looks for more
+        // (`RUST_LOG=qobuzdlx=debug`), and cut short: it can be a whole page of an edge server, written
+        // once per request it refuses, or echo something that was sent
+        let error = Error::from_response(status, &body);
+        tracing::warn!(call = what, status = status.as_u16(), %error, "Qobuz answered with an error");
+        tracing::debug!(call = what, body = %excerpt(&body), "what Qobuz answered");
+        Err(error)
     }
 
     async fn send_with_retry(
@@ -317,6 +321,26 @@ impl Client {
     }
 }
 
+/// The start of a body, on one line, for the log.
+fn excerpt(body: &str) -> String {
+    const KEPT: usize = 300;
+    let mut text: String = body
+        .chars()
+        .take(KEPT)
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect();
+    if body.chars().nth(KEPT).is_some() {
+        text.push('\u{2026}');
+    }
+    text
+}
+
 /// `Retry-After` in seconds when Qobuz gives one, otherwise 1 s, 2 s, 4 s... Never more than the
 /// policy's maximum.
 fn retry_delay(response: &Response, attempt: u32, policy: RetryPolicy) -> Duration {
@@ -331,4 +355,22 @@ fn retry_delay(response: &Response, attempt: u32, policy: RetryPolicy) -> Durati
     advised
         .unwrap_or_else(|| policy.base_delay.saturating_mul(1 << exponent))
         .min(policy.max_delay)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::excerpt;
+
+    #[test]
+    fn a_short_body_is_kept_whole_on_one_line() {
+        assert_eq!(excerpt("{\"message\":\n\"no\"}"), "{\"message\": \"no\"}");
+    }
+
+    #[test]
+    fn a_long_body_is_cut_on_a_character_boundary() {
+        let cut = excerpt(&"é".repeat(1000));
+
+        assert_eq!(cut.chars().count(), 301);
+        assert!(cut.ends_with('…'));
+    }
 }
