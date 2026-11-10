@@ -1,5 +1,6 @@
 import { api, EVENTS_URL } from '#lib/api.ts';
 import type { Counts, LogLine, Progress, QueueItem, QueueView, Sample, Work } from '#lib/types.ts';
+import { mergeLog } from './log.ts';
 
 /** The log kept on screen. The server keeps at most as many. */
 const MAX_LOG_LINES = 1200;
@@ -105,6 +106,9 @@ class DownloadsState {
 
 		source.onopen = () => {
 			this.connected = true;
+			// At every connection, the first one and those the browser makes again by itself: the
+			// server may have restarted in between, and its log with it
+			void this.loadLog();
 		};
 		source.onerror = () => {
 			// The browser reconnects by itself, and the server starts again from the state it has
@@ -136,8 +140,6 @@ class DownloadsState {
 		source.addEventListener('session_expired', () => {
 			this.onSessionExpired?.();
 		});
-
-		void this.loadLog();
 	}
 
 	disconnect() {
@@ -149,17 +151,30 @@ class DownloadsState {
 	/** Called when the server says Qobuz refused the session. */
 	onSessionExpired: (() => void) | undefined;
 
+	/** The lines the live view tells while the history is being read, which decides what is new. */
+	private told: LogLine[] | null = null;
+
 	private async loadLog() {
+		if (this.told) return;
+		this.told = [];
 		try {
-			const lines = await api.log();
-			this.log = lines.slice(-MAX_LOG_LINES);
-			this.lastSeq = lines.at(-1)?.seq ?? -1;
+			const merged = mergeLog(await api.log(), this.told, MAX_LOG_LINES);
+			this.log = merged.lines;
+			this.lastSeq = merged.lastSeq;
+			this.told = null;
 		} catch {
-			// The live view will bring the next lines anyway
+			// Without the history, what was told is all there is to go by
+			const told = this.told ?? [];
+			this.told = null;
+			for (const line of told) this.append(line);
 		}
 	}
 
 	private append(line: LogLine) {
+		if (this.told) {
+			this.told.push(line);
+			return;
+		}
 		// A line already in the history can come again after a reconnection
 		if (line.seq <= this.lastSeq) return;
 		this.lastSeq = line.seq;
