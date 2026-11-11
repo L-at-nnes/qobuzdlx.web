@@ -101,7 +101,7 @@ impl Job {
             .folder(Some(&album), Some(&item), Some(playlist))
             .await?;
         playlist_folder.get_or_insert_with(|| folder.clone());
-        let cover = self.cover(&folder, &album).await;
+        let cover = self.cover(&folder, &album, true).await;
 
         let suffix = self.collision_suffix(index, &item, &album, &folder, playlist);
         let result = self

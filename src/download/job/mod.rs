@@ -312,11 +312,17 @@ impl Job {
         }
     }
 
-    /// Saves `Cover.jpg` in the folder and returns the picture to embed in the tracks.
+    /// Saves `Cover.jpg` in the folder and returns the picture to embed in the tracks, when
+    /// `to_embed` says that there will be tracks to embed it in.
     ///
     /// A cover that cannot be had is not a reason to refuse the music: it is reported in the log of
     /// the server and the tracks go without.
-    async fn cover(&mut self, folder: &Path, album: &Album) -> Option<Arc<Vec<u8>>> {
+    async fn cover(
+        &mut self,
+        folder: &Path,
+        album: &Album,
+        to_embed: bool,
+    ) -> Option<Arc<Vec<u8>>> {
         let artwork = &self.settings.artwork;
 
         let mut saved = None;
@@ -331,7 +337,7 @@ impl Job {
             saved = Some(picture);
         }
 
-        if !self.settings.tags.cover {
+        if !to_embed || !self.settings.tags.cover {
             return None;
         }
         if let Some(cached) = self.pictures.get(&album.id) {

@@ -112,6 +112,59 @@ const KIND_OF_BLUE: [(u64, u32, &str); 3] = [
 // ─── Album ───
 
 #[tokio::test]
+async fn an_album_found_whole_on_the_disk_costs_its_listing_and_nothing_else() {
+    let rig = Rig::new().await;
+    rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let (first, _) = rig.run(ItemKind::Album, "alb").await;
+    first.unwrap();
+    let asked = |path: &str| rig.server.count(path);
+    let before = (
+        asked("/api/album/get"),
+        asked("/api/track/get"),
+        asked("/api/track/getFileUrl"),
+        asked("/cdn/cover"),
+        asked("/cdn/audio"),
+    );
+    assert!(before.3 >= 1, "the cover was fetched the first time");
+
+    let (again, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    again.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (0, 3));
+    assert_eq!(
+        (
+            asked("/api/album/get"),
+            asked("/api/track/get"),
+            asked("/api/track/getFileUrl"),
+            asked("/cdn/cover"),
+            asked("/cdn/audio"),
+        ),
+        (before.0 + 1, before.1, before.2, before.3, before.4),
+        "one request for the listing: no track, no file, no picture"
+    );
+}
+
+#[tokio::test]
+async fn a_track_missing_from_an_album_on_the_disk_still_gets_its_cover() {
+    let rig = Rig::new().await;
+    rig.add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let (first, _) = rig.run(ItemKind::Album, "alb").await;
+    first.unwrap();
+    let covers = rig.server.count("/cdn/cover");
+    std::fs::remove_file(rig.file("Miles Davis/Kind of Blue/2 - Freddie Freeloader.flac")).unwrap();
+
+    let (again, outcome) = rig.run(ItemKind::Album, "alb").await;
+
+    again.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (1, 2));
+    assert_eq!(
+        rig.server.count("/cdn/cover"),
+        covers + 1,
+        "the track that is fetched has its picture"
+    );
+}
+
+#[tokio::test]
 async fn two_tracks_the_templates_give_the_same_name_are_both_downloaded() {
     let mut rig = Rig::new().await;
     // No track number in the name, and two movements with the same title

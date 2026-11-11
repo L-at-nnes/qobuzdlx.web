@@ -53,12 +53,15 @@ impl Job {
         }
 
         let folder = self.folder(Some(&album), None, None).await?;
-        let cover = self.cover(&folder, &album).await;
-
         let tracks = album
             .tracks
             .as_ref()
             .map_or(&[][..], |page| page.items.as_slice());
+        // An album found whole on the disk has nothing to embed a picture in: going through a list
+        // again costs the listing of each album, and nothing else
+        let to_embed = self.has_a_track_to_fetch(&album, tracks, &folder);
+        let cover = self.cover(&folder, &album, to_embed).await;
+
         let skipped = self
             .download_tracks(&album, tracks, &folder, cover.as_deref())
             .await?;
@@ -158,6 +161,26 @@ impl Job {
         }
         self.check_cancelled()?;
         Ok(skipped.load(Ordering::SeqCst))
+    }
+
+    /// Whether at least one track of the album will be downloaded: one that is wanted and whose file
+    /// is not in place, or any wanted one when files in place are not left alone.
+    fn has_a_track_to_fetch(&self, album: &Album, tracks: &[Track], folder: &Path) -> bool {
+        let mut wanted = tracks.iter().filter(|track| !self.excluded(track.id));
+        if self.settings.advanced.duplicates != DuplicateMode::Skip {
+            return wanted.next().is_some();
+        }
+        let namer = self.namer();
+        let suffixes = self.same_name_suffixes(album, tracks, folder);
+        tracks
+            .iter()
+            .zip(&suffixes)
+            .filter(|(track, _)| !self.excluded(track.id))
+            .any(|(track, suffix)| {
+                !namer
+                    .track_path(folder, DownloadKind::Album, album, track, None, suffix)
+                    .exists()
+            })
     }
 
     /// What each track of the album adds to the name of its file so that no two tracks share one:
@@ -317,7 +340,7 @@ impl Job {
         );
 
         let folder = self.folder(Some(&album), Some(&track), None).await?;
-        let cover = self.cover(&folder, &album).await;
+        let cover = self.cover(&folder, &album, true).await;
         let result = self
             .context()
             .download_track(&TrackRequest {
