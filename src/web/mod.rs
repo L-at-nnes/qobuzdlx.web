@@ -18,6 +18,7 @@ use axum::middleware::{from_fn, from_fn_with_state};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
+use tower_http::compression::CompressionLayer;
 
 pub use error::{ApiError, ApiResult};
 pub use state::{AppState, Shared};
@@ -40,6 +41,9 @@ pub fn router(state: AppState) -> Router {
         .fallback(assets::serve)
         .layer(from_fn(guard::same_origin))
         .layer(from_fn(guard::security_headers))
+        // The scripts of the interface and the JSON of a long queue shrink several times over.
+        // Pictures and the live events are left as they are: the layer knows them
+        .layer(CompressionLayer::new())
         .with_state(state)
 }
 

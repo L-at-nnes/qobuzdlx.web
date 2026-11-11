@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use axum::http::{HeaderValue, StatusCode, Uri, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 use rust_embed::RustEmbed;
 
@@ -20,13 +20,34 @@ struct Embedded;
 pub struct Asset {
     pub bytes: Cow<'static, [u8]>,
     pub mime: String,
+    /// What names this version of the file: it changes when the content does.
+    pub etag: String,
 }
 
 fn embedded(path: &str) -> Option<Asset> {
     Embedded::get(path).map(|file| Asset {
+        etag: etag_of(&file.metadata.sha256_hash()),
         bytes: file.data,
         mime: mime_of(path),
     })
+}
+
+/// The tag of a file from the hash of its content. Weak (`W/`): the same file goes out compressed
+/// or not, which a strong tag would have to tell apart.
+fn etag_of(hash: &[u8]) -> String {
+    let short = &hash[..hash.len().min(16)];
+    format!("W/\"{}\"", crate::hex::encode(short))
+}
+
+/// Whether the browser already holds this version: `If-None-Match` names it, or names any.
+fn is_held(headers: &HeaderMap, etag: &str) -> bool {
+    let opaque = |tag: &str| tag.trim().trim_start_matches("W/").to_owned();
+    headers
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|line| line.split(','))
+        .any(|tag| tag.trim() == "*" || opaque(tag) == opaque(etag))
 }
 
 /// `.webmanifest` is missing from many tables: without it the file would go as a download and
@@ -96,10 +117,10 @@ pub fn resolve(path: &str, lookup: &impl Fn(&str) -> Option<Asset>) -> Resolved 
 }
 
 /// Answers every request that is not for the API.
-pub async fn serve(uri: Uri) -> Response {
+pub async fn serve(uri: Uri, headers: HeaderMap) -> Response {
     match resolve(uri.path(), &embedded) {
-        Resolved::File { asset, immutable } => file_response(asset, immutable),
-        Resolved::EntryPage(asset) => file_response(asset, false),
+        Resolved::File { asset, immutable } => file_response(asset, immutable, &headers),
+        Resolved::EntryPage(asset) => file_response(asset, false, &headers),
         Resolved::Missing => ApiError::not_found("not_found", "nothing here").into_response(),
         Resolved::NotBuilt => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -110,17 +131,26 @@ pub async fn serve(uri: Uri) -> Response {
     }
 }
 
-fn file_response(asset: Asset, immutable: bool) -> Response {
+fn file_response(asset: Asset, immutable: bool, asked: &HeaderMap) -> Response {
     let cache = if immutable {
         "public, max-age=31536000, immutable"
     } else {
-        // Revalidated every time: a new version of the application is seen at the next load
+        // Revalidated every time: a new version of the application is seen at the next load. The
+        // tag is what makes that cheap: the browser is told it holds the right one, in a few bytes
         "no-cache"
     };
-    let mut response = asset.bytes.into_owned().into_response();
+    let mut response = if is_held(asked, &asset.etag) {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        let mut response = asset.bytes.into_owned().into_response();
+        if let Ok(mime) = HeaderValue::from_str(&asset.mime) {
+            response.headers_mut().insert(header::CONTENT_TYPE, mime);
+        }
+        response
+    };
     let headers = response.headers_mut();
-    if let Ok(mime) = HeaderValue::from_str(&asset.mime) {
-        headers.insert(header::CONTENT_TYPE, mime);
+    if let Ok(etag) = HeaderValue::from_str(&asset.etag) {
+        headers.insert(header::ETAG, etag);
     }
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
     response
@@ -140,12 +170,70 @@ mod tests {
             known.get(path).map(|content| Asset {
                 bytes: Cow::Owned(content.clone().into_bytes()),
                 mime: mime_of(path),
+                etag: etag_of(content.as_bytes()),
             })
         }
     }
 
     fn text(asset: &Asset) -> String {
         String::from_utf8(asset.bytes.to_vec()).unwrap()
+    }
+
+    fn asking_with(tags: &[&str]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for tag in tags {
+            headers.append(header::IF_NONE_MATCH, HeaderValue::from_str(tag).unwrap());
+        }
+        headers
+    }
+
+    fn page() -> Asset {
+        files(&["index.html"])("index.html").unwrap()
+    }
+
+    #[test]
+    fn a_file_is_sent_with_the_tag_of_its_version() {
+        let etag = page().etag;
+
+        let response = file_response(page(), false, &HeaderMap::new());
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header::ETAG], etag.as_str());
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-cache");
+        assert!(etag.starts_with("W/\""), "{etag}");
+    }
+
+    #[test]
+    fn a_browser_that_holds_the_version_is_told_so_instead_of_being_sent_it_again() {
+        let etag = page().etag;
+        let strong = etag.trim_start_matches("W/").to_owned();
+
+        for asked in [
+            asking_with(&[&etag]),
+            asking_with(&[&strong]),
+            asking_with(&[&format!("\"other\", {etag}")]),
+            asking_with(&["\"other\"", &etag]),
+            asking_with(&["*"]),
+        ] {
+            let response = file_response(page(), false, &asked);
+
+            assert_eq!(response.status(), StatusCode::NOT_MODIFIED, "{asked:?}");
+            assert_eq!(response.headers()[header::ETAG], etag.as_str());
+            assert!(!response.headers().contains_key(header::CONTENT_TYPE));
+        }
+    }
+
+    #[test]
+    fn another_version_is_sent_whole() {
+        let response = file_response(page(), false, &asking_with(&["W/\"0123456789abcdef\""]));
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn the_tag_follows_the_content() {
+        assert_eq!(etag_of(b"same"), etag_of(b"same"));
+        assert_ne!(etag_of(b"one"), etag_of(b"two"));
     }
 
     #[test]

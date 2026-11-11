@@ -32,6 +32,7 @@ thiserror = "2.0.21"
 time = { version = "0.3.45", features = ["formatting"] }
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "io-util", "net", "process", "signal"] }
 tokio-util = "0.7.20"
+tower-http = { version = "0.6.11", features = ["compression-gzip"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicode-segmentation = "1.13.3"
