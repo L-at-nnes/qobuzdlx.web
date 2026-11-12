@@ -678,6 +678,17 @@ mod tests {
     }
 
     #[test]
+    fn what_is_downloaded_without_a_choice_is_the_highest_flac() {
+        let settings = Settings::default();
+
+        assert_eq!(settings.download.quality, Quality::Flac24Max);
+        assert!(settings.download.quality.is_flac());
+        // And a settings file that says nothing about it gets the same
+        let read: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(read.download.quality, Quality::Flac24Max);
+    }
+
+    #[test]
     fn qualities_map_to_the_format_ids_and_extensions_of_qobuz() {
         let expected = [
             (Quality::Mp3, 5, ".mp3"),
