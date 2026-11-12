@@ -113,7 +113,7 @@ Without a password, anyone who can reach the server can use the Qobuz account li
 
 ### From source
 
-You need Rust (1.85 or newer) and Node.js (22 or newer).
+You need Rust (1.88 or newer) and Node.js (22 or newer).
 
 ```bash
 cd web && npm ci && npm run build && cd ..
