@@ -1,9 +1,11 @@
 //! The parts of the Qobuz API responses the application uses.
 //!
-//! Qobuz leaves fields out whenever it feels like it, so almost everything has a default: a
-//! response that lacks a field must still be readable.
+//! Qobuz leaves fields out whenever it feels like it, and writes `null` where it has nothing to
+//! say, so almost everything has a default that stands for both: a response that lacks a field, or
+//! holds one that is empty, must still be readable. One `null` in one album must not cost the page of
+//! five hundred it is listed in.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 fn yes() -> bool {
     true
@@ -17,16 +19,38 @@ fn album_type() -> String {
     "album".to_owned()
 }
 
+/// Reads a field that may be `null`: the default stands in for it, as it does for a field left out.
+fn or_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+fn or_yes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    Ok(Option::deserialize(deserializer)?.unwrap_or(true))
+}
+
+fn or_one<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    Ok(Option::deserialize(deserializer)?.unwrap_or(1))
+}
+
+fn or_album_type<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    Ok(Option::deserialize(deserializer)?.unwrap_or_else(album_type))
+}
+
 /// One page of a listing, with the total the whole listing holds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(bound(deserialize = "T: Deserialize<'de>"))]
 pub struct Page<T> {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub offset: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub limit: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub total: u32,
-    #[serde(default = "Vec::new")]
+    #[serde(default = "Vec::new", deserialize_with = "or_default")]
     pub items: Vec<T>,
 }
 
@@ -43,27 +67,27 @@ impl<T> Default for Page<T> {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Image {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub small: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub thumbnail: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub large: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Genre {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub name: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Label {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub albums_count: u32,
     /// Only present on `label/get` with `extra=albums`.
     #[serde(default)]
@@ -73,7 +97,7 @@ pub struct Label {
 /// An artist, composer or performer as a track or album credits them.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Person {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
     #[serde(default)]
     pub name: Option<String>,
@@ -82,11 +106,11 @@ pub struct Person {
 /// An artist of a release with the roles they played on it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ArtistRole {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub roles: Vec<String>,
 }
 
@@ -99,13 +123,13 @@ impl ArtistRole {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Artist {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub name: String,
     #[serde(default)]
     pub picture: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub albums_count: u32,
     /// Only present on `artist/get` with `extra=albums`.
     #[serde(default)]
@@ -115,9 +139,9 @@ pub struct Artist {
 /// A booklet or other bonus file attached to an album.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Goody {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub file_format_id: u32,
     #[serde(default)]
     pub name: Option<String>,
@@ -131,23 +155,23 @@ pub struct Goody {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Album {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub title: String,
     #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
     pub url: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub artist: Person,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub artists: Vec<ArtistRole>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub image: Image,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub genre: Genre,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub label: Label,
     #[serde(default)]
     pub composer: Option<Person>,
@@ -159,19 +183,19 @@ pub struct Album {
     pub copyright: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default = "album_type")]
+    #[serde(default = "album_type", deserialize_with = "or_album_type")]
     pub product_type: String,
-    #[serde(default = "yes")]
+    #[serde(default = "yes", deserialize_with = "or_yes")]
     pub streamable: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub parental_warning: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub tracks_count: u32,
-    #[serde(default = "one")]
+    #[serde(default = "one", deserialize_with = "or_one")]
     pub media_count: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub maximum_bit_depth: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub maximum_sampling_rate: f64,
     /// Only present on `album/get`.
     #[serde(default)]
@@ -212,33 +236,33 @@ impl Default for Album {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Track {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub title: String,
     #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
     pub url: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub track_number: u32,
-    #[serde(default = "one")]
+    #[serde(default = "one", deserialize_with = "or_one")]
     pub media_number: u32,
     /// Rank in a playlist (playlists only).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub position: u32,
     /// Length in seconds.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub duration: u32,
-    #[serde(default = "yes")]
+    #[serde(default = "yes", deserialize_with = "or_yes")]
     pub streamable: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub parental_warning: bool,
     #[serde(default)]
     pub isrc: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub maximum_bit_depth: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub maximum_sampling_rate: f64,
     #[serde(default)]
     pub performer: Option<Person>,
@@ -277,13 +301,13 @@ impl Default for Track {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Playlist {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub tracks_count: u32,
     #[serde(default)]
     pub owner: Option<Person>,
@@ -302,22 +326,22 @@ pub struct Playlist {
 pub struct StreamUrl {
     #[serde(default)]
     pub url: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub format_id: u32,
     #[serde(default)]
     pub mime_type: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub sampling_rate: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub bit_depth: u32,
     /// True when the URL only gives the 30 second preview, not the whole track.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub sample: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInfo {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub id: u64,
     #[serde(default)]
     pub display_name: Option<String>,
@@ -337,9 +361,9 @@ pub struct Credential {
 pub struct CredentialParameters {
     #[serde(default)]
     pub short_label: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub lossless_streaming: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub hires_streaming: bool,
 }
 
@@ -355,28 +379,28 @@ pub struct LoginResponse {
 /// `album/search`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AlbumSearch {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub albums: Page<Album>,
 }
 
 /// `track/search`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct TrackSearch {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub tracks: Page<Track>,
 }
 
 /// `artist/search`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ArtistSearch {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub artists: Page<Artist>,
 }
 
 /// `playlist/search`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PlaylistSearch {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub playlists: Page<Playlist>,
 }
 
@@ -464,6 +488,91 @@ mod tests {
         assert!(preview.sample);
         assert!(!full.sample);
         assert_eq!((full.format_id, full.bit_depth), (6, 16));
+    }
+
+    #[test]
+    fn a_null_is_read_as_a_field_left_out() {
+        let album: Album = serde_json::from_value(json!({
+            "id": "abc",
+            "title": null,
+            "version": null,
+            "artist": null,
+            "artists": null,
+            "image": null,
+            "genre": null,
+            "label": null,
+            "composer": null,
+            "product_type": null,
+            "streamable": null,
+            "parental_warning": null,
+            "tracks_count": null,
+            "media_count": null,
+            "maximum_bit_depth": null,
+            "maximum_sampling_rate": null,
+            "tracks": null,
+            "goodies": null,
+        }))
+        .unwrap();
+
+        assert_eq!(
+            album,
+            Album {
+                id: "abc".into(),
+                ..Album::default()
+            }
+        );
+        assert!(album.streamable);
+        assert_eq!(
+            (album.media_count, album.product_type.as_str()),
+            (1, "album")
+        );
+    }
+
+    #[test]
+    fn one_empty_entry_does_not_cost_the_page_it_is_listed_in() {
+        let page: Page<Track> = serde_json::from_value(json!({
+            "offset": null,
+            "total": 2,
+            "items": [
+                { "id": 1, "title": "Whole", "duration": 60, "performer": { "id": 1, "name": "Ada" } },
+                {
+                    "id": 2, "title": null, "track_number": null, "media_number": null,
+                    "duration": null, "streamable": null, "isrc": null,
+                    "maximum_bit_depth": null, "maximum_sampling_rate": null,
+                    "performer": { "id": null, "name": null }, "album": { "id": null, "image": null },
+                },
+            ],
+        }))
+        .unwrap();
+
+        assert_eq!(page.items.len(), 2);
+        let empty = &page.items[1];
+        assert_eq!(
+            (empty.id, empty.media_number, empty.streamable),
+            (2, 1, true)
+        );
+        assert_eq!(empty.album.as_ref().unwrap().id, "");
+    }
+
+    #[test]
+    fn the_rest_of_the_answers_take_a_null_too() {
+        let playlist: Playlist = serde_json::from_value(
+            json!({ "id": 5, "name": null, "tracks_count": null, "owner": null }),
+        )
+        .unwrap();
+        let stream: StreamUrl = serde_json::from_value(
+            json!({ "url": null, "format_id": null, "sampling_rate": null, "bit_depth": null, "sample": null }),
+        )
+        .unwrap();
+        let search: AlbumSearch = serde_json::from_value(json!({ "albums": null })).unwrap();
+        let user: UserInfo =
+            serde_json::from_value(json!({ "id": 7, "credential": { "parameters": null } }))
+                .unwrap();
+
+        assert_eq!((playlist.id, playlist.name.as_str()), (5, ""));
+        assert_eq!((stream.url, stream.sample), (None, false));
+        assert!(search.albums.items.is_empty());
+        assert_eq!(user.id, 7);
     }
 
     #[test]
