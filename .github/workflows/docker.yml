@@ -1,8 +1,10 @@
 name: Docker image
 
-# Builds the image for x86 and ARM and publishes it to GitHub's container registry:
+# Checks the code, then builds the image for x86 and ARM and publishes it to GitHub's container
+# registry:
 #   ghcr.io/l-at-nnes/qobuzdlx.web
-# Each architecture is built on a machine of its own kind, which is far faster than emulating one.
+# Nothing is published from code that does not pass its own checks. Each architecture is built on a
+# machine of its own kind, which is far faster than emulating one.
 on:
   push:
     branches: [main]
@@ -18,8 +20,52 @@ permissions:
   packages: write
 
 jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Built before the server is tested: the server carries the interface, and serves it in tests
+      - name: Interface
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+          npm test
+          npm run build
+
+      - name: Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: checks-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: checks-${{ runner.os }}-
+
+      # Clippy reports and does not stop the build on a warning: a new version of the compiler brings
+      # new ones, and they should not keep a fix from being published
+      - name: Server
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets
+          cargo test
+
   build:
     name: Build ${{ matrix.arch }}
+    needs: checks
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
