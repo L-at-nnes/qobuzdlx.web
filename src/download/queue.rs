@@ -204,6 +204,8 @@ impl Queue {
         wanted: impl IntoIterator<Item = (QobuzUrl, Display)>,
     ) -> EnqueuedCounts {
         /// What an address of the batch puts at the end of the queue.
+        // Each is made and taken once: boxing the item would cost an allocation per address
+        #[allow(clippy::large_enum_variant)]
         enum Entry {
             New(QueueItem),
             /// A finished item, by its address in lower case, to process again.

@@ -11,6 +11,17 @@ fn album_url(id: &str) -> String {
     format!("https://play.qobuz.com/album/{id}")
 }
 
+/// A list of `count` album addresses, one per line, as a file to import holds them.
+fn album_list(count: usize) -> String {
+    use std::fmt::Write;
+
+    (0..count).fold(String::new(), |mut list, number| {
+        // Writing into a String cannot fail
+        let _ = writeln!(list, "https://play.qobuz.com/album/{number:013}");
+        list
+    })
+}
+
 fn add_one(app: &TestApp) {
     app.catalogue
         .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
@@ -401,14 +412,7 @@ async fn a_page_is_given_the_part_of_the_queue_it_asks_for_and_what_the_rest_com
     let app = TestApp::start().await;
     app.catalogue.client.end_session();
     let browser = app.browser();
-    let list: String = (0..300)
-        .map(|number| {
-            format!(
-                "https://play.qobuz.com/album/{number:013}
-"
-            )
-        })
-        .collect();
+    let list = album_list(300);
     browser.post_text("/api/downloads/import", &list).await;
 
     let usual = browser.get("/api/downloads").await.json();
@@ -439,14 +443,7 @@ async fn a_page_is_given_the_part_of_the_queue_it_asks_for_and_what_the_rest_com
 async fn the_live_view_starts_with_the_part_that_was_asked_for() {
     let app = TestApp::start().await;
     app.catalogue.client.end_session();
-    let list: String = (0..40)
-        .map(|number| {
-            format!(
-                "https://play.qobuz.com/album/{number:013}
-"
-            )
-        })
-        .collect();
+    let list = album_list(40);
     app.browser()
         .post_text("/api/downloads/import", &list)
         .await;

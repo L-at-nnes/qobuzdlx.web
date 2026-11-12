@@ -451,6 +451,7 @@ impl Manager {
 
     /// Tries again everything that failed: whole items that did, and the failed tracks of those
     /// that ended with some. Returns how many items go again.
+    #[allow(clippy::must_use_candidate)] // Asked for what it does, not for the count
     pub fn retry_all_failed(&self) -> usize {
         let count = locked(&self.inner.state).queue.retry_all_failed();
         if count > 0 {

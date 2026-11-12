@@ -48,6 +48,9 @@ pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+# `assert!(list.is_empty())` says what is expected; the form the lint asks for, an `assert_eq!` with
+# an empty array of the right type, says it less well
+assert_is_empty = "allow"
 
 [profile.release]
 lto = "thin"
