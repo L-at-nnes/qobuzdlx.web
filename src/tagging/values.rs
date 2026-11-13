@@ -119,10 +119,8 @@ fn apply_marker(title: &str, marker: &TitleMarker) -> String {
 /// "merge artist names" option is on.
 #[must_use]
 pub fn album_artist(album: &Album, merge_artists: bool) -> String {
-    if merge_artists {
-        if let Some(joined) = joined_main_artists(&album.artists) {
-            return joined;
-        }
+    if merge_artists && let Some(joined) = joined_main_artists(&album.artists) {
+        return joined;
     }
     album.artist.name.clone().unwrap_or_default()
 }

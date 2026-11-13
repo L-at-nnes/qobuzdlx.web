@@ -85,10 +85,11 @@ impl<'a> Namer<'a> {
     #[must_use]
     pub fn release_artists(self, album: &Album) -> String {
         let naming = &self.settings.naming;
-        if naming.merge_artists && naming.merge_artists_in_folders {
-            if let Some(joined) = joined_main_artists(&album.artists) {
-                return joined;
-            }
+        if naming.merge_artists
+            && naming.merge_artists_in_folders
+            && let Some(joined) = joined_main_artists(&album.artists)
+        {
+            return joined;
         }
         album
             .artist
