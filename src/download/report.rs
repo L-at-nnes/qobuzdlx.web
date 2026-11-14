@@ -68,6 +68,8 @@ pub struct Outcome {
     pub downloaded: u32,
     pub skipped: u32,
     pub failures: Vec<FailedTrack>,
+    /// The parts of the item that could not be had and may be later: see [`QueueItem::left_out`].
+    pub left_out: Vec<String>,
     /// The files of a playlist in place, by position.
     pub playlist_entries: Vec<PlaylistEntry>,
 }
@@ -81,6 +83,7 @@ impl Outcome {
             downloaded: item.downloaded,
             skipped: item.skipped,
             failures: item.failures.clone(),
+            left_out: item.left_out.clone(),
             playlist_entries: item.playlist_entries.clone(),
         }
     }
@@ -89,6 +92,7 @@ impl Outcome {
         item.downloaded = self.downloaded;
         item.skipped = self.skipped;
         item.failures.clone_from(&self.failures);
+        item.left_out.clone_from(&self.left_out);
         item.playlist_entries.clone_from(&self.playlist_entries);
     }
 

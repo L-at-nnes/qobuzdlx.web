@@ -108,6 +108,8 @@ export interface QueueItem {
 	/** What the files written weigh. */
 	bytes: number;
 	failures: FailedTrack[];
+	/** How many albums of the item could not be had and may be later: a retry takes only those. */
+	left_out: number;
 }
 
 /** How many items the queue holds, by what they are doing. */

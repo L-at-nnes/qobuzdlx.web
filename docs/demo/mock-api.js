@@ -240,7 +240,8 @@ async (page) => {
 				downloaded: status === 'completed' && !failed ? album.tracks_count : status === 'running' ? 7 : 0,
 				skipped: 0,
 				bytes: status === 'completed' && !failed ? album.tracks_count * (album.bit_depth === 24 ? 41_000_000 : 29_000_000) : 0,
-				failures: []
+				failures: [],
+				left_out: 0
 			});
 		}
 		return items;

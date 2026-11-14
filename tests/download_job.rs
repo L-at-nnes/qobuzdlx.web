@@ -733,9 +733,41 @@ async fn an_artist_gives_every_album_and_the_progress_covers_the_whole_discograp
     );
 }
 
+/// An artist whose discography lists the given albums, and a Qobuz that answers for them as `reply`
+/// says, falling back to its catalogue.
+fn artist_with(
+    rig: &Rig,
+    listed: &[&str],
+    reply: impl Fn(&str) -> Option<Reply> + Send + Sync + 'static,
+) {
+    let entries: Vec<_> = listed
+        .iter()
+        .map(|id| json!({ "id": id, "title": id, "artist": { "id": 1 } }))
+        .collect();
+    rig.artists.lock().unwrap().insert(
+        1,
+        json!({ "id": 1, "name": "Miles Davis", "albums": page(entries) }),
+    );
+    let albums = rig.albums.clone();
+    rig.server.on("/api/album/get", move |call| {
+        let key = call.param("album_id").to_owned();
+        reply(&key).unwrap_or_else(|| match albums.lock().unwrap().get(&key) {
+            Some(album) => Reply::json(album.clone()),
+            None => Reply::error(404, "No result matching given argument"),
+        })
+    });
+}
+
+fn album_calls(rig: &Rig, id: &str) -> usize {
+    rig.server
+        .calls_to("/api/album/get")
+        .iter()
+        .filter(|call| call.param("album_id") == id)
+        .count()
+}
+
 #[tokio::test]
-async fn an_album_of_an_artist_that_cannot_be_had_is_reported_the_next_goes_on_and_the_item_fails()
-{
+async fn an_album_that_no_longer_exists_is_left_alone_and_the_item_is_done() {
     let rig = Rig::new().await;
     rig.add_album(
         "a2",
@@ -743,10 +775,39 @@ async fn an_album_of_an_artist_that_cannot_be_had_is_reported_the_next_goes_on_a
         "Miles Davis",
         &[(41, 1, "Pharaoh's Dance")],
     );
-    rig.artists.lock().unwrap().insert(
-        1,
-        json!({ "id": 1, "name": "Miles Davis", "albums": page(vec![json!({"id": "gone", "title": "Gone", "artist": {"id": 1}}), json!({"id": "a2", "title": "Bitches Brew", "artist": {"id": 1}})]) }),
+    artist_with(&rig, &["gone", "a2"], |_| None);
+
+    let (result, outcome) = rig.run(ItemKind::Artist, "1").await;
+
+    result.unwrap();
+    assert_eq!((outcome.downloaded, outcome.skipped), (1, 1));
+    assert!(
+        outcome.left_out.is_empty(),
+        "asking again would change nothing"
     );
+    assert!(
+        rig.recorder
+            .has(|event| matches!(event, LogEvent::AlbumGone { album_id } if album_id == "gone"))
+    );
+    assert!(
+        rig.recorder
+            .has(|event| matches!(event, LogEvent::Complete))
+    );
+}
+
+#[tokio::test]
+async fn an_album_that_fails_is_remembered_the_next_goes_on_and_the_item_fails() {
+    let rig = Rig::new().await;
+    rig.add_album("bad", "Broken", "Miles Davis", &[(51, 1, "One")]);
+    rig.add_album(
+        "a2",
+        "Bitches Brew",
+        "Miles Davis",
+        &[(41, 1, "Pharaoh's Dance")],
+    );
+    artist_with(&rig, &["bad", "a2"], |id| {
+        (id == "bad").then(|| Reply::error(500, "broken"))
+    });
 
     let (result, outcome) = rig.run(ItemKind::Artist, "1").await;
 
@@ -755,12 +816,69 @@ async fn an_album_of_an_artist_that_cannot_be_had_is_reported_the_next_goes_on_a
         "an item that left an album out is not done: {result:?}"
     );
     assert_eq!(outcome.downloaded, 1, "what could be had is in place");
-    assert!(rig.recorder.has(
-        |event| matches!(event, LogEvent::AlbumFailed { album_id, .. } if album_id == "gone")
-    ));
+    assert_eq!(outcome.left_out, ["bad"]);
+    assert!(
+        rig.recorder.has(
+            |event| matches!(event, LogEvent::AlbumFailed { album_id, .. } if album_id == "bad")
+        )
+    );
     assert!(
         !rig.recorder
             .has(|event| matches!(event, LogEvent::Complete))
+    );
+}
+
+#[tokio::test]
+async fn a_retry_goes_through_the_albums_that_were_left_out_and_no_other() {
+    let rig = Rig::new().await;
+    rig.add_album("bad", "Broken", "Miles Davis", &[(51, 1, "One")]);
+    rig.add_album(
+        "a2",
+        "Bitches Brew",
+        "Miles Davis",
+        &[(41, 1, "Pharaoh's Dance")],
+    );
+    artist_with(&rig, &["bad", "a2"], |_| None);
+    let mut item = Rig::item(ItemKind::Artist, "1");
+    item.downloaded = 1;
+    item.only_parts = Some(BTreeSet::from(["bad".to_owned()]));
+
+    let (result, outcome) = rig.run_item(&item).await;
+
+    result.unwrap();
+    assert_eq!(
+        outcome.downloaded, 2,
+        "builds on what the item had achieved"
+    );
+    assert!(rig.file("Miles Davis/Broken/1 - One.flac").exists());
+    assert_eq!(
+        album_calls(&rig, "a2"),
+        0,
+        "the other album is not even asked for"
+    );
+    assert_eq!(album_calls(&rig, "bad"), 1);
+}
+
+#[tokio::test]
+async fn an_item_that_stops_on_something_else_does_not_claim_to_have_gone_through_all() {
+    let rig = Rig::new().await;
+    rig.add_album("bad", "Broken", "Miles Davis", &[(51, 1, "One")]);
+    artist_with(&rig, &["bad", "a2"], |id| match id {
+        "bad" => Some(Reply::error(500, "broken")),
+        // The session ends before the item gets to the last album
+        _ => Some(Reply::error(401, "expired")),
+    });
+
+    let (result, outcome) = rig.run(ItemKind::Artist, "1").await;
+
+    assert!(
+        matches!(result, Err(JobError::SessionExpired)),
+        "{result:?}"
+    );
+    assert!(
+        outcome.left_out.is_empty(),
+        "a retry of only the first album would lose the others: {:?}",
+        outcome.left_out
     );
 }
 

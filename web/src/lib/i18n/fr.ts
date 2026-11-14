@@ -225,7 +225,7 @@ export const fr: Record<Key, Message> = {
 
 	'item.counts': '{downloaded} téléchargées, {skipped} ignorées, {failed} en échec',
 	'item.retry': 'Télécharger à nouveau',
-	'item.retryFailures': 'Relancer les pistes en échec',
+	'item.retryFailures': 'Relancer ce qui a échoué',
 	'item.moveUp': 'Monter',
 	'item.moveDown': 'Descendre',
 	'item.failures': {
@@ -276,6 +276,8 @@ export const fr: Record<Key, Message> = {
 	'log.track_unavailable': 'La piste {number} est indisponible.',
 	'log.track_failed': 'La piste {track_id} a échoué : {error}',
 	'log.album_failed': "L'album {album_id} a échoué : {error}",
+	'log.album_gone': "L'album {album_id} n'existe plus chez Qobuz : laissé de côté.",
+	'log.artist_gone': "L'artiste {artist_id} n'existe plus chez Qobuz : laissé de côté.",
 	'log.artist_failed': "L'artiste {artist_id} a échoué : {error}",
 	'log.preview_only':
 		"Qobuz n'a donné que l'extrait de 30 secondes de cette piste : ignorée. L'abonnement est-il actif ?",

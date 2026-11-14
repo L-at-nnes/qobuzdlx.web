@@ -95,6 +95,13 @@ pub struct QueueItem {
     pub playlist_entries: Vec<PlaylistEntry>,
     /// Set by "retry the failures": only these tracks are processed.
     pub only_track_ids: Option<BTreeSet<u64>>,
+    /// The parts of an item made of several (a discography, a label, favourites) that could not be
+    /// had and may be later: an album by its id, an artist among favourites as `artist:<id>`.
+    #[serde(default)]
+    pub left_out: Vec<String>,
+    /// Set by "retry the failures" for such an item: only these parts are processed again.
+    #[serde(default)]
+    pub only_parts: Option<BTreeSet<String>>,
 }
 
 pub(super) fn now() -> u64 {
@@ -128,6 +135,8 @@ impl QueueItem {
             bytes: 0,
             playlist_entries: Vec::new(),
             only_track_ids: None,
+            left_out: Vec::new(),
+            only_parts: None,
         }
     }
 
@@ -159,6 +168,8 @@ impl QueueItem {
         self.failures.clear();
         self.playlist_entries.clear();
         self.only_track_ids = None;
+        self.left_out.clear();
+        self.only_parts = None;
     }
 
     /// Makes a running item wait again, to be processed from the start.
@@ -167,21 +178,35 @@ impl QueueItem {
         self.started_at = None;
         // A whole item restarts from scratch: what it had counted would be counted twice. A
         // "retry the failures" pass keeps its earlier outcome, which its own counters build on.
-        if self.only_track_ids.is_none() {
+        if self.only_track_ids.is_none() && self.only_parts.is_none() {
             self.reset_outcome();
         }
     }
 
-    /// Makes a finished item wait again for the tracks that failed only: it keeps what it had
-    /// already achieved, which its counters and playlist files build on.
+    /// Makes a finished item wait again for what failed in it only: the tracks that failed, or the
+    /// albums that were left out. It keeps what it had already achieved, which its counters and
+    /// playlist files build on.
+    ///
+    /// Two things cannot be told apart from what is kept, and are processed from the start instead
+    /// (what is already on the disk costs one request per album): an item that failed whole, which
+    /// stopped before it had gone through everything, and one that has both failed tracks and
+    /// albums left out, which no single filter can describe.
     pub(super) fn requeue_failures(&mut self) {
-        self.only_track_ids = Some(
-            self.failures
-                .iter()
-                .map(|failure| failure.track_id)
-                .collect(),
-        );
-        self.failures.clear();
+        let whole = self.status == ItemStatus::Failed && self.left_out.is_empty();
+        let both = !self.failures.is_empty() && !self.left_out.is_empty();
+        if whole || both {
+            self.reset_outcome();
+        } else if self.left_out.is_empty() {
+            self.only_track_ids = Some(
+                self.failures
+                    .iter()
+                    .map(|failure| failure.track_id)
+                    .collect(),
+            );
+            self.failures.clear();
+        } else {
+            self.only_parts = Some(self.left_out.drain(..).collect());
+        }
         self.requeue();
     }
 

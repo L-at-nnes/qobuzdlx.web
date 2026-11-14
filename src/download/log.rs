@@ -122,6 +122,14 @@ pub enum LogEvent {
         artist_id: u64,
         error: String,
     },
+    /// An album of a discography, a label or favourites that Qobuz no longer has: it is left alone.
+    AlbumGone {
+        album_id: String,
+    },
+    /// An artist among the favourites that Qobuz no longer has.
+    ArtistGone {
+        artist_id: u64,
+    },
     PreviewOnly,
     FavoritesEmpty,
     LabelNotFound,
@@ -289,6 +297,18 @@ impl fmt::Display for LogEvent {
             }
             Self::ArtistFailed { artist_id, error } => {
                 write!(formatter, "Artist {artist_id} failed: {error}")
+            }
+            Self::AlbumGone { album_id } => {
+                write!(
+                    formatter,
+                    "Album {album_id} no longer exists at Qobuz: left out."
+                )
+            }
+            Self::ArtistGone { artist_id } => {
+                write!(
+                    formatter,
+                    "Artist {artist_id} no longer exists at Qobuz: left out."
+                )
             }
             Self::PreviewOnly => write!(
                 formatter,

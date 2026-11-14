@@ -172,6 +172,8 @@ pub struct ItemView<'a> {
     pub skipped: u32,
     pub bytes: u64,
     pub failures: &'a [FailedTrack],
+    /// How many albums (or artists) of the item could not be had and may be later.
+    pub left_out: usize,
 }
 
 impl<'a> From<&'a QueueItem> for ItemView<'a> {
@@ -193,6 +195,7 @@ impl<'a> From<&'a QueueItem> for ItemView<'a> {
             skipped: item.skipped,
             bytes: item.bytes,
             failures: &item.failures,
+            left_out: item.left_out.len(),
         }
     }
 }

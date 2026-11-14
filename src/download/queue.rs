@@ -398,11 +398,11 @@ impl Queue {
     /// Processes again only the tracks of a finished item that failed. The item keeps what it had
     /// already achieved: its counters and playlist files build on it.
     pub fn retry_failures(&mut self, id: &str) -> bool {
-        let Some(position) = self
-            .items
-            .iter()
-            .position(|item| item.id == id && item.is_finished() && !item.failures.is_empty())
-        else {
+        let Some(position) = self.items.iter().position(|item| {
+            item.id == id
+                && item.is_finished()
+                && (!item.failures.is_empty() || !item.left_out.is_empty())
+        }) else {
             return false;
         };
 
@@ -412,8 +412,8 @@ impl Queue {
         true
     }
 
-    /// Tries again everything that has something left to try: an item that failed is processed from
-    /// scratch, one that ended with failed tracks only for those. They go to the end of the queue in
+    /// Tries again everything that has something left to try, each item for what failed in it only
+    /// where that can be told (see `QueueItem::requeue_failures`). They go to the end of the queue in
     /// the order they had. Returns how many there were.
     pub fn retry_all_failed(&mut self) -> usize {
         let (mut again, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.items)
@@ -421,12 +421,7 @@ impl Queue {
             .partition(QueueItem::is_to_retry);
         self.items = kept;
         for item in &mut again {
-            if item.status == ItemStatus::Failed {
-                item.reset_outcome();
-                item.requeue();
-            } else {
-                item.requeue_failures();
-            }
+            item.requeue_failures();
         }
         let count = again.len();
         self.items.extend(again);
@@ -688,6 +683,109 @@ mod tests {
         }
         assert!(queue.get(&failed_id).is_none(), "forgotten once it is done");
         assert!(queue.get(&incomplete_id).is_some());
+    }
+
+    /// A finished item with what it kept of how it went.
+    fn ended(
+        queue: &mut Queue,
+        url: &str,
+        status: ItemStatus,
+        left_out: &[&str],
+        failed_tracks: &[u64],
+    ) -> String {
+        let id = id_of(queue, url);
+        let item = queue.get_mut(&id).unwrap();
+        item.downloaded = 5;
+        item.left_out = left_out.iter().map(|part| (*part).to_owned()).collect();
+        item.failures = failed_tracks
+            .iter()
+            .map(|track_id| FailedTrack {
+                track_id: *track_id,
+                title: "Track".into(),
+                error: "restricted".into(),
+            })
+            .collect();
+        queue.finish(&id, status, None);
+        id
+    }
+
+    #[test]
+    fn an_item_with_albums_left_out_is_tried_again_for_those_albums_only() {
+        let mut queue = queue_with(&["a"]);
+        let id = ended(&mut queue, "a", ItemStatus::Failed, &["x", "artist:7"], &[]);
+
+        assert!(queue.retry_failures(&id));
+
+        let item = queue.get(&id).unwrap();
+        assert_eq!(item.status, ItemStatus::Pending);
+        assert_eq!(
+            item.only_parts,
+            Some(std::collections::BTreeSet::from([
+                "x".to_owned(),
+                "artist:7".to_owned()
+            ]))
+        );
+        assert_eq!(item.only_track_ids, None);
+        assert!(
+            item.left_out.is_empty(),
+            "what is asked again is not left out"
+        );
+        assert_eq!(item.downloaded, 5, "what it achieved is kept");
+    }
+
+    #[test]
+    fn an_item_that_failed_whole_or_in_two_ways_is_processed_from_the_start() {
+        let mut queue = queue_with(&["whole", "both"]);
+        // Stopped on an error before it had gone through everything
+        let whole = ended(&mut queue, "whole", ItemStatus::Failed, &[], &[3]);
+        // Albums left out, and tracks failed in the others: no single filter says both
+        let both = ended(&mut queue, "both", ItemStatus::Failed, &["x"], &[3]);
+
+        assert_eq!(queue.retry_all_failed(), 2);
+
+        for id in [whole, both] {
+            let item = queue.get(&id).unwrap();
+            assert_eq!(item.status, ItemStatus::Pending);
+            assert_eq!(
+                (&item.only_parts, &item.only_track_ids, item.downloaded),
+                (&None, &None, 0),
+                "{id}"
+            );
+            assert!(item.failures.is_empty() && item.left_out.is_empty());
+        }
+    }
+
+    #[test]
+    fn an_item_that_left_albums_out_is_kept_and_counted_as_to_retry() {
+        let mut queue = queue_with(&["a"]);
+        let id = ended(&mut queue, "a", ItemStatus::Failed, &["x"], &[]);
+        for number in 0..MAX_FINISHED + 5 {
+            let url = format!("https://play.qobuz.com/album/n{number}");
+            queue.enqueue(&url, ItemKind::Album, "x", Display::default());
+            finished(&mut queue, &url, ItemStatus::Completed);
+        }
+
+        assert!(queue.get(&id).is_some());
+        assert_eq!(queue.view(Window::ALL).counts.failed, 1);
+    }
+
+    #[test]
+    fn a_queue_saved_before_albums_were_remembered_still_loads() {
+        let item = QueueItem::new(
+            "https://play.qobuz.com/album/a".into(),
+            ItemKind::Album,
+            "a".into(),
+            Display::default(),
+        );
+        let mut saved = serde_json::to_value(&item).unwrap();
+        let fields = saved.as_object_mut().unwrap();
+        fields.remove("left_out");
+        fields.remove("only_parts");
+
+        let loaded: QueueItem = serde_json::from_value(saved).unwrap();
+
+        assert!(loaded.left_out.is_empty());
+        assert_eq!(loaded.only_parts, None);
     }
 
     #[test]

@@ -220,7 +220,7 @@ export const en = {
 
 	'item.counts': '{downloaded} downloaded, {skipped} skipped, {failed} failed',
 	'item.retry': 'Download again',
-	'item.retryFailures': 'Retry the failed tracks',
+	'item.retryFailures': 'Retry what failed',
 	'item.moveUp': 'Move up',
 	'item.moveDown': 'Move down',
 	'item.failures': {
@@ -272,6 +272,8 @@ export const en = {
 	'log.track_failed': 'Track {track_id} failed: {error}',
 	'log.album_failed': 'Album {album_id} failed: {error}',
 	'log.artist_failed': 'Artist {artist_id} failed: {error}',
+	'log.album_gone': 'Album {album_id} no longer exists at Qobuz: left out.',
+	'log.artist_gone': 'Artist {artist_id} no longer exists at Qobuz: left out.',
 	'log.preview_only': 'Qobuz only gave the 30 second preview of this track: skipped. Is the subscription active?',
 	'log.favorites_empty': 'No favourites to download.',
 	'log.label_not_found': 'Label not found.',

@@ -11,8 +11,9 @@
 	let showFailures = $state(false);
 
 	const finished = $derived(item.status !== 'pending' && item.status !== 'running');
-	const counted = $derived(item.downloaded + item.skipped + item.failures.length > 0);
-	const failed = $derived(item.failures.length > 0);
+	const failedCount = $derived(item.failures.length + item.left_out);
+	const counted = $derived(item.downloaded + item.skipped + failedCount > 0);
+	const failed = $derived(failedCount > 0);
 	const expired = $derived(item.status === 'failed' && item.error?.includes('session'));
 </script>
 
@@ -29,7 +30,7 @@
 						{t('item.counts', {
 							downloaded: item.downloaded,
 							skipped: item.skipped,
-							failed: item.failures.length
+							failed: failedCount
 						})}
 					</span>
 				{/if}
