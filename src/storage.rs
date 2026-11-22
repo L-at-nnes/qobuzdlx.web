@@ -13,6 +13,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+/// How many unreadable copies of a file are kept, the most recent ones.
+const KEPT_SET_ASIDE: usize = 3;
+
 /// Who may read the file on a shared machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
@@ -90,9 +93,44 @@ impl JsonFile {
             .map_or(0, |elapsed| elapsed.as_secs());
         let target = self.sibling(&format!(".corrupt-{seconds}"));
         match fs::rename(&self.path, &target) {
-            Ok(()) => tracing::warn!(path = %target.display(), "unreadable file set aside"),
+            Ok(()) => {
+                tracing::warn!(path = %target.display(), "unreadable file set aside");
+                self.prune_set_aside();
+            }
             Err(error) => {
                 tracing::error!(path = %self.path.display(), %error, "could not set the unreadable file aside");
+            }
+        }
+    }
+
+    /// Deletes the oldest unreadable copies so that no more than [`KEPT_SET_ASIDE`] stay: a queue of
+    /// a hundred thousand items is tens of megabytes, and a file that keeps being damaged would fill
+    /// the disk one copy at a time.
+    fn prune_set_aside(&self) {
+        let prefix = self.sibling(".corrupt-");
+        let (Some(directory), Some(prefix)) = (
+            self.path.parent(),
+            prefix.file_name().and_then(|name| name.to_str()),
+        ) else {
+            return;
+        };
+        let Ok(entries) = fs::read_dir(directory) else {
+            return;
+        };
+
+        let mut copies: Vec<(u64, PathBuf)> = entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let name = entry.file_name();
+                let seconds = name.to_str()?.strip_prefix(prefix)?.parse().ok()?;
+                Some((seconds, entry.path()))
+            })
+            .collect();
+        copies.sort_unstable_by_key(|(seconds, _)| std::cmp::Reverse(*seconds));
+
+        for (_, path) in copies.into_iter().skip(KEPT_SET_ASIDE) {
+            if let Err(error) = fs::remove_file(&path) {
+                tracing::warn!(path = %path.display(), %error, "could not delete an old unreadable copy");
             }
         }
     }
@@ -294,6 +332,51 @@ mod tests {
             !file.path().exists(),
             "the damaged file no longer sits in the way"
         );
+    }
+
+    fn set_aside_copies(directory: &TempDir, file: &str) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(directory.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(&format!("{file}.corrupt-")))
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn only_the_latest_unreadable_copies_are_kept() {
+        let directory = TempDir::new().unwrap();
+        let file = file_in(&directory);
+        for seconds in [100, 200, 300, 400] {
+            fs::write(
+                directory
+                    .path()
+                    .join(format!("sample.json.corrupt-{seconds}")),
+                "old",
+            )
+            .unwrap();
+        }
+        // Another file's copies, and a name that only looks alike, are not this file's business
+        fs::write(directory.path().join("other.json.corrupt-1"), "x").unwrap();
+        fs::write(directory.path().join("sample.json.corrupt-notes"), "x").unwrap();
+        fs::write(file.path(), "not json").unwrap();
+
+        assert_eq!(file.load::<Sample>(), None);
+
+        let kept = set_aside_copies(&directory, "sample.json");
+        assert_eq!(kept.len(), KEPT_SET_ASIDE + 1, "{kept:?}");
+        assert!(
+            !kept.contains(&"sample.json.corrupt-100".to_owned()),
+            "{kept:?}"
+        );
+        assert!(
+            !kept.contains(&"sample.json.corrupt-200".to_owned()),
+            "{kept:?}"
+        );
+        assert!(kept.contains(&"sample.json.corrupt-notes".to_owned()));
+        assert!(directory.path().join("other.json.corrupt-1").exists());
     }
 
     #[test]
