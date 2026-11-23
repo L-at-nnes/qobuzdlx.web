@@ -245,6 +245,7 @@ QobuzDLX tells **extensions** what it does, so that you can add your own actions
 | `track_saved` | A track is in its final place, tagged and verified |
 | `item_finished` | An album, playlist, discography... ended, with its counts and the folders written |
 | `queue_drained` | Nothing is left to download |
+| `queue_halted` | The queue stopped by itself (session expired, disk full...) and waits for you |
 
 There are three kinds, and the first two are added without recompiling: a **command** (a program that gets the event as JSON on its standard input), a **webhook** (the event is `POST`ed to an address) and a **built-in** extension (Rust). To add one, put a folder with an `extension.json` into `<config>/extensions` (`/config/extensions` in the image) and restart:
 

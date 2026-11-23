@@ -18,7 +18,7 @@ mod registry;
 mod webhook;
 
 pub use command::CommandExtension;
-pub use event::{Event, EventKind, ItemFinished, SCHEMA, TrackSaved};
+pub use event::{Event, EventKind, HaltReason, ItemFinished, SCHEMA, TrackSaved};
 pub use loader::{Loaded, Problem, load_dir};
 pub use manifest::{Manifest, ManifestError, Webhook};
 pub use registry::{Extensions, Source};

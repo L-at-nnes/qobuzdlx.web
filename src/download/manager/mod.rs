@@ -24,7 +24,7 @@ use super::store::QueueStore;
 use super::track::{Environment, TEMP_PREFIX, Tuning, partial_dir};
 use super::transfer::Fetcher;
 use super::url::{QobuzUrl, parse};
-use crate::extensions::Extensions;
+use crate::extensions::{Event as Told, Extensions, HaltReason};
 use crate::qobuz::{Client, SessionEvent};
 use crate::settings::SettingsStore;
 
@@ -486,7 +486,26 @@ impl Inner {
         if first {
             self.log(LogEvent::SessionExpired);
             self.emit(Event::SessionExpired);
+            // Whoever is not looking at the page learns it here. An expiry noticed with nothing to
+            // download costs nothing, and is not the queue stopping
+            if self.has_unfinished() {
+                self.tell_halted(HaltReason::SessionExpired);
+            }
         }
+    }
+
+    /// Whether something is waiting or running.
+    fn has_unfinished(&self) -> bool {
+        locked(&self.state)
+            .queue
+            .items()
+            .iter()
+            .any(|item| !item.is_finished())
+    }
+
+    /// Tells the extensions that the queue stopped by itself, and why.
+    pub(super) fn tell_halted(&self, reason: HaltReason) {
+        self.extensions.emit(Told::QueueHalted { reason });
     }
 
     /// Stops the item in progress so that it waits again instead of ending.

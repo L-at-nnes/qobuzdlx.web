@@ -10,7 +10,9 @@ use qobuzdlx::download::{
     QueueItem, QueueStore, Tuning,
 };
 use qobuzdlx::download::{Halt, WaitReason};
-use qobuzdlx::extensions::{Event as Told, Extension, Extensions, Failure, Info, Source};
+use qobuzdlx::extensions::{
+    Event as Told, Extension, Extensions, Failure, HaltReason, Info, Source,
+};
 use qobuzdlx::settings::{Delay, Quality, RateLimit, SettingsStore};
 use serde_json::json;
 use tempfile::TempDir;
@@ -482,6 +484,62 @@ async fn a_refused_session_pauses_the_item_instead_of_failing_it() {
         announced |= matches!(event, Event::SessionExpired);
     }
     assert!(announced, "the interface is told to ask for a new sign-in");
+}
+
+fn halts_told(told: &std::sync::Mutex<Vec<Told>>) -> Vec<HaltReason> {
+    told.lock()
+        .unwrap()
+        .iter()
+        .filter_map(|event| match event {
+            Told::QueueHalted { reason } => Some(*reason),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn extensions_are_told_once_when_the_session_expires_with_work_waiting() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue.server.on("/api/track/get", |_| {
+        Reply::error(401, "Invalid or expired user_auth_token")
+    });
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let extensions = Extensions::start(vec![std::sync::Arc::new(Recorder(told.clone()))], vec![]);
+    let manager = rig.start_with(extensions);
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the extensions to be told", || {
+        !halts_told(&told).is_empty()
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(halts_told(&told), [HaltReason::SessionExpired]);
+}
+
+#[tokio::test]
+async fn a_session_that_expires_with_nothing_to_download_is_not_a_halt() {
+    let rig = Rig::new().await;
+    rig.catalogue.server.on("/api/track/get", |_| {
+        Reply::error(401, "Invalid or expired user_auth_token")
+    });
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let extensions = Extensions::start(vec![std::sync::Arc::new(Recorder(told.clone()))], vec![]);
+    let _manager = rig.start_with(extensions);
+
+    // Someone browsing meets the refusal; no item is involved
+    assert!(rig.catalogue.client.track(1).await.is_err());
+
+    eventually("the session to be forgotten", || {
+        !rig.catalogue.client.is_signed_in()
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(halts_told(&told).is_empty());
 }
 
 #[tokio::test]

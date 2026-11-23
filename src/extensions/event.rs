@@ -18,6 +18,8 @@ pub enum EventKind {
     ItemFinished,
     /// The last waiting item has been processed.
     QueueDrained,
+    /// The queue stopped by itself and waits for someone to deal with the cause.
+    QueueHalted,
 }
 
 impl EventKind {
@@ -28,6 +30,7 @@ impl EventKind {
             Self::TrackSaved => "track_saved",
             Self::ItemFinished => "item_finished",
             Self::QueueDrained => "queue_drained",
+            Self::QueueHalted => "queue_halted",
         }
     }
 }
@@ -68,6 +71,16 @@ pub struct ItemFinished {
     pub folders: Vec<String>,
 }
 
+/// Why the queue stopped by itself: what is waiting is kept, and nothing goes on until someone acts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HaltReason {
+    /// Qobuz refused the session token: signing in again is the only way on.
+    SessionExpired,
+    /// The disk cannot take any more files.
+    StorageFull,
+}
+
 /// Something that happened in the application.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
@@ -80,6 +93,9 @@ pub enum Event {
     },
     ItemFinished(ItemFinished),
     QueueDrained,
+    QueueHalted {
+        reason: HaltReason,
+    },
 }
 
 impl Event {
@@ -89,6 +105,7 @@ impl Event {
             Self::TrackSaved { .. } => EventKind::TrackSaved,
             Self::ItemFinished(_) => EventKind::ItemFinished,
             Self::QueueDrained => EventKind::QueueDrained,
+            Self::QueueHalted { .. } => EventKind::QueueHalted,
         }
     }
 
@@ -181,10 +198,30 @@ mod tests {
     }
 
     #[test]
+    fn a_halt_event_says_why_the_queue_stopped() {
+        let event = Event::QueueHalted {
+            reason: HaltReason::SessionExpired,
+        };
+
+        assert_eq!(
+            json_of(&event),
+            json!({"schema": 1, "at": 42, "event": "queue_halted", "reason": "session_expired"})
+        );
+        assert_eq!(event.kind(), EventKind::QueueHalted);
+        assert_eq!(
+            json_of(&Event::QueueHalted {
+                reason: HaltReason::StorageFull
+            })["reason"],
+            "storage_full"
+        );
+    }
+
+    #[test]
     fn the_name_of_a_kind_is_the_one_in_the_json() {
         let event = Event::QueueDrained;
         assert_eq!(json_of(&event)["event"], event.kind().name());
         assert_eq!(EventKind::TrackSaved.name(), "track_saved");
         assert_eq!(EventKind::ItemFinished.name(), "item_finished");
+        assert_eq!(EventKind::QueueHalted.name(), "queue_halted");
     }
 }

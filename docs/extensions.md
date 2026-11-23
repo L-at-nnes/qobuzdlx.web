@@ -154,6 +154,21 @@ The last waiting item was processed and nothing is left to do. Nothing but the c
 
 It is the right moment for something expensive that should run once after a batch: a full library scan, a backup, a report.
 
+### `queue_halted`
+
+The queue stopped by itself and will not go on until someone acts. What is waiting is kept, nothing failed. It is the event to send a notification on: a queue left to run for days would otherwise sit stopped without anyone knowing.
+
+```json
+{ "schema": 1, "at": 1760000200, "event": "queue_halted", "reason": "session_expired" }
+```
+
+`reason` says what to do:
+
+- `session_expired`: Qobuz refused the session token. The password is not kept, so the queue waits until someone signs in again, with this account or another one, after which it goes on by itself. Only sent when something was waiting or running.
+- `storage_full`: the disk is full, over its quota or read-only. Make room, then press *Go on*.
+
+More reasons may be added: ignore the ones you do not know.
+
 ## Command extensions
 
 ```json

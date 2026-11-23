@@ -11,7 +11,7 @@ use crate::download::job::{Job, JobError, JobSetup};
 use crate::download::log::LogEvent;
 use crate::download::progress::{Halt, Progress, Wait, WaitReason};
 use crate::download::report::{Outcome, Reporter};
-use crate::extensions::{self, ItemFinished};
+use crate::extensions::{self, HaltReason, ItemFinished};
 use crate::settings::LogDetail;
 
 /// What the worker does between an item and the next, as the end of the item decides it.
@@ -370,6 +370,9 @@ impl Inner {
 
     /// The queue stops: what is waiting stays so, and the interface says why.
     pub(super) fn announce_halt(&self, halt: Halt) {
+        if halt == Halt::StorageFull {
+            self.tell_halted(HaltReason::StorageFull);
+        }
         {
             let mut state = locked(&self.state);
             state.progress = Progress {
