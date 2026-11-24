@@ -131,6 +131,8 @@ pub enum LogEvent {
         artist_id: u64,
     },
     PreviewOnly,
+    /// Several tracks in a row were refused: the account can no longer download, the queue stops.
+    SubscriptionLapsed,
     FavoritesEmpty,
     LabelNotFound,
     TrackNotFound,
@@ -170,6 +172,7 @@ impl LogEvent {
             | Self::AlbumFailed { .. }
             | Self::ArtistFailed { .. }
             | Self::PreviewOnly
+            | Self::SubscriptionLapsed
             | Self::TrackNotFound
             | Self::AlbumInfoUnavailable
             | Self::PlaylistFileFailed { .. }
@@ -313,6 +316,10 @@ impl fmt::Display for LogEvent {
             Self::PreviewOnly => write!(
                 formatter,
                 "Qobuz only gave the 30 second preview of this track: it is skipped (is the subscription active?)."
+            ),
+            Self::SubscriptionLapsed => write!(
+                formatter,
+                "Qobuz refused the files of several tracks in a row: the subscription seems to have ended. The queue stops, nothing is failed."
             ),
             Self::FavoritesEmpty => write!(formatter, "No favorites to download."),
             Self::LabelNotFound => write!(formatter, "Label not found."),

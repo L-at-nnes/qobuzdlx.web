@@ -542,6 +542,199 @@ async fn a_session_that_expires_with_nothing_to_download_is_not_a_halt() {
     assert!(halts_told(&told).is_empty());
 }
 
+// ─── An account that went back to free ───
+
+const TEN_TRACKS: [(u64, u32, &str); 10] = [
+    (31, 1, "One"),
+    (32, 2, "Two"),
+    (33, 3, "Three"),
+    (34, 4, "Four"),
+    (35, 5, "Five"),
+    (36, 6, "Six"),
+    (37, 7, "Seven"),
+    (38, 8, "Eight"),
+    (39, 9, "Nine"),
+    (40, 10, "Ten"),
+];
+
+fn music_files(rig: &Rig) -> usize {
+    walk(rig.music.path())
+}
+
+fn walk(folder: &std::path::Path) -> usize {
+    std::fs::read_dir(folder).map_or(0, |entries| {
+        entries
+            .filter_map(Result::ok)
+            .map(|entry| {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path)
+                } else {
+                    usize::from(
+                        path.extension()
+                            .is_some_and(|extension| extension == "flac"),
+                    )
+                }
+            })
+            .sum()
+    })
+}
+
+/// Two albums of ten tracks, and a Qobuz that refuses every file the way `refusal` says.
+async fn refused_everywhere(
+    refusal: impl Fn() -> Reply + Send + Sync + 'static,
+) -> (Rig, Manager, std::sync::Arc<std::sync::Mutex<Vec<Told>>>) {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &TEN_TRACKS);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(51, 1, "Other")]);
+    rig.catalogue
+        .server
+        .on("/api/track/getFileUrl", move |_| refusal());
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let extensions = Extensions::start(vec![std::sync::Arc::new(Recorder(told.clone()))], vec![]);
+    let manager = rig.start_with(extensions);
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+    (rig, manager, told)
+}
+
+async fn assert_the_queue_stopped_on_the_account(
+    rig: &Rig,
+    manager: &Manager,
+    told: &std::sync::Mutex<Vec<Told>>,
+) {
+    eventually("the queue to stop on the subscription", || {
+        manager.progress().halt == Some(Halt::SubscriptionLapsed)
+    })
+    .await;
+
+    // Not the ten tracks, not the next album: a handful of requests, and nothing written
+    let asked = rig.catalogue.server.count("/api/track/getFileUrl");
+    assert!(
+        (3..=5).contains(&asked),
+        "{asked} files were asked for in a queue that should have stopped"
+    );
+    assert_eq!(music_files(rig), 0);
+    // Nothing failed: both items wait, the first one is the first to start again
+    for url in [album_url("one"), album_url("two")] {
+        let item = item_of(manager, &url);
+        assert_eq!(item.status, ItemStatus::Pending, "{url}");
+        assert_eq!(item.error, None, "{url}");
+    }
+    assert_eq!(rig.catalogue.server.count("/api/album/get"), 1);
+    assert!(
+        manager
+            .log_lines()
+            .iter()
+            .any(|line| matches!(line.event, LogEvent::SubscriptionLapsed))
+    );
+    eventually("the extensions to be told", || !halts_told(told).is_empty()).await;
+    assert_eq!(halts_told(told), [HaltReason::SubscriptionLapsed]);
+}
+
+#[tokio::test]
+async fn an_account_that_only_gets_previews_stops_the_queue_after_a_few_requests() {
+    let (rig, manager, told) = refused_everywhere({
+        let url = String::new();
+        move || {
+            Reply::json(
+                json!({ "url": format!("{url}/cdn/audio"), "format_id": 6, "sample": true }),
+            )
+        }
+    })
+    .await;
+
+    assert_the_queue_stopped_on_the_account(&rig, &manager, &told).await;
+}
+
+#[tokio::test]
+async fn an_account_whose_files_are_refused_with_an_error_stops_the_queue_too() {
+    let (rig, manager, told) =
+        refused_everywhere(|| Reply::error(403, "Not allowed for this subscription")).await;
+
+    assert_the_queue_stopped_on_the_account(&rig, &manager, &told).await;
+}
+
+#[tokio::test]
+async fn once_the_account_can_download_again_going_on_finishes_what_was_waiting() {
+    let (rig, manager, _told) =
+        refused_everywhere(|| Reply::error(403, "Not allowed for this subscription")).await;
+    eventually("the queue to stop", || {
+        manager.progress().halt == Some(Halt::SubscriptionLapsed)
+    })
+    .await;
+
+    // The subscription is renewed: files are given again
+    let audio = format!("{}/cdn/audio", rig.catalogue.server.url());
+    rig.catalogue
+        .server
+        .on("/api/track/getFileUrl", move |call| {
+            Reply::json(json!({
+                "url": audio,
+                "format_id": call.param("format_id").parse::<u32>().unwrap(),
+                "bit_depth": 16,
+                "sampling_rate": 44.1,
+            }))
+        });
+    manager.resume();
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(music_files(&rig), 11);
+    assert_eq!(manager.progress().halt, None);
+}
+
+#[tokio::test]
+async fn a_track_that_is_only_ever_a_preview_does_not_stop_the_queue() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("alb", "Kind of Blue", "Miles Davis", &KIND_OF_BLUE);
+    let audio = format!("{}/cdn/audio", rig.catalogue.server.url());
+    rig.catalogue.server.on("/api/track/getFileUrl", move |call| {
+        // One track of the three is offered as a preview, whatever the account
+        let sample = call.param("track_id") == "12";
+        Reply::json(json!({
+            "url": audio, "format_id": 6, "bit_depth": 16, "sampling_rate": 44.1, "sample": sample,
+        }))
+    });
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("alb"), Display::default())
+        .unwrap();
+
+    let status = finished(&manager, &album_url("alb")).await;
+    assert_eq!(status, ItemStatus::Completed);
+    let item = item_of(&manager, &album_url("alb"));
+    assert_eq!((item.downloaded, item.failures.len()), (2, 1));
+    assert_eq!(manager.progress().halt, None);
+}
+
+#[tokio::test]
+async fn tracks_that_do_not_exist_are_not_taken_for_a_lapsed_account() {
+    let (rig, manager, _told) = refused_everywhere(|| Reply::error(404, "Not found")).await;
+
+    // Every track of both albums fails by itself, and the queue goes through them all
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(manager.progress().halt, None);
+    assert_eq!(rig.catalogue.server.count("/api/track/getFileUrl"), 11);
+}
+
 #[tokio::test]
 async fn signing_out_midway_pauses_the_queue_and_a_new_sign_in_goes_on_by_itself() {
     let rig = Rig::new().await;

@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 use super::chain::{describe_stream, fallback_chain, quality_label};
+use super::lapse::Refusals;
 use super::log::LogEvent;
 use super::report::Reporter;
 use super::transfer::{Error as TransferError, Fetcher, Transfer};
@@ -40,6 +41,9 @@ pub struct Environment {
     pub client: Client,
     pub fetcher: Fetcher,
     pub tuning: Tuning,
+    /// The tracks Qobuz refused to give, one after the other: what tells that the account can no
+    /// longer download.
+    pub refusals: Refusals,
 }
 
 /// Prefix of the partial files, which is what lets a start-up clean up after a killed process.
@@ -112,6 +116,9 @@ pub enum TrackError {
     Io(#[from] io::Error),
     #[error("the track is not available in any quality")]
     Unavailable,
+    /// Several tracks in a row were refused and none written: the account can no longer download.
+    #[error("Qobuz keeps refusing the files: the subscription seems to have ended")]
+    SubscriptionLapsed,
 }
 
 impl TrackError {
@@ -119,11 +126,24 @@ impl TrackError {
     /// again at once is what Qobuz just refused.
     fn is_final(&self) -> bool {
         match self {
-            Self::Cancelled | Self::PreviewOnly => true,
+            Self::Cancelled | Self::PreviewOnly | Self::SubscriptionLapsed => true,
             Self::Api(error) => {
                 error.is_session_gone() || error.is_rate_limited() || error.is_blocked()
             }
             _ => self.is_storage_full(),
+        }
+    }
+
+    /// Whether Qobuz refused the file itself, as it does for an account that cannot download: a
+    /// preview instead of the track, or a refusal of the request that is not about the session, the
+    /// rate or a track that does not exist.
+    fn is_refusal(&self) -> bool {
+        match self {
+            Self::PreviewOnly => true,
+            Self::Api(error) => error.status().is_some_and(|status| {
+                status.is_client_error() && !matches!(status.as_u16(), 401 | 404 | 408 | 429)
+            }),
+            _ => false,
         }
     }
 
@@ -225,6 +245,24 @@ impl Context<'_> {
         // file must not stay behind
         let result = self.produce(request, &temp, wanted).await;
         let _ = tokio::fs::remove_file(&temp).await;
+        self.watch_account(result)
+    }
+
+    /// Keeps count of the tracks Qobuz refused one after the other. A file written says the account
+    /// can download; the refusal that makes the series long enough ends the item, whatever the
+    /// reason the track itself gives.
+    fn watch_account(
+        &self,
+        result: Result<TrackResult, TrackError>,
+    ) -> Result<TrackResult, TrackError> {
+        match &result {
+            Ok(track) if !track.already_existed => self.env.refusals.served(),
+            Err(error) if error.is_refusal() && self.env.refusals.refused() => {
+                self.reporter.log(LogEvent::SubscriptionLapsed);
+                return Err(TrackError::SubscriptionLapsed);
+            }
+            _ => {}
+        }
         result
     }
 

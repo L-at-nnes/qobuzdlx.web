@@ -140,6 +140,8 @@ pub enum Halt {
     SignedOut,
     /// The user paused the queue.
     Paused,
+    /// Qobuz refused the files of several tracks in a row: the subscription seems to have ended.
+    SubscriptionLapsed,
 }
 
 #[cfg(test)]

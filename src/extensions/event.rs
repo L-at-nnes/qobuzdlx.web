@@ -79,6 +79,8 @@ pub enum HaltReason {
     SessionExpired,
     /// The disk cannot take any more files.
     StorageFull,
+    /// Qobuz refused the files of several tracks in a row: the subscription seems to have ended.
+    SubscriptionLapsed,
 }
 
 /// Something that happened in the application.

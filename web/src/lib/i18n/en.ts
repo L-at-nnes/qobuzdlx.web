@@ -180,6 +180,8 @@ export const en = {
 		'The queue stopped: the disk cannot take any more files (it is full, over its quota or read-only). What is waiting is kept. Make room, then go on.',
 	'downloads.halted.signed_out':
 		'Signed out of Qobuz. Nothing failed: the queue is kept and goes on by itself when you sign in again, with this account or another one.',
+	'downloads.halted.subscription_lapsed':
+		'The queue stopped: Qobuz no longer gives complete files to this account, which usually means the subscription ended (a free account only gets 30 second previews). Nothing failed and what is waiting is kept. Sign in with another account and it goes on by itself, or press Go on once the subscription is back.',
 	'downloads.halted.paused': 'The queue is paused. What is waiting is kept.',
 	'downloads.resume': 'Go on',
 	'downloads.pause': 'Pause the queue',
@@ -275,6 +277,8 @@ export const en = {
 	'log.album_gone': 'Album {album_id} no longer exists at Qobuz: left out.',
 	'log.artist_gone': 'Artist {artist_id} no longer exists at Qobuz: left out.',
 	'log.preview_only': 'Qobuz only gave the 30 second preview of this track: skipped. Is the subscription active?',
+	'log.subscription_lapsed':
+		'Qobuz refused the files of several tracks in a row: the subscription seems to have ended. The queue stops, nothing is failed.',
 	'log.favorites_empty': 'No favourites to download.',
 	'log.label_not_found': 'Label not found.',
 	'log.track_not_found': 'Track not found.',

@@ -10,7 +10,7 @@ use common::catalogue::{Catalogue, page};
 use common::{Recorder, Reply, TINY_JPEG, flac_bytes};
 use qobuzdlx::download::{
     Covers, Display, Environment, Fetcher, ItemKind, Job, JobError, JobSetup, LogEvent, Outcome,
-    QueueItem, Tuning,
+    QueueItem, Refusals, Tuning,
 };
 use qobuzdlx::settings::{Quality, RateLimit, Settings};
 use serde_json::json;
@@ -84,6 +84,7 @@ impl Rig {
                         attempts_per_quality: 2,
                         backoff: Duration::ZERO,
                     },
+                    refusals: Refusals::default(),
                 },
                 settings,
                 reporter: self.recorder.clone(),

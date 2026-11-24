@@ -166,6 +166,7 @@ The queue stopped by itself and will not go on until someone acts. What is waiti
 
 - `session_expired`: Qobuz refused the session token. The password is not kept, so the queue waits until someone signs in again, with this account or another one, after which it goes on by itself. Only sent when something was waiting or running.
 - `storage_full`: the disk is full, over its quota or read-only. Make room, then press *Go on*.
+- `subscription_lapsed`: Qobuz refused the files of three tracks in a row and none was written, so the account can no longer download (a free account only gets 30 second previews). The item it was on waits again, nothing failed. Sign in with another account, or press *Go on* once the subscription is back.
 
 More reasons may be added: ignore the ones you do not know.
 

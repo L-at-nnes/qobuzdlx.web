@@ -17,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::artwork::Covers;
 use super::item::{Display, QueueItem};
+use super::lapse::Refusals;
 use super::log::{Log, LogEvent, LogLine};
 use super::progress::{Halt, Progress};
 use super::queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, Window, Work};
@@ -125,8 +126,9 @@ pub(super) struct Inner {
     pub(super) current: Mutex<Option<CancellationToken>>,
     /// "Skip": the album in progress is dropped.
     pub(super) skip: Arc<AtomicBool>,
-    /// The queue stopped by itself (the disk is full) and waits to be told to go on.
-    pub(super) halted: AtomicBool,
+    /// Why the queue stopped by itself (the disk is full, the subscription ended), if it did: it
+    /// waits to be told to go on.
+    halted: Mutex<Option<Halt>>,
     /// The user paused the queue: no item starts until it goes on.
     pub(super) paused: AtomicBool,
     /// The item in progress is being stopped to wait again (paused, signed out) rather than to end.
@@ -173,6 +175,7 @@ impl Manager {
             client: config.client.clone(),
             fetcher: Fetcher::new(config.http.clone(), config.stall_timeout),
             tuning: config.tuning,
+            refusals: Refusals::default(),
         };
         let (events, _) = broadcast::channel(256);
         let manager = Self {
@@ -196,7 +199,7 @@ impl Manager {
                 shutdown: CancellationToken::new(),
                 current: Mutex::new(None),
                 skip: Arc::new(AtomicBool::new(false)),
-                halted: AtomicBool::new(false),
+                halted: Mutex::new(None),
                 paused: AtomicBool::new(paused),
                 interrupt: AtomicBool::new(false),
                 stir: Notify::new(),
@@ -373,7 +376,7 @@ impl Manager {
     /// user paused it.
     pub fn resume(&self) {
         let paused = self.inner.paused.swap(false, Ordering::SeqCst);
-        let halted = self.inner.halted.swap(false, Ordering::SeqCst);
+        let halted = self.inner.take_halted().is_some();
         if !(paused || halted) {
             return;
         }
@@ -492,6 +495,22 @@ impl Inner {
                 self.tell_halted(HaltReason::SessionExpired);
             }
         }
+    }
+
+    /// Why the queue stopped by itself, if it did.
+    pub(super) fn halted(&self) -> Option<Halt> {
+        *locked(&self.halted)
+    }
+
+    /// The queue stops by itself, for this reason, and the next item is not started.
+    pub(super) fn halt(&self, halt: Halt) {
+        *locked(&self.halted) = Some(halt);
+    }
+
+    /// Forgets why the queue stopped, and the series of refusals that may have caused it.
+    pub(super) fn take_halted(&self) -> Option<Halt> {
+        self.env.refusals.reset();
+        locked(&self.halted).take()
     }
 
     /// Whether something is waiting or running.

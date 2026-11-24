@@ -9,7 +9,8 @@ use lofty::file::TaggedFileExt;
 use lofty::prelude::*;
 use lofty::probe::Probe;
 use qobuzdlx::download::{
-    Context, Environment, Fetcher, LogEvent, TrackError, TrackRequest, TrackResult, Tuning,
+    Context, Environment, Fetcher, LogEvent, Refusals, TrackError, TrackRequest, TrackResult,
+    Tuning,
 };
 use qobuzdlx::naming::DownloadKind;
 use qobuzdlx::qobuz::{Album, Client, Track};
@@ -94,6 +95,7 @@ impl Rig {
                 attempts_per_quality: 5,
                 backoff: Duration::ZERO,
             },
+            refusals: Refusals::default(),
         };
         let context = Context {
             env: &env,

@@ -39,7 +39,7 @@ pub(super) async fn run(inner: Arc<Inner>) {
         }
         // Whoever woke the worker wants it to try again, with room made or not. A user's pause is
         // lifted by the user alone
-        inner.halted.store(false, Ordering::SeqCst);
+        inner.take_halted();
         inner.clear_halt(Halt::SignedOut);
 
         // Drained until nothing is left: a wake-up says there is work, not how much
@@ -54,7 +54,7 @@ pub(super) async fn run(inner: Arc<Inner>) {
             processed = true;
             let pace = inner.process(item).await;
             // Nothing more can be written: every item that follows would fail the same way
-            if inner.halted.load(Ordering::SeqCst) {
+            if inner.halted().is_some() {
                 break;
             }
             inner.rest(pace).await;
@@ -171,6 +171,12 @@ impl Inner {
                 self.log_at(LogEvent::Aborted, detail);
                 Some((ItemStatus::Cancelled, None))
             }
+            // Several tracks in a row refused: the account cannot download. The item waits, nothing
+            // failed, and the queue stops until the account changes or the user goes on
+            Err(JobError::SubscriptionLapsed) => {
+                self.halt(Halt::SubscriptionLapsed);
+                None
+            }
             Err(JobError::SessionExpired) => {
                 // Before the next item is picked: it would meet the same refusal. When the user
                 // signed out there is nothing to announce
@@ -181,7 +187,7 @@ impl Inner {
             }
             Err(error) => {
                 if matches!(error, JobError::StorageFull(_)) {
-                    self.halted.store(true, Ordering::SeqCst);
+                    self.halt(Halt::StorageFull);
                 }
                 let message = error.to_string();
                 self.log_at(
@@ -229,30 +235,35 @@ impl Inner {
             Pace::None
         };
         if let Some(item) = finished {
-            self.extensions
-                .emit(extensions::Event::ItemFinished(ItemFinished {
-                    item_id: item.id,
-                    url: item.url,
-                    kind: item.kind,
-                    label: item.label,
-                    status: item.status,
-                    error: item.error,
-                    downloaded: item.downloaded,
-                    skipped: item.skipped,
-                    failed: u32::try_from(item.failures.len()).unwrap_or(u32::MAX),
-                    folders: folders
-                        .iter()
-                        .map(|folder| folder.to_string_lossy().into_owned())
-                        .collect(),
-                }));
+            self.tell_finished(item, folders);
         }
         pace
+    }
+
+    /// Tells the extensions that an item ended.
+    fn tell_finished(&self, item: QueueItem, folders: &BTreeSet<PathBuf>) {
+        self.extensions
+            .emit(extensions::Event::ItemFinished(ItemFinished {
+                item_id: item.id,
+                url: item.url,
+                kind: item.kind,
+                label: item.label,
+                status: item.status,
+                error: item.error,
+                downloaded: item.downloaded,
+                skipped: item.skipped,
+                failed: u32::try_from(item.failures.len()).unwrap_or(u32::MAX),
+                folders: folders
+                    .iter()
+                    .map(|folder| folder.to_string_lossy().into_owned())
+                    .collect(),
+            }));
     }
 
     /// Whether the worker has to leave the queue alone: it stops, or it is told to.
     fn must_stop(&self) -> bool {
         self.shutdown.is_cancelled()
-            || self.halted.load(Ordering::SeqCst)
+            || self.halted().is_some()
             || self.paused.load(Ordering::SeqCst)
             || !self.client.is_signed_in()
     }
@@ -357,8 +368,8 @@ impl Inner {
 
     /// Why the worker has to stop going through the queue, if it has to.
     pub(super) fn stop_reason(&self) -> Option<Halt> {
-        if self.halted.load(Ordering::SeqCst) {
-            Some(Halt::StorageFull)
+        if let Some(halt) = self.halted() {
+            Some(halt)
         } else if self.paused.load(Ordering::SeqCst) {
             Some(Halt::Paused)
         } else if !self.client.is_signed_in() && locked(&self.state).queue.has_pending() {
@@ -370,8 +381,10 @@ impl Inner {
 
     /// The queue stops: what is waiting stays so, and the interface says why.
     pub(super) fn announce_halt(&self, halt: Halt) {
-        if halt == Halt::StorageFull {
-            self.tell_halted(HaltReason::StorageFull);
+        match halt {
+            Halt::StorageFull => self.tell_halted(HaltReason::StorageFull),
+            Halt::SubscriptionLapsed => self.tell_halted(HaltReason::SubscriptionLapsed),
+            Halt::SignedOut | Halt::Paused => {}
         }
         {
             let mut state = locked(&self.state);

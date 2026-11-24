@@ -55,6 +55,10 @@ pub enum JobError {
         "{0} of its albums could not be downloaded (the log names them): retry to get only those"
     )]
     Incomplete(u32),
+    /// Several tracks in a row were refused and none written: the account can no longer download,
+    /// and the item waits, like the queue, until someone has dealt with it.
+    #[error("the Qobuz subscription seems to have ended")]
+    SubscriptionLapsed,
     /// The disk is full (or over its quota, or read-only): nothing more can be written.
     #[error("the disk cannot take any more files: {0}")]
     StorageFull(String),
@@ -78,6 +82,7 @@ impl From<TrackError> for JobError {
     fn from(error: TrackError) -> Self {
         match error {
             TrackError::Cancelled => Self::Cancelled,
+            TrackError::SubscriptionLapsed => Self::SubscriptionLapsed,
             TrackError::Api(api) if api.is_session_gone() => Self::SessionExpired,
             TrackError::Api(api) if api.is_rate_limited() => Self::RateLimited,
             TrackError::Api(api) if api.is_unreachable() => Self::Unreachable(api.to_string()),
