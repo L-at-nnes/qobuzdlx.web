@@ -19,7 +19,7 @@ use super::report::{Outcome, Reporter, StepTrack};
 use super::track::{Context, Environment, TrackError};
 use crate::extensions::TrackSaved;
 use crate::naming::Namer;
-use crate::qobuz::{self, Album, Playlist, Track};
+use crate::qobuz::{self, Album, Playlist, Subscription, Track};
 use crate::settings::{ArtworkSize, Settings};
 
 /// How many albums are remembered. The point is to catch neighbours (a playlist often draws several
@@ -240,6 +240,12 @@ impl Job {
         let Some(duration) = self.reporter.break_due() else {
             return Ok(());
         };
+        // A break is the moment to ask whether the account still can download: one request that
+        // saves the next few albums from being asked for in vain
+        if self.env.client.subscription().await == Subscription::Lapsed {
+            self.log(LogEvent::SubscriptionLapsed);
+            return Err(JobError::SubscriptionLapsed);
+        }
         self.reporter.resting(Some(duration));
         let result = self.wait(duration).await;
         self.reporter.resting(None);

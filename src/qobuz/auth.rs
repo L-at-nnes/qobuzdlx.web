@@ -5,7 +5,9 @@ use std::time::Duration;
 use reqwest::StatusCode;
 
 use super::client::Auth;
-use super::{Account, AppCredentials, Client, Error, LoginResponse, Result, Session, UserInfo};
+use super::{
+    Account, AppCredentials, Client, Error, LoginResponse, Result, Session, Subscription, UserInfo,
+};
 
 /// How long a saved session is given to prove it is still valid before it is assumed to be.
 const VERIFY_TIMEOUT: Duration = Duration::from_secs(10);
@@ -88,6 +90,21 @@ impl Client {
                 SessionCheck::Rejected
             }
             Ok(Err(_)) | Err(_) => SessionCheck::Unreachable,
+        }
+    }
+
+    /// Asks Qobuz what the subscription of the signed-in account is now, with a single request.
+    ///
+    /// [`Subscription::Unknown`] when nobody is signed in, when Qobuz cannot be asked or does not say:
+    /// a refused session is left for the next call that needs it to find out and announce.
+    pub async fn subscription(&self) -> Subscription {
+        let Some(session) = self.session() else {
+            return Subscription::Unknown;
+        };
+        let check = self.fetch_user(&session.app.app_id, &session.user_auth_token);
+        match tokio::time::timeout(VERIFY_TIMEOUT, check).await {
+            Ok(Ok(user)) => user.subscription(),
+            Ok(Err(_)) | Err(_) => Subscription::Unknown,
         }
     }
 

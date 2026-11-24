@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use common::{FakeServer, Reply};
 use qobuzdlx::qobuz::{
     Account, AppCredentials, Client, Error, FavoriteKind, Session, SessionCheck, SessionEvent,
+    Subscription,
 };
 use serde_json::json;
 
@@ -436,6 +437,34 @@ async fn a_saved_session_is_valid_rejected_or_unreachable() {
         client.verify_session(&session()).await,
         SessionCheck::Unreachable
     );
+}
+
+#[tokio::test]
+async fn the_subscription_is_only_called_lapsed_when_qobuz_says_so() {
+    let server = FakeServer::start().await;
+    let client = server.client();
+    // Nobody is signed in: nothing is asked
+    assert_eq!(client.subscription().await, Subscription::Unknown);
+    assert_eq!(server.count("/api/user/get"), 0);
+    client.start_session(session());
+
+    let answer = |lossless: bool, hires: bool| {
+        json!({ "id": 3, "credential": { "parameters": {
+            "lossless_streaming": lossless, "hires_streaming": hires
+        } } })
+    };
+    server.on_json("/api/user/get", answer(true, true));
+    assert_eq!(client.subscription().await, Subscription::Active);
+
+    server.on_json("/api/user/get", answer(false, false));
+    assert_eq!(client.subscription().await, Subscription::Lapsed);
+
+    // A failure to ask says nothing about the account, and is no reason to announce a refusal
+    server.on("/api/user/get", |_| Reply::error(500, "boom"));
+    assert_eq!(client.subscription().await, Subscription::Unknown);
+    server.on("/api/user/get", |_| Reply::error(401, "expired"));
+    assert_eq!(client.subscription().await, Subscription::Unknown);
+    assert!(client.is_signed_in());
 }
 
 // ─── App credentials ───

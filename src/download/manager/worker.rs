@@ -12,6 +12,7 @@ use crate::download::log::LogEvent;
 use crate::download::progress::{Halt, Progress, Wait, WaitReason};
 use crate::download::report::{Outcome, Reporter};
 use crate::extensions::{self, HaltReason, ItemFinished};
+use crate::qobuz::Subscription;
 use crate::settings::LogDetail;
 
 /// What the worker does between an item and the next, as the end of the item decides it.
@@ -47,6 +48,7 @@ pub(super) async fn run(inner: Arc<Inner>) {
         while !inner.shutdown.is_cancelled()
             && inner.client.is_signed_in()
             && !inner.paused.load(Ordering::SeqCst)
+            && inner.halted().is_none()
         {
             let Some(item) = inner.take_next() else {
                 break;
@@ -290,6 +292,12 @@ impl Inner {
                     return;
                 }
                 if let Some(duration) = self.break_due() {
+                    // A break is the moment to ask whether the account still can download
+                    if self.client.subscription().await == Subscription::Lapsed {
+                        self.log(LogEvent::SubscriptionLapsed);
+                        self.halt(Halt::SubscriptionLapsed);
+                        return;
+                    }
                     (WaitReason::Break, duration, None)
                 } else if wrote {
                     (

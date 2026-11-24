@@ -361,10 +361,43 @@ pub struct Credential {
 pub struct CredentialParameters {
     #[serde(default)]
     pub short_label: Option<String>,
-    #[serde(default, deserialize_with = "or_default")]
-    pub lossless_streaming: bool,
-    #[serde(default, deserialize_with = "or_default")]
-    pub hires_streaming: bool,
+    /// `None` when Qobuz does not say, which is not the same as no.
+    #[serde(default)]
+    pub lossless_streaming: Option<bool>,
+    #[serde(default)]
+    pub hires_streaming: Option<bool>,
+}
+
+/// What Qobuz says of the subscription of an account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Subscription {
+    /// Qobuz says the account can stream in lossless or better.
+    Active,
+    /// Qobuz says, in as many words, that the account can stream neither lossless nor hi-res: a free
+    /// account, or one whose subscription ended.
+    Lapsed,
+    /// Qobuz did not say, or could not be asked. Never a reason to stop anything: the answer has
+    /// never been seen for an account that went back to free, so only a clear "no" counts.
+    Unknown,
+}
+
+impl UserInfo {
+    /// The subscription of the account, as Qobuz states it.
+    #[must_use]
+    pub fn subscription(&self) -> Subscription {
+        let Some(parameters) = self
+            .credential
+            .as_ref()
+            .and_then(|credential| credential.parameters.as_ref())
+        else {
+            return Subscription::Unknown;
+        };
+        match (parameters.lossless_streaming, parameters.hires_streaming) {
+            (Some(false), Some(false)) => Subscription::Lapsed,
+            (Some(true), _) | (_, Some(true)) => Subscription::Active,
+            _ => Subscription::Unknown,
+        }
+    }
 }
 
 /// `user/login`.
@@ -594,7 +627,43 @@ mod tests {
         assert_eq!(login.user_auth_token.as_deref(), Some("secret-token"));
         let user = login.user.unwrap();
         assert_eq!(user.display_name.as_deref(), Some("me"));
-        assert!(user.credential.unwrap().parameters.unwrap().hires_streaming);
+        assert_eq!(
+            user.credential.unwrap().parameters.unwrap().hires_streaming,
+            Some(true)
+        );
+    }
+
+    fn subscription_of(credential: &serde_json::Value) -> Subscription {
+        let user: UserInfo =
+            serde_json::from_value(json!({ "id": 7, "credential": credential })).unwrap();
+        user.subscription()
+    }
+
+    #[test]
+    fn only_a_clear_no_to_streaming_is_a_lapsed_subscription() {
+        let streaming = |lossless: serde_json::Value, hires: serde_json::Value| {
+            subscription_of(
+                &json!({ "parameters": { "lossless_streaming": lossless, "hires_streaming": hires } }),
+            )
+        };
+
+        assert_eq!(streaming(json!(false), json!(false)), Subscription::Lapsed);
+        assert_eq!(streaming(json!(true), json!(false)), Subscription::Active);
+        assert_eq!(streaming(json!(true), json!(true)), Subscription::Active);
+        assert_eq!(streaming(json!(false), json!(true)), Subscription::Active);
+        // What is not said is not a no
+        assert_eq!(streaming(json!(false), json!(null)), Subscription::Unknown);
+        assert_eq!(
+            subscription_of(&json!({ "parameters": {} })),
+            Subscription::Unknown
+        );
+        assert_eq!(
+            subscription_of(&json!({ "parameters": null })),
+            Subscription::Unknown
+        );
+        assert_eq!(subscription_of(&json!({})), Subscription::Unknown);
+        assert_eq!(subscription_of(&json!(null)), Subscription::Unknown);
+        assert_eq!(UserInfo::default().subscription(), Subscription::Unknown);
     }
 
     #[test]

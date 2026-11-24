@@ -1118,6 +1118,111 @@ async fn a_long_break_is_taken_between_two_albums_of_the_same_artist() {
     assert_eq!(finished(&manager, url).await, ItemStatus::Completed);
 }
 
+fn subscription_answer(rig: &Rig, lossless: bool, hires: bool) {
+    rig.catalogue.server.on_json(
+        "/api/user/get",
+        json!({
+            "id": 7,
+            "credential": { "parameters": { "lossless_streaming": lossless, "hires_streaming": hires } }
+        }),
+    );
+}
+
+#[tokio::test]
+async fn the_account_is_checked_at_a_long_break_and_a_lapsed_one_stops_the_queue() {
+    let rig = Rig::new().await;
+    for id in ["one", "two", "three"] {
+        rig.catalogue
+            .add_album(id, id, "Artist", &[(u64::from(id.as_bytes()[0]), 1, "A")]);
+    }
+    subscription_answer(&rig, false, false);
+    pace(&rig, |limits| {
+        limits.break_after_albums = 1;
+        limits.break_length = Delay::new(600, 600);
+    });
+    let manager = rig.start();
+    for id in ["one", "two", "three"] {
+        manager.enqueue(&album_url(id), Display::default()).unwrap();
+    }
+
+    eventually("the queue to stop", || {
+        manager.progress().halt == Some(Halt::SubscriptionLapsed)
+    })
+    .await;
+    // The break was due after the first album: the second never started
+    assert_eq!(
+        status_of(&manager, &album_url("one")),
+        Some(ItemStatus::Completed)
+    );
+    for id in ["two", "three"] {
+        assert_eq!(
+            status_of(&manager, &album_url(id)),
+            Some(ItemStatus::Pending),
+            "{id}"
+        );
+    }
+    assert_eq!(rig.catalogue.server.count("/api/user/get"), 1);
+    assert_eq!(rig.catalogue.server.count("/api/album/get"), 1);
+}
+
+#[tokio::test]
+async fn a_lapsed_account_is_found_in_the_break_inside_an_item_too() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("a1", "First", "Artist", &[(51, 1, "A")]);
+    rig.catalogue
+        .add_album("a2", "Second", "Artist", &[(52, 1, "B")]);
+    rig.catalogue.artists.lock().unwrap().insert(
+        7,
+        json!({ "id": 7, "name": "Artist", "albums": page(vec![json!({"id": "a1", "title": "First", "artist": {"id": 7}}), json!({"id": "a2", "title": "Second", "artist": {"id": 7}})]) }),
+    );
+    subscription_answer(&rig, false, false);
+    pace(&rig, |limits| {
+        limits.break_after_albums = 1;
+        limits.break_length = Delay::new(600, 600);
+    });
+    let manager = rig.start();
+    let url = "https://play.qobuz.com/artist/7";
+    manager.enqueue(url, Display::default()).unwrap();
+
+    eventually("the queue to stop", || {
+        manager.progress().halt == Some(Halt::SubscriptionLapsed)
+    })
+    .await;
+    // The item waits again, from the start, and nothing about it failed
+    let item = item_of(&manager, url);
+    assert_eq!(item.status, ItemStatus::Pending);
+    assert_eq!(item.error, None);
+}
+
+#[tokio::test]
+async fn an_account_that_qobuz_does_not_describe_never_stops_the_queue() {
+    let rig = Rig::new().await;
+    for id in ["one", "two"] {
+        rig.catalogue
+            .add_album(id, id, "Artist", &[(u64::from(id.as_bytes()[0]), 1, "A")]);
+    }
+    // No credential at all, as a test server that knows nothing of plans answers
+    rig.catalogue
+        .server
+        .on_json("/api/user/get", json!({ "id": 7 }));
+    pace(&rig, |limits| {
+        limits.break_after_albums = 1;
+        limits.break_length = Delay::new(20, 20);
+    });
+    let manager = rig.start();
+    for id in ["one", "two"] {
+        manager.enqueue(&album_url(id), Display::default()).unwrap();
+    }
+
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(manager.progress().halt, None);
+    assert!(rig.catalogue.server.count("/api/user/get") >= 1);
+}
+
 #[tokio::test]
 async fn an_album_that_found_everything_in_place_only_waits_the_shortest_time() {
     let rig = Rig::new().await;
