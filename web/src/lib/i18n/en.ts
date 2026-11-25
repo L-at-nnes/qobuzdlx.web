@@ -182,6 +182,8 @@ export const en = {
 		'Signed out of Qobuz. Nothing failed: the queue is kept and goes on by itself when you sign in again, with this account or another one.',
 	'downloads.halted.subscription_lapsed':
 		'The queue stopped: Qobuz no longer gives complete files to this account, which usually means the subscription ended (a free account only gets 30 second previews). Nothing failed and what is waiting is kept. Sign in with another account and it goes on by itself, or press Go on once the subscription is back.',
+	'downloads.halted.blocked':
+		'The queue stopped: Qobuz refuses the requests of this network, which is what a VPN or a server in a datacenter gets. Waiting would not change it. Nothing failed and what is waiting is kept. Change the network (or turn the VPN off), then go on.',
 	'downloads.halted.paused': 'The queue is paused. What is waiting is kept.',
 	'downloads.resume': 'Go on',
 	'downloads.pause': 'Pause the queue',

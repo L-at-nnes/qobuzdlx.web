@@ -481,6 +481,20 @@ impl RateLimit {
         let wait = u64::from(base) << doublings;
         Duration::from_millis(wait.min(u64::from(Delay::LIMIT_MS)))
     }
+
+    /// The longest wait after Qobuz could not be reached.
+    pub const OUTAGE_MAX: Duration = Duration::from_secs(600);
+
+    /// How long to wait after Qobuz could not be reached for the `outages`-th time in a row (from 1):
+    /// a sixth of the cooldown (10 s by default), doubled each time, ten minutes at most. A network
+    /// that blinks is not Qobuz asking to slow down, and is not waited for as long; the two are
+    /// counted apart, so that one does not lengthen the other.
+    #[must_use]
+    pub fn outage_wait(&self, outages: u32) -> Duration {
+        let doublings = outages.saturating_sub(1).min(Self::COOLDOWN_DOUBLINGS);
+        let base = u64::from(self.cooldown_ms.max(Self::COOLDOWN_MIN_MS)) / 6;
+        Duration::from_millis(base << doublings).min(Self::OUTAGE_MAX)
+    }
 }
 
 impl Default for RateLimit {
@@ -523,6 +537,25 @@ mod tests {
         assert_eq!(advanced.parallel(), 1);
         advanced.parallel_tracks = 200;
         assert_eq!(advanced.parallel(), 6);
+    }
+
+    #[test]
+    fn a_network_outage_is_waited_for_less_than_a_cooldown_and_is_capped() {
+        let limits = RateLimit::default();
+
+        // A sixth of the 60 s cooldown, doubled each time, ten minutes at most
+        assert_eq!(limits.outage_wait(1), Duration::from_secs(10));
+        assert_eq!(limits.outage_wait(2), Duration::from_secs(20));
+        assert_eq!(limits.outage_wait(3), Duration::from_secs(40));
+        assert_eq!(limits.outage_wait(7), RateLimit::OUTAGE_MAX);
+        assert_eq!(limits.outage_wait(1000), RateLimit::OUTAGE_MAX);
+        assert!(limits.outage_wait(1) < limits.cooldown(1));
+        // A cooldown set very short does not make the wait vanish
+        let hasty = RateLimit {
+            cooldown_ms: RateLimit::COOLDOWN_MIN_MS,
+            ..limits
+        };
+        assert!(hasty.outage_wait(1) > Duration::ZERO);
     }
 
     #[test]

@@ -38,7 +38,11 @@ pub enum JobError {
     /// Qobuz keeps answering "too many requests": the item waits and is tried again after a pause.
     #[error("Qobuz asked to slow down")]
     RateLimited,
-    /// Qobuz could not be asked: the network is down, or its edge refuses this address. Nothing
+    /// What stands in front of Qobuz refuses the requests of this network (a VPN, a hosted server).
+    /// Waiting does not change it: the queue stops until the network does.
+    #[error("{0}")]
+    Blocked(String),
+    /// Qobuz could not be asked: the network is down, or a gateway answers in its place. Nothing
     /// about the item failed, and every item after it would meet the same wall: it waits.
     #[error("{0}")]
     Unreachable(String),
@@ -70,6 +74,8 @@ impl From<qobuz::Error> for JobError {
             Self::SessionExpired
         } else if error.is_rate_limited() {
             Self::RateLimited
+        } else if error.is_blocked() {
+            Self::Blocked(error.to_string())
         } else if error.is_unreachable() {
             Self::Unreachable(error.to_string())
         } else {
@@ -85,6 +91,7 @@ impl From<TrackError> for JobError {
             TrackError::SubscriptionLapsed => Self::SubscriptionLapsed,
             TrackError::Api(api) if api.is_session_gone() => Self::SessionExpired,
             TrackError::Api(api) if api.is_rate_limited() => Self::RateLimited,
+            TrackError::Api(api) if api.is_blocked() => Self::Blocked(api.to_string()),
             TrackError::Api(api) if api.is_unreachable() => Self::Unreachable(api.to_string()),
             full if full.is_storage_full() => Self::StorageFull(full.to_string()),
             other => Self::Track(other),

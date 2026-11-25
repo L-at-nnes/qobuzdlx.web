@@ -1302,14 +1302,14 @@ async fn when_qobuz_cannot_be_reached_nothing_is_failed_and_the_queue_waits() {
     rig.catalogue
         .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
     pace(&rig, |limits| limits.cooldown_ms = 300);
-    // The edge in front of Qobuz refuses this network twice, then lets it through
+    // The gateway in front of Qobuz fails for the three attempts of the client, then answers
     let refused = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let albums = rig.catalogue.albums.clone();
     rig.catalogue.server.on("/api/album/get", {
         let refused = refused.clone();
         move |call| {
-            if refused.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 2 {
-                return Reply::text("<HTML><TITLE>Access Denied</TITLE></HTML>").with_status(403);
+            if refused.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < 3 {
+                return Reply::status(502);
             }
             let key = call.param("album_id").to_owned();
             Reply::json(albums.lock().unwrap().get(&key).unwrap().clone())
@@ -1340,6 +1340,69 @@ async fn when_qobuz_cannot_be_reached_nothing_is_failed_and_the_queue_waits() {
             .any(|line| matches!(line.event, LogEvent::QobuzUnreachable { .. }))
     );
 
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(
+        finished(&manager, &album_url("two")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn a_network_that_qobuz_refuses_stops_the_queue_instead_of_waiting_for_it() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    rig.catalogue
+        .add_album("two", "Second", "Artist", &[(22, 1, "B")]);
+    let blocked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let albums = rig.catalogue.albums.clone();
+    rig.catalogue.server.on("/api/album/get", {
+        let blocked = blocked.clone();
+        move |call| {
+            if blocked.load(std::sync::atomic::Ordering::SeqCst) {
+                return Reply::text("<HTML><TITLE>Access Denied</TITLE></HTML>").with_status(403);
+            }
+            let key = call.param("album_id").to_owned();
+            Reply::json(albums.lock().unwrap().get(&key).unwrap().clone())
+        }
+    });
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let extensions = Extensions::start(vec![std::sync::Arc::new(Recorder(told.clone()))], vec![]);
+    let manager = rig.start_with(extensions);
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    manager
+        .enqueue(&album_url("two"), Display::default())
+        .unwrap();
+
+    eventually("the queue to stop", || {
+        manager.progress().halt == Some(Halt::Blocked)
+    })
+    .await;
+    for url in [album_url("one"), album_url("two")] {
+        let item = item_of(&manager, &url);
+        assert_eq!(item.status, ItemStatus::Pending, "{url}");
+        assert_eq!(item.error, None, "{url}");
+    }
+    assert_eq!(
+        waiting_for(&manager),
+        None,
+        "it is not waiting to try again"
+    );
+    eventually("the extensions to be told", || {
+        !halts_told(&told).is_empty()
+    })
+    .await;
+    assert_eq!(halts_told(&told), [HaltReason::Blocked]);
+
+    // Another network: the queue goes on
+    blocked.store(false, std::sync::atomic::Ordering::SeqCst);
+    manager.resume();
     assert_eq!(
         finished(&manager, &album_url("one")).await,
         ItemStatus::Completed

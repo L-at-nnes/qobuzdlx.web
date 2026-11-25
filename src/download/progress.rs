@@ -126,7 +126,7 @@ pub enum WaitReason {
     Break,
     /// Qobuz asked to slow down.
     RateLimited,
-    /// Qobuz could not be reached: the network is down, or its edge refuses this address.
+    /// Qobuz could not be reached: the network is down, or a gateway answers in its place.
     Unreachable,
 }
 
@@ -142,6 +142,8 @@ pub enum Halt {
     Paused,
     /// Qobuz refused the files of several tracks in a row: the subscription seems to have ended.
     SubscriptionLapsed,
+    /// Qobuz refuses the requests of this network (a VPN, a hosted server): waiting will not help.
+    Blocked,
 }
 
 #[cfg(test)]

@@ -160,10 +160,10 @@ impl Inner {
                 cooldown = true;
                 None
             }
-            // The network is down or Qobuz refuses this address: the item keeps its place, and so do
+            // The network is down or a gateway fails: the item keeps its place, and so do
             // those after it, which would all end the same way
             Err(JobError::Unreachable(reason)) => {
-                self.strikes.fetch_add(1, Ordering::SeqCst);
+                self.outages.fetch_add(1, Ordering::SeqCst);
                 unreachable = Some(reason);
                 None
             }
@@ -172,6 +172,12 @@ impl Inner {
             Err(JobError::Cancelled) => {
                 self.log_at(LogEvent::Aborted, detail);
                 Some((ItemStatus::Cancelled, None))
+            }
+            // Waiting does not change that: the queue stops, and says so to those who are not looking
+            Err(JobError::Blocked(reason)) => {
+                self.halt(Halt::Blocked);
+                self.log_at(LogEvent::Error { message: reason }, detail);
+                None
             }
             // Several tracks in a row refused: the account cannot download. The item waits, nothing
             // failed, and the queue stops until the account changes or the user goes on
@@ -224,6 +230,7 @@ impl Inner {
             .is_some_and(|item| item.status == ItemStatus::Completed)
         {
             self.strikes.store(0, Ordering::SeqCst);
+            self.outages.store(0, Ordering::SeqCst);
         }
         let pace = if cooldown {
             Pace::Cooldown
@@ -271,8 +278,8 @@ impl Inner {
     }
 
     /// The wait between an item and the next one: a pause between albums, a long break every so
-    /// many, or the cooldown after Qobuz asked to slow down or could not be reached. That last wait
-    /// doubles each time it happens again, like the cooldown it shares its length with.
+    /// many, the cooldown after Qobuz asked to slow down, or the shorter wait after it could not be
+    /// reached. Both double each time they happen again.
     async fn rest(&self, pace: Pace) {
         let limits = self.settings.get().rate_limit;
         let (reason, duration, unreachable) = match pace {
@@ -284,7 +291,7 @@ impl Inner {
             ),
             Pace::Unreachable { reason } => (
                 WaitReason::Unreachable,
-                limits.cooldown(self.strikes.load(Ordering::SeqCst)),
+                limits.outage_wait(self.outages.load(Ordering::SeqCst)),
                 Some(reason),
             ),
             Pace::Spaced { wrote } => {
@@ -392,6 +399,7 @@ impl Inner {
         match halt {
             Halt::StorageFull => self.tell_halted(HaltReason::StorageFull),
             Halt::SubscriptionLapsed => self.tell_halted(HaltReason::SubscriptionLapsed),
+            Halt::Blocked => self.tell_halted(HaltReason::Blocked),
             Halt::SignedOut | Halt::Paused => {}
         }
         {

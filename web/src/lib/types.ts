@@ -175,7 +175,7 @@ export interface Progress {
 	/** The tracks being downloaded, by position: an album downloads several at once. */
 	tracks: TrackProgress[];
 	/** Why the queue stopped by itself, when it did. */
-	halt: 'storage_full' | 'signed_out' | 'paused' | 'subscription_lapsed' | null;
+	halt: 'storage_full' | 'signed_out' | 'paused' | 'subscription_lapsed' | 'blocked' | null;
 	/** The queue holds back on purpose, until the given Unix time in seconds. */
 	wait: {
 		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable';

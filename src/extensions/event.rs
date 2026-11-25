@@ -81,6 +81,8 @@ pub enum HaltReason {
     StorageFull,
     /// Qobuz refused the files of several tracks in a row: the subscription seems to have ended.
     SubscriptionLapsed,
+    /// Qobuz refuses the requests of this network (a VPN, a hosted server).
+    Blocked,
 }
 
 /// Something that happened in the application.

@@ -137,6 +137,8 @@ pub(super) struct Inner {
     pub(super) stir: Notify,
     /// How many times in a row Qobuz asked to slow down, with no item going well in between.
     pub(super) strikes: AtomicU32,
+    /// How many times in a row Qobuz could not be reached, with no item going well in between.
+    pub(super) outages: AtomicU32,
     /// What was fetched since the last long break.
     quota: Mutex<quota::Quota>,
     /// The interface was told the session expired, and has not been given a new one since.
@@ -204,6 +206,7 @@ impl Manager {
                 interrupt: AtomicBool::new(false),
                 stir: Notify::new(),
                 strikes: AtomicU32::new(0),
+                outages: AtomicU32::new(0),
                 quota: Mutex::default(),
                 expiry_announced: AtomicBool::new(false),
             }),

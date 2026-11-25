@@ -186,6 +186,8 @@ export const fr: Record<Key, Message> = {
 		"Déconnecté de Qobuz. Rien n'a échoué : la file est conservée et repart toute seule quand vous vous reconnectez, avec ce compte ou un autre.",
 	'downloads.halted.subscription_lapsed':
 		"La file s'est arrêtée : Qobuz ne donne plus de fichiers complets à ce compte, ce qui veut en général dire que l'abonnement est terminé (un compte gratuit n'a que des extraits de 30 secondes). Rien n'a échoué et ce qui attend est conservé. Connectez-vous avec un autre compte et elle repart toute seule, ou appuyez sur Reprendre quand l'abonnement est de retour.",
+	'downloads.halted.blocked':
+		"La file s'est arrêtée : Qobuz refuse les requêtes de ce réseau, ce que reçoivent un VPN ou un serveur d'hébergement. Attendre n'y changerait rien. Rien n'a échoué et ce qui attend est conservé. Changez de réseau (ou coupez le VPN), puis reprenez.",
 	'downloads.halted.paused': 'La file est en pause. Ce qui attend est conservé.',
 	'downloads.resume': 'Reprendre',
 	'downloads.pause': 'Mettre la file en pause',
