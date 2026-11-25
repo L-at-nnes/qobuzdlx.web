@@ -1,10 +1,11 @@
 name: Docker image
 
-# Checks the code, then builds the image for x86 and ARM and publishes it to GitHub's container
-# registry:
+# Checks the code on every push. An image is built, for x86 and ARM, and published to GitHub's
+# container registry only for a version tag (v1.2.3):
 #   ghcr.io/l-at-nnes/qobuzdlx.web
-# Nothing is published from code that does not pass its own checks. Each architecture is built on a
-# machine of its own kind, which is far faster than emulating one.
+# so that a release is built once, and 1.2.3, 1.2 and latest are the same image. A push to main is
+# checked and nothing more. Nothing is published from code that does not pass its own checks. Each
+# architecture is built on a machine of its own kind, which is far faster than emulating one.
 on:
   push:
     branches: [main]
@@ -66,6 +67,7 @@ jobs:
   build:
     name: Build ${{ matrix.arch }}
     needs: checks
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -120,6 +122,7 @@ jobs:
     name: Publish the tags
     runs-on: ubuntu-24.04
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Name the image
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
@@ -138,14 +141,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # latest follows main; a tag v1.2.3 gives 1.2.3 and 1.2; every build is also kept by its commit
+      # A tag v1.2.3 gives 1.2.3, 1.2 and latest (not for a pre-release such as v1.2.3-rc1); every
+      # build is also kept by its commit. A manual run gives the commit alone
       - name: Work out the tags
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
+          flavor: latest=auto
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=

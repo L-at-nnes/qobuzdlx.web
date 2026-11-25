@@ -72,7 +72,7 @@ sudo docker compose up -d
 
 Then open `http://<your server>:8080` and sign in to Qobuz. The settings, the session and the queue live in a Docker volume and survive an update. To update, `git pull`, then run the same two `docker compose` commands.
 
-The image is `ghcr.io/l-at-nnes/qobuzdlx.web`. `latest` follows the main branch, a version tag gives `1.2.3` and `1.2`, and each build is also kept under its short commit hash. If `docker compose pull` is refused, the package is still private: on GitHub, open the package, then Package settings, then Change visibility, then Public (or run `docker login ghcr.io` on the server).
+The image is `ghcr.io/l-at-nnes/qobuzdlx.web`. An image is built when a version tag is pushed, once: `v1.2.3` gives `1.2.3`, `1.2` and `latest`, which are the same image (a pre-release such as `v1.2.3-rc1` gives `1.2.3-rc1` only). A push to the main branch is checked, not published, so `latest` is the last release, not the last commit; every image is also kept under its short commit hash. If `docker compose pull` is refused, the package is still private: on GitHub, open the package, then Package settings, then Change visibility, then Public (or run `docker login ghcr.io` on the server).
 
 To build the image on the server from the source instead, run `sudo docker compose up -d --build`. The first time it compiles for 10 to 40 minutes depending on the machine.
 
