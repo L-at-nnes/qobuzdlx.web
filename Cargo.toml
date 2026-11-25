@@ -1,6 +1,6 @@
 [package]
 name = "qobuzdlx"
-version = "2.0.0-dev"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.88"
 description = "A self-hosted web application for downloading music from Qobuz"
