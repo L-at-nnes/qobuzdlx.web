@@ -334,4 +334,15 @@ mod tests {
         assert_eq!(mime_of("x.css"), "text/css");
         assert_eq!(mime_of("x.woff2"), "font/woff2");
     }
+
+    #[test]
+    fn the_icons_are_images() {
+        assert_eq!(mime_of("icon-192.png"), "image/png");
+        assert_eq!(mime_of("favicon.svg"), "image/svg+xml");
+        assert!(
+            mime_of("favicon.ico").starts_with("image/"),
+            "{}",
+            mime_of("favicon.ico")
+        );
+    }
 }
