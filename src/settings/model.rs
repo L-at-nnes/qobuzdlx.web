@@ -429,6 +429,9 @@ pub struct RateLimit {
     /// The most that is received per second, all the tracks downloading at once together, in
     /// megabytes (a million bytes). `0`: no limit.
     pub max_speed_mb: u32,
+    /// The most that is written in any 24 hours, in gigabytes (a billion bytes). When it is reached
+    /// the queue waits until enough of the day has gone by, and goes on by itself. `0`: no limit.
+    pub daily_limit_gb: u32,
 }
 
 impl RateLimit {
@@ -440,6 +443,8 @@ impl RateLimit {
     pub const COOLDOWN_DOUBLINGS: u32 = 6;
     /// The highest speed limit that may be set, in megabytes per second.
     pub const SPEED_LIMIT_MAX_MB: u32 = 10_000;
+    /// The highest daily limit that may be set, in gigabytes.
+    pub const DAILY_LIMIT_MAX_GB: u32 = 100_000;
 
     /// No wait anywhere but after Qobuz asked for one, for programs that talk to a server of their
     /// own.
@@ -454,6 +459,7 @@ impl RateLimit {
             break_length: Delay::NONE,
             cooldown_ms: 1000,
             max_speed_mb: 0,
+            daily_limit_gb: 0,
         }
     }
 
@@ -472,6 +478,7 @@ impl RateLimit {
             && self.cooldown_ms >= Self::COOLDOWN_MIN_MS
             && self.cooldown_ms <= Delay::LIMIT_MS
             && self.max_speed_mb <= Self::SPEED_LIMIT_MAX_MB
+            && self.daily_limit_gb <= Self::DAILY_LIMIT_MAX_GB
     }
 
     /// How long to wait after Qobuz said "too many requests" for the `strikes`-th time in a row
@@ -493,6 +500,12 @@ impl RateLimit {
     #[must_use]
     pub fn max_speed(&self) -> u64 {
         u64::from(self.max_speed_mb.min(Self::SPEED_LIMIT_MAX_MB)) * 1_000_000
+    }
+
+    /// The daily limit in bytes, `0` when there is none.
+    #[must_use]
+    pub fn daily_limit(&self) -> u64 {
+        u64::from(self.daily_limit_gb.min(Self::DAILY_LIMIT_MAX_GB)) * 1_000_000_000
     }
 
     /// The longest wait after Qobuz could not be reached.
@@ -521,6 +534,7 @@ impl Default for RateLimit {
             break_length: Delay::new(120_000, 300_000),
             cooldown_ms: 60_000,
             max_speed_mb: 10,
+            daily_limit_gb: 50,
         }
     }
 }
@@ -557,6 +571,15 @@ mod tests {
     fn the_speed_is_limited_by_default_and_the_limit_is_in_megabytes() {
         assert_eq!(RateLimit::default().max_speed(), 10_000_000);
         assert_eq!(RateLimit::off().max_speed(), 0);
+        assert_eq!(RateLimit::default().daily_limit(), 50_000_000_000);
+        assert_eq!(RateLimit::off().daily_limit(), 0);
+        assert!(
+            !RateLimit {
+                daily_limit_gb: RateLimit::DAILY_LIMIT_MAX_GB + 1,
+                ..RateLimit::default()
+            }
+            .is_valid()
+        );
         let high = RateLimit {
             max_speed_mb: RateLimit::SPEED_LIMIT_MAX_MB + 1,
             ..RateLimit::default()

@@ -9,11 +9,14 @@ use super::{Inner, locked};
 use crate::download::item::{ItemStatus, QueueItem, now};
 use crate::download::job::{Job, JobError, JobSetup};
 use crate::download::log::LogEvent;
-use crate::download::progress::{Halt, Progress, Wait, WaitReason};
+use crate::download::progress::{Gate, Halt, Progress, Wait, WaitReason};
 use crate::download::report::{Outcome, Reporter};
 use crate::extensions::{self, HaltReason, ItemFinished};
 use crate::qobuz::Subscription;
 use crate::settings::LogDetail;
+
+/// How often a wait on a limit is looked at again, whatever its length.
+const GATE_RECHECK: Duration = Duration::from_secs(30);
 
 /// What the worker does between an item and the next, as the end of the item decides it.
 #[derive(Debug, Clone)]
@@ -50,6 +53,11 @@ pub(super) async fn run(inner: Arc<Inner>) {
             && !inner.paused.load(Ordering::SeqCst)
             && inner.halted().is_none()
         {
+            // Nothing is started while a limit holds the queue back
+            inner.pass_gate().await;
+            if inner.must_stop() {
+                break;
+            }
             let Some(item) = inner.take_next() else {
                 break;
             };
@@ -351,6 +359,7 @@ impl Inner {
                 seconds,
             },
             WaitReason::Break => LogEvent::BreakStarted { seconds },
+            WaitReason::DailyLimit => LogEvent::DailyLimitReached { seconds },
             WaitReason::BetweenAlbums => LogEvent::BetweenAlbums { seconds },
         });
         self.set_wait(Some(Wait {
@@ -363,6 +372,73 @@ impl Inner {
             () = tokio::time::sleep(duration) => {}
         }
         self.set_wait(None);
+    }
+
+    /// Why no file should be started now, if there is a reason: a limit that was reached.
+    pub(super) fn gate(&self) -> Option<Gate> {
+        let limits = self.settings.get().rate_limit;
+        locked(&self.budget)
+            .wait(now(), limits.daily_limit())
+            .map(|wait| Gate {
+                reason: WaitReason::DailyLimit,
+                wait,
+            })
+    }
+
+    /// Tells that the queue holds back for this reason, or that it no longer does. The log says it
+    /// once, when the reason starts, not each time the wait is looked at again.
+    pub(super) fn show_gate(&self, gate: Option<Gate>) {
+        let Some(gate) = gate else {
+            self.set_wait(None);
+            return;
+        };
+        let seconds = u64::try_from(gate.wait.as_millis().div_ceil(1000)).unwrap_or(u64::MAX);
+        let started = locked(&self.state)
+            .progress
+            .wait
+            .is_none_or(|wait| wait.reason != gate.reason);
+        if started {
+            self.log(match gate.reason {
+                WaitReason::DailyLimit => LogEvent::DailyLimitReached { seconds },
+                WaitReason::BetweenAlbums
+                | WaitReason::Break
+                | WaitReason::RateLimited
+                | WaitReason::Unreachable => return,
+            });
+        }
+        self.set_wait(Some(Wait {
+            reason: gate.reason,
+            until: now() + seconds,
+        }));
+    }
+
+    /// Waits for as long as a limit holds the queue back, looking again from time to time: the
+    /// limit may be changed meanwhile. Returns early when the queue is paused, signed out or
+    /// stopped, or has nothing waiting.
+    pub(super) async fn pass_gate(&self) {
+        let mut held = false;
+        loop {
+            // Listening starts before the checks, so that a pause between the two is not missed
+            let stirred = self.stir.notified();
+            tokio::pin!(stirred);
+            stirred.as_mut().enable();
+            if self.must_stop() || !locked(&self.state).queue.has_pending() {
+                break;
+            }
+            let Some(gate) = self.gate() else {
+                break;
+            };
+            held = true;
+            self.show_gate(Some(gate));
+            tokio::select! {
+                () = self.shutdown.cancelled() => break,
+                () = &mut stirred => {}
+                () = tokio::time::sleep(gate.wait.min(GATE_RECHECK)) => {}
+            }
+        }
+        if held {
+            self.show_gate(None);
+        }
     }
 
     /// Tells that the item in progress rests for a long break, or that it no longer does.

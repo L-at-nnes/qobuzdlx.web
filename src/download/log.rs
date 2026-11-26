@@ -102,6 +102,10 @@ pub enum LogEvent {
     BetweenAlbums {
         seconds: u64,
     },
+    /// The daily limit is reached: nothing is started until enough of the day has gone by.
+    DailyLimitReached {
+        seconds: u64,
+    },
     AlbumSkipped,
     AlbumNotStreamable,
     TrackNotStreamable {
@@ -282,6 +286,10 @@ impl fmt::Display for LogEvent {
             Self::BetweenAlbums { seconds } => {
                 write!(formatter, "Waiting {seconds} s before the next album.")
             }
+            Self::DailyLimitReached { seconds } => write!(
+                formatter,
+                "The daily limit is reached: waiting {seconds} s for enough of the day to go by."
+            ),
             Self::QueuePaused => write!(formatter, "Queue paused."),
             Self::QueueResumed => write!(formatter, "Queue resumed."),
             Self::AlbumSkipped => write!(formatter, "Album skipped."),

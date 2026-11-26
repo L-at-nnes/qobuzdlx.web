@@ -58,6 +58,14 @@ pub trait Reporter: Send + Sync {
     /// The item rests for this long (a long break), or no longer does.
     fn resting(&self, _break_for: Option<std::time::Duration>) {}
 
+    /// Why no file should be started now, if there is a reason: a limit that was reached.
+    fn gate(&self) -> Option<super::progress::Gate> {
+        None
+    }
+
+    /// The item holds back for this reason, or no longer does.
+    fn holding(&self, _gate: Option<super::progress::Gate>) {}
+
     /// What has been achieved so far.
     fn outcome(&self, outcome: &Outcome);
 }

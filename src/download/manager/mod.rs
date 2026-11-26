@@ -1,6 +1,7 @@
 //! The download queue as the rest of the application sees it: what can be asked, what is shown, and
 //! the worker that goes through the queue one item at a time.
 
+mod budget;
 mod quota;
 mod reporter;
 mod worker;
@@ -16,7 +17,7 @@ use tokio::sync::{Notify, broadcast};
 use tokio_util::sync::CancellationToken;
 
 use super::artwork::Covers;
-use super::item::{Display, QueueItem};
+use super::item::{Display, QueueItem, now};
 use super::lapse::Refusals;
 use super::log::{Log, LogEvent, LogLine};
 use super::progress::{Halt, Progress};
@@ -141,6 +142,8 @@ pub(super) struct Inner {
     pub(super) outages: AtomicU32,
     /// What was fetched since the last long break.
     quota: Mutex<quota::Quota>,
+    /// What was written in the last 24 hours, which the daily limit is measured against.
+    budget: Mutex<budget::Budget>,
     /// The interface was told the session expired, and has not been given a new one since.
     expiry_announced: AtomicBool,
 }
@@ -208,6 +211,7 @@ impl Manager {
                 strikes: AtomicU32::new(0),
                 outages: AtomicU32::new(0),
                 quota: Mutex::default(),
+                budget: Mutex::new(budget::Budget::load(&config.config_dir)),
                 expiry_announced: AtomicBool::new(false),
             }),
         };
@@ -581,6 +585,7 @@ impl Inner {
     /// A file was written: it counts toward the next long break.
     pub(super) fn count_saved(&self, album_id: &str, bytes: u64) {
         locked(&self.quota).saved(album_id, bytes);
+        locked(&self.budget).record(now(), bytes);
     }
 
     /// How long to rest if a condition of the long break is reached, which starts the count again.

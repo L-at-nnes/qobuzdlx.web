@@ -28,7 +28,9 @@ pub use lapse::Refusals;
 pub use list::{AddressList, parse_list};
 pub use log::{Log, LogEvent, LogLine};
 pub use manager::{Event, InvalidAddress, Manager, ManagerConfig, Snapshot};
-pub use progress::{AlbumCard, Halt, Progress, ProgressScope, TrackProgress, Wait, WaitReason};
+pub use progress::{
+    AlbumCard, Gate, Halt, Progress, ProgressScope, TrackProgress, Wait, WaitReason,
+};
 pub use queue::{Counts, Enqueued, EnqueuedCounts, Queue, Sample, UrlState, View, Window, Work};
 pub use report::{Outcome, Reporter, StepTrack};
 pub use store::QueueStore;

@@ -1223,6 +1223,170 @@ async fn an_account_that_qobuz_does_not_describe_never_stops_the_queue() {
     assert!(rig.catalogue.server.count("/api/user/get") >= 1);
 }
 
+// ─── The daily limit ───
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+/// What was downloaded earlier today, as the server found it in `usage.json` when it started.
+fn written_before(rig: &Rig, entries: &[(u64, u64)]) {
+    let entries: Vec<_> = entries
+        .iter()
+        .map(|(at, bytes)| json!({ "at": at, "bytes": bytes }))
+        .collect();
+    std::fs::write(
+        rig.config.path().join("usage.json"),
+        serde_json::to_string(&entries).unwrap(),
+    )
+    .unwrap();
+}
+
+const GIGABYTE: u64 = 1_000_000_000;
+
+#[tokio::test]
+async fn nothing_is_started_while_the_daily_limit_is_reached() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.daily_limit_gb = 50);
+    written_before(&rig, &[(unix_now() - 100, 60 * GIGABYTE)]);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the wait for the day to go by", || {
+        waiting_for(&manager) == Some(WaitReason::DailyLimit)
+    })
+    .await;
+    assert_eq!(
+        item_of(&manager, &album_url("one")).status,
+        ItemStatus::Pending
+    );
+    assert_eq!(rig.catalogue.server.count("/api/album/get"), 0);
+    let until = manager.progress().wait.unwrap().until;
+    assert!(
+        until > unix_now() + 80_000,
+        "the wait ends when the day is over, not soon"
+    );
+    assert!(
+        manager
+            .log_lines()
+            .iter()
+            .any(|line| matches!(line.event, LogEvent::DailyLimitReached { .. }))
+    );
+}
+
+#[tokio::test]
+async fn the_queue_goes_on_by_itself_when_enough_of_the_day_has_gone_by() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.daily_limit_gb = 50);
+    // The 60 GB leave the 24 hours window in two seconds
+    written_before(&rig, &[(unix_now() - 86_400 + 2, 60 * GIGABYTE)]);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the wait", || {
+        waiting_for(&manager) == Some(WaitReason::DailyLimit)
+    })
+    .await;
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+    assert_eq!(waiting_for(&manager), None);
+}
+
+#[tokio::test]
+async fn without_a_daily_limit_what_was_written_does_not_matter() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.daily_limit_gb = 0);
+    written_before(&rig, &[(unix_now() - 100, 900 * GIGABYTE)]);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
+    );
+}
+
+#[tokio::test]
+async fn the_limit_is_reached_in_the_middle_of_an_album_and_the_item_waits_there() {
+    let rig = Rig::new().await;
+    rig.catalogue.add_album(
+        "alb",
+        "Three",
+        "Artist",
+        &[(31, 1, "One"), (32, 2, "Two"), (33, 3, "Three")],
+    );
+    pace(&rig, |limits| limits.daily_limit_gb = 50);
+    rig.settings
+        .update(|settings| settings.advanced.parallel_tracks = 1)
+        .unwrap();
+    // One byte under the limit: the first track still starts, and brings it over
+    written_before(&rig, &[(unix_now() - 100, 50 * GIGABYTE - 1)]);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("alb"), Display::default())
+        .unwrap();
+
+    eventually("the wait", || {
+        waiting_for(&manager) == Some(WaitReason::DailyLimit)
+    })
+    .await;
+    assert_eq!(music_files(&rig), 1, "one track written, the others wait");
+    assert_eq!(
+        item_of(&manager, &album_url("alb")).status,
+        ItemStatus::Running
+    );
+}
+
+#[tokio::test]
+async fn pausing_ends_the_wait_for_the_day_and_keeps_what_is_waiting() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    pace(&rig, |limits| limits.daily_limit_gb = 50);
+    written_before(&rig, &[(unix_now() - 100, 60 * GIGABYTE)]);
+    let manager = rig.start();
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+    eventually("the wait", || {
+        waiting_for(&manager) == Some(WaitReason::DailyLimit)
+    })
+    .await;
+
+    manager.pause();
+
+    eventually("the pause", || {
+        manager.progress().halt == Some(Halt::Paused)
+    })
+    .await;
+    assert_eq!(waiting_for(&manager), None);
+    assert_eq!(
+        item_of(&manager, &album_url("one")).status,
+        ItemStatus::Pending
+    );
+}
+
 #[tokio::test]
 async fn an_album_that_found_everything_in_place_only_waits_the_shortest_time() {
     let rig = Rig::new().await;

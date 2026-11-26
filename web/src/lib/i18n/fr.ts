@@ -465,10 +465,13 @@ export const fr: Record<Key, Message> = {
 	'settings.rate.sum.or': ' ou ',
 	'settings.rate.sum.some': 'Une pause de {from} à {to} min est prise après {conditions}, selon ce qui arrive en premier.',
 	'settings.rate.sum.none': "Pas de longue pause : seules les petites attentes et l'attente après un refus s'appliquent.",
-	'settings.rate.speed': 'Vitesse de téléchargement',
+	'settings.rate.limits': 'Vitesse et volume',
 	'settings.rate.speed.label': 'Vitesse maximale, en Mo/s',
 	'settings.rate.speed.hint':
 		"Ce que reçoivent ensemble toutes les pistes téléchargées en même temps, un mégaoctet valant un million d'octets. 0 veut dire sans limite. Une vitesse plus basse évite aussi qu'une connexion rapide ne vide un serveur par rafales.",
+	'settings.rate.daily.label': 'Maximum écrit en 24 heures, en Go',
+	'settings.rate.daily.hint':
+		"En gigaoctets, un gigaoctet valant un milliard d'octets. Quand les téléchargements des dernières 24 heures l'atteignent, la file attend qu'assez de ce temps soit passé, puis repart toute seule. 0 veut dire sans limite.",
 	'settings.rate.refused': 'Quand Qobuz refuse',
 	'settings.rate.cooldown': 'Attente après « trop de requêtes », en secondes',
 	'settings.rate.cooldown.hint':
@@ -505,11 +508,14 @@ export const fr: Record<Key, Message> = {
 	'downloads.wait.between_albums': "Attente avant l'album suivant, jusqu'à {time}.",
 	'downloads.wait.break': "Pause en cours, jusqu'à {time}.",
 	'downloads.wait.rate_limited': 'Qobuz a demandé de ralentir. Nouvel essai à {time}.',
+	'downloads.wait.daily_limit': 'La limite quotidienne est atteinte. Reprise à {time}.',
 	'downloads.wait.unreachable':
 		"Qobuz est injoignable. Rien n'est mis en échec : nouvel essai à {time}.",
 	'log.rate_limited': 'Qobuz a demandé de ralentir : attente de {seconds} s, puis nouvel essai.',
 	'log.qobuz_unreachable':
 		"{error}. Rien n'est mis en échec : nouvel essai dans {seconds} s.",
+	'log.daily_limit_reached':
+		"La limite quotidienne est atteinte : attente de {seconds} s, le temps qu'assez de la journée passe.",
 	'log.break_started': 'Pause de {seconds} s.',
 	'log.between_albums': "Attente de {seconds} s avant l'album suivant.",
 

@@ -8,8 +8,8 @@
 
 	let { draft = $bindable() }: { draft: Settings } = $props();
 
-	/** What a starting point sets: the waits and the breaks. The speed limit is not one of them. */
-	type ProfileLimits = Omit<RateLimit, 'max_speed_mb'>;
+	/** What a starting point sets: the waits and the breaks. The speed and daily limits are not part of it. */
+	type ProfileLimits = Omit<RateLimit, 'max_speed_mb' | 'daily_limit_gb'>;
 
 	type Profile = {
 		id: 'light' | 'careful' | 'patient';
@@ -84,8 +84,12 @@
 	const custom = $derived(!profiles.some(matches));
 
 	function apply(profile: Profile) {
-		// The speed limit is kept: it is not part of what a starting point decides
-		draft.rate_limit = { ...structuredClone(profile.limits), max_speed_mb: draft.rate_limit.max_speed_mb };
+		// The speed and daily limits are kept: a starting point does not decide them
+		draft.rate_limit = {
+			...structuredClone(profile.limits),
+			max_speed_mb: draft.rate_limit.max_speed_mb,
+			daily_limit_gb: draft.rate_limit.daily_limit_gb
+		};
 		draft.advanced.parallel_tracks = profile.parallel;
 	}
 
@@ -110,6 +114,19 @@
 			const parsed = Number.parseInt(text, 10);
 			// 0 is no limit
 			draft.rate_limit.max_speed_mb = Number.isFinite(parsed) ? Math.min(10_000, Math.max(0, parsed)) : 0;
+		}
+	};
+
+	const daily = {
+		get value() {
+			return String(draft.rate_limit.daily_limit_gb);
+		},
+		set value(text: string) {
+			const parsed = Number.parseInt(text, 10);
+			// 0 is no limit
+			draft.rate_limit.daily_limit_gb = Number.isFinite(parsed)
+				? Math.min(100_000, Math.max(0, parsed))
+				: 0;
 		}
 	};
 
@@ -222,7 +239,7 @@
 	</div>
 
 	<div class="group">
-		<h3>{t('settings.rate.speed')}</h3>
+		<h3>{t('settings.rate.limits')}</h3>
 		<TextField
 			label={t('settings.rate.speed.label')}
 			hint={t('settings.rate.speed.hint')}
@@ -232,6 +249,16 @@
 			max="10000"
 			step="1"
 			bind:value={speed.value}
+		/>
+		<TextField
+			label={t('settings.rate.daily.label')}
+			hint={t('settings.rate.daily.hint')}
+			type="number"
+			inputmode="numeric"
+			min="0"
+			max="100000"
+			step="1"
+			bind:value={daily.value}
 		/>
 	</div>
 

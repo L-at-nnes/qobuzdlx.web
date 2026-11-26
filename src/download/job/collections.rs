@@ -224,6 +224,7 @@ impl Job {
             // Waits are between albums that were processed: those a retry leaves out cost none
             if processed > 0 {
                 self.take_break().await?;
+                self.pass_gate().await?;
                 self.wait(self.settings.rate_limit.between_albums.pick())
                     .await?;
             }

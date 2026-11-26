@@ -128,6 +128,16 @@ pub enum WaitReason {
     RateLimited,
     /// Qobuz could not be reached: the network is down, or a gateway answers in its place.
     Unreachable,
+    /// What was downloaded in the last 24 hours reached the daily limit: the queue waits until enough
+    /// of the day has gone by.
+    DailyLimit,
+}
+
+/// A reason not to start another file for now, and for how long it holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Gate {
+    pub reason: WaitReason,
+    pub wait: std::time::Duration,
 }
 
 /// Why the queue stopped by itself.

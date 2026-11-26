@@ -178,7 +178,7 @@ export interface Progress {
 	halt: 'storage_full' | 'signed_out' | 'paused' | 'subscription_lapsed' | 'blocked' | null;
 	/** The queue holds back on purpose, until the given Unix time in seconds. */
 	wait: {
-		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable';
+		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable' | 'daily_limit';
 		until: number;
 	} | null;
 }
@@ -229,6 +229,8 @@ export interface RateLimit {
 	cooldown_ms: number;
 	/** Megabytes per second, all the tracks together, a megabyte being a million bytes. 0: no limit. */
 	max_speed_mb: number;
+	/** Gigabytes (a billion bytes) written in any 24 hours at most. 0: no limit. */
+	daily_limit_gb: number;
 }
 
 export interface Settings {

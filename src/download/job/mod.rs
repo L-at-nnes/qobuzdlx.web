@@ -26,6 +26,9 @@ use crate::settings::{ArtworkSize, Settings};
 /// tracks from one album), not to remember everything: a full cache is simply emptied.
 const ALBUM_CACHE_MAX: usize = 50;
 
+/// How often a wait on a limit is looked at again, whatever its length.
+const GATE_RECHECK: std::time::Duration = std::time::Duration::from_secs(30);
+
 #[derive(Debug, thiserror::Error)]
 pub enum JobError {
     #[error("cancelled")]
@@ -242,6 +245,24 @@ impl Job {
         }
     }
 
+    /// Waits for as long as a limit holds the downloads back (the daily limit), unless the item is
+    /// cancelled first. The limit is looked at again from time to time: it may be changed meanwhile.
+    async fn pass_gate(&self) -> Result<(), JobError> {
+        let mut held = false;
+        while let Some(gate) = self.reporter.gate() {
+            held = true;
+            self.reporter.holding(Some(gate));
+            if let Err(cancelled) = self.wait(gate.wait.min(GATE_RECHECK)).await {
+                self.reporter.holding(None);
+                return Err(cancelled);
+            }
+        }
+        if held {
+            self.reporter.holding(None);
+        }
+        Ok(())
+    }
+
     /// Rests, if the long break is due, unless the item is cancelled first.
     async fn take_break(&self) -> Result<(), JobError> {
         let Some(duration) = self.reporter.break_due() else {
@@ -323,6 +344,7 @@ impl Job {
 
     /// A track by its id, `None` when Qobuz does not know it.
     async fn track_info(&self, track_id: u64) -> Result<Option<Track>, JobError> {
+        self.pass_gate().await?;
         self.wait(self.settings.rate_limit.between_tracks.pick())
             .await?;
         match self.env.client.track(track_id).await {

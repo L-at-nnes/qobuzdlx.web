@@ -6,7 +6,7 @@ use std::time::Duration;
 use super::{Event, Inner, locked};
 use crate::download::item::ItemKind;
 use crate::download::log::LogEvent;
-use crate::download::progress::{AlbumCard, TrackProgress};
+use crate::download::progress::{AlbumCard, Gate, TrackProgress};
 use crate::download::report::{Outcome, Reporter, StepTrack};
 use crate::download::transfer::Update;
 use crate::extensions::{self, TrackSaved};
@@ -176,6 +176,14 @@ impl Reporter for ItemReporter {
 
     fn resting(&self, break_for: Option<Duration>) {
         self.inner.show_break(break_for);
+    }
+
+    fn gate(&self) -> Option<Gate> {
+        self.inner.gate()
+    }
+
+    fn holding(&self, gate: Option<Gate>) {
+        self.inner.show_gate(gate);
     }
 
     fn outcome(&self, outcome: &Outcome) {
