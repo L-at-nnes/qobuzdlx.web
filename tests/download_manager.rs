@@ -13,7 +13,7 @@ use qobuzdlx::download::{Halt, WaitReason};
 use qobuzdlx::extensions::{
     Event as Told, Extension, Extensions, Failure, HaltReason, Info, Source,
 };
-use qobuzdlx::settings::{Delay, Quality, RateLimit, SettingsStore};
+use qobuzdlx::settings::{Delay, Quality, QuietHours, RateLimit, SettingsStore};
 use serde_json::json;
 use tempfile::TempDir;
 use tokio::io::AsyncWriteExt;
@@ -1384,6 +1384,76 @@ async fn pausing_ends_the_wait_for_the_day_and_keeps_what_is_waiting() {
     assert_eq!(
         item_of(&manager, &album_url("one")).status,
         ItemStatus::Pending
+    );
+}
+
+// ─── Quiet hours ───
+
+/// Quiet hours, set in UTC, that contain this moment (the hour that started a minute ago), or that
+/// do not (the hour that ended a minute ago).
+fn quiet_around_now(rig: &Rig, contains_now: bool) {
+    let minute = u16::try_from((unix_now() / 60) % 1440).unwrap();
+    let (from, to) = if contains_now {
+        ((minute + 1439) % 1440, (minute + 60) % 1440)
+    } else {
+        ((minute + 1380) % 1440, (minute + 1439) % 1440)
+    };
+    pace(rig, |limits| {
+        limits.quiet_hours = QuietHours {
+            enabled: true,
+            from_minute: from,
+            to_minute: to,
+            utc_offset_minutes: 0,
+        };
+    });
+}
+
+#[tokio::test]
+async fn nothing_is_started_during_the_quiet_hours() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    quiet_around_now(&rig, true);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    eventually("the wait for the quiet hours to end", || {
+        waiting_for(&manager) == Some(WaitReason::QuietHours)
+    })
+    .await;
+    assert_eq!(
+        item_of(&manager, &album_url("one")).status,
+        ItemStatus::Pending
+    );
+    assert_eq!(rig.catalogue.server.count("/api/album/get"), 0);
+    let until = manager.progress().wait.unwrap().until;
+    assert!(until > unix_now() + 3000 && until <= unix_now() + 3700);
+    assert!(
+        manager
+            .log_lines()
+            .iter()
+            .any(|line| matches!(line.event, LogEvent::QuietHoursStarted { .. }))
+    );
+}
+
+#[tokio::test]
+async fn outside_the_quiet_hours_the_queue_runs() {
+    let rig = Rig::new().await;
+    rig.catalogue
+        .add_album("one", "First", "Artist", &[(21, 1, "A")]);
+    quiet_around_now(&rig, false);
+    let manager = rig.start();
+
+    manager
+        .enqueue(&album_url("one"), Display::default())
+        .unwrap();
+
+    assert_eq!(
+        finished(&manager, &album_url("one")).await,
+        ItemStatus::Completed
     );
 }
 

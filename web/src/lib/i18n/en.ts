@@ -459,6 +459,14 @@ export const en = {
 	'settings.rate.daily.label': 'Most written in 24 hours, in GB',
 	'settings.rate.daily.hint':
 		'In gigabytes, a gigabyte being a billion bytes. When the downloads of the last 24 hours reach it, the queue waits until enough of that time has gone by, then goes on by itself. 0 means no limit.',
+	'settings.rate.quiet': 'Quiet hours',
+	'settings.rate.quiet.switch': 'Download nothing during these hours',
+	'settings.rate.quiet.hint':
+		'The queue waits for the end of the hours, then goes on by itself. A track already being downloaded is finished first.',
+	'settings.rate.quiet.from': 'From',
+	'settings.rate.quiet.to': 'Until',
+	'settings.rate.quiet.zone':
+		'Hours of the time zone of this browser, UTC{offset}. After a change of time (summer or winter), save the settings again.',
 	'settings.rate.refused': 'When Qobuz refuses',
 	'settings.rate.cooldown': 'Wait after "too many requests", in seconds',
 	'settings.rate.cooldown.hint':
@@ -496,12 +504,14 @@ export const en = {
 	'downloads.wait.break': 'Taking a break, until {time}.',
 	'downloads.wait.rate_limited': 'Qobuz asked to slow down. Trying again at {time}.',
 	'downloads.wait.daily_limit': 'The daily limit is reached. Going on at {time}.',
+	'downloads.wait.quiet_hours': 'Quiet hours. Going on at {time}.',
 	'downloads.wait.unreachable':
 		'Qobuz cannot be reached. Nothing is failed: trying again at {time}.',
 	'log.rate_limited': 'Qobuz asked to slow down: waiting {seconds} s, then trying again.',
 	'log.qobuz_unreachable': '{error}. Nothing is failed: trying again in {seconds} s.',
 	'log.daily_limit_reached':
 		'The daily limit is reached: waiting {seconds} s for enough of the day to go by.',
+	'log.quiet_hours_started': 'Quiet hours: nothing is downloaded for the next {seconds} s.',
 	'log.break_started': 'Taking a break of {seconds} s.',
 	'log.between_albums': 'Waiting {seconds} s before the next album.',
 

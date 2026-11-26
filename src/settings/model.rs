@@ -407,6 +407,80 @@ impl Default for Delay {
     }
 }
 
+/// Hours of the day when nothing is downloaded, from a start to an end that may be on the next day
+/// (23:00 to 07:00). The time of the day is the one of the person who set it: `utc_offset_minutes`
+/// says how far that is from UTC, because the server may be anywhere (a container runs on UTC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QuietHours {
+    pub enabled: bool,
+    /// Minutes since midnight, 0 to 1439.
+    pub from_minute: u16,
+    pub to_minute: u16,
+    /// Local time minus UTC, in minutes: 60 for UTC+1, -300 for UTC-5.
+    pub utc_offset_minutes: i16,
+}
+
+impl QuietHours {
+    const DAY: u64 = 86_400;
+    /// The largest offset from UTC there is, UTC+14, in minutes.
+    pub const OFFSET_LIMIT_MINUTES: i16 = 840;
+
+    pub const OFF: Self = Self {
+        enabled: false,
+        from_minute: 23 * 60,
+        to_minute: 7 * 60,
+        utc_offset_minutes: 0,
+    };
+
+    #[must_use]
+    pub const fn is_valid(&self) -> bool {
+        self.from_minute < 1440
+            && self.to_minute < 1440
+            && self.utc_offset_minutes >= -Self::OFFSET_LIMIT_MINUTES
+            && self.utc_offset_minutes <= Self::OFFSET_LIMIT_MINUTES
+    }
+
+    /// How long until the quiet hours end, when `now` (Unix seconds) is inside them. `None` outside
+    /// them, when they are off, and when they start and end at the same minute (an empty span).
+    #[must_use]
+    pub fn remaining(&self, now: u64) -> Option<Duration> {
+        if !self.enabled || !self.is_valid() || self.from_minute == self.to_minute {
+            return None;
+        }
+        let offset = i64::from(self.utc_offset_minutes) * 60;
+        let local = i64::try_from(now)
+            .unwrap_or(i64::MAX)
+            .saturating_add(offset);
+        let second_of_day =
+            u64::try_from(local.rem_euclid(i64::try_from(Self::DAY).unwrap_or(0))).unwrap_or(0);
+        let (from, to) = (
+            u64::from(self.from_minute) * 60,
+            u64::from(self.to_minute) * 60,
+        );
+        let inside = if from < to {
+            (from..to).contains(&second_of_day)
+        } else {
+            second_of_day >= from || second_of_day < to
+        };
+        if !inside {
+            return None;
+        }
+        let wait = if second_of_day < to {
+            to - second_of_day
+        } else {
+            Self::DAY - second_of_day + to
+        };
+        Some(Duration::from_secs(wait))
+    }
+}
+
+impl Default for QuietHours {
+    fn default() -> Self {
+        Self::OFF
+    }
+}
+
 /// How gently Qobuz is asked for things. Qobuz publishes no limit: these waits keep a large queue
 /// from looking like a machine going as fast as it can.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -432,6 +506,8 @@ pub struct RateLimit {
     /// The most that is written in any 24 hours, in gigabytes (a billion bytes). When it is reached
     /// the queue waits until enough of the day has gone by, and goes on by itself. `0`: no limit.
     pub daily_limit_gb: u32,
+    /// Hours of the day when nothing is downloaded.
+    pub quiet_hours: QuietHours,
 }
 
 impl RateLimit {
@@ -460,6 +536,7 @@ impl RateLimit {
             cooldown_ms: 1000,
             max_speed_mb: 0,
             daily_limit_gb: 0,
+            quiet_hours: QuietHours::OFF,
         }
     }
 
@@ -479,6 +556,7 @@ impl RateLimit {
             && self.cooldown_ms <= Delay::LIMIT_MS
             && self.max_speed_mb <= Self::SPEED_LIMIT_MAX_MB
             && self.daily_limit_gb <= Self::DAILY_LIMIT_MAX_GB
+            && self.quiet_hours.is_valid()
     }
 
     /// How long to wait after Qobuz said "too many requests" for the `strikes`-th time in a row
@@ -535,6 +613,7 @@ impl Default for RateLimit {
             cooldown_ms: 60_000,
             max_speed_mb: 10,
             daily_limit_gb: 50,
+            quiet_hours: QuietHours::OFF,
         }
     }
 }
@@ -592,6 +671,87 @@ mod tests {
             }
             .is_valid()
         );
+    }
+
+    const HOUR: u64 = 3600;
+
+    fn quiet(from: u16, to: u16, offset: i16) -> QuietHours {
+        QuietHours {
+            enabled: true,
+            from_minute: from * 60,
+            to_minute: to * 60,
+            utc_offset_minutes: offset,
+        }
+    }
+
+    fn secs(hours: f64) -> Duration {
+        Duration::from_secs_f64(hours * 3600.0)
+    }
+
+    #[test]
+    fn quiet_hours_within_a_day_hold_from_their_start_until_their_end() {
+        let hours = quiet(9, 17, 0);
+
+        assert_eq!(hours.remaining(8 * HOUR + 59 * 60), None);
+        assert_eq!(hours.remaining(9 * HOUR), Some(secs(8.0)));
+        assert_eq!(hours.remaining(12 * HOUR), Some(secs(5.0)));
+        assert_eq!(hours.remaining(17 * HOUR), None, "the end is outside");
+        // The same on any other day
+        assert_eq!(hours.remaining(40 * 86_400 + 12 * HOUR), Some(secs(5.0)));
+    }
+
+    #[test]
+    fn quiet_hours_over_midnight_hold_on_both_sides_of_it() {
+        let night = quiet(23, 7, 0);
+
+        assert_eq!(night.remaining(12 * HOUR), None);
+        assert_eq!(night.remaining(22 * HOUR + 59 * 60), None);
+        assert_eq!(night.remaining(23 * HOUR + 30 * 60), Some(secs(7.5)));
+        assert_eq!(night.remaining(0), Some(secs(7.0)));
+        assert_eq!(night.remaining(3 * HOUR), Some(secs(4.0)));
+        assert_eq!(night.remaining(7 * HOUR), None);
+    }
+
+    #[test]
+    fn quiet_hours_are_those_of_the_time_zone_they_were_set_in() {
+        // UTC+2: 22:00 UTC is midnight there, seven hours before the end of the night
+        assert_eq!(quiet(23, 7, 120).remaining(22 * HOUR), Some(secs(7.0)));
+        // UTC-5: 05:00 UTC is midnight there
+        assert_eq!(quiet(23, 7, -300).remaining(5 * HOUR), Some(secs(7.0)));
+        // 12:00 UTC is 14:00 in UTC+2: outside the night
+        assert_eq!(quiet(23, 7, 120).remaining(12 * HOUR), None);
+    }
+
+    #[test]
+    fn quiet_hours_that_are_off_or_empty_or_invalid_hold_nothing() {
+        let off = QuietHours {
+            enabled: false,
+            ..quiet(0, 23, 0)
+        };
+        assert_eq!(off.remaining(5 * HOUR), None);
+        assert_eq!(quiet(8, 8, 0).remaining(8 * HOUR), None, "an empty span");
+        let broken = QuietHours {
+            from_minute: 2000,
+            ..quiet(0, 23, 0)
+        };
+        assert!(!broken.is_valid());
+        assert_eq!(broken.remaining(5 * HOUR), None);
+        assert!(!quiet(1, 2, 900).is_valid());
+        assert!(quiet(1, 2, -840).is_valid());
+        assert!(
+            !RateLimit {
+                quiet_hours: broken,
+                ..RateLimit::default()
+            }
+            .is_valid()
+        );
+    }
+
+    #[test]
+    fn quiet_hours_are_off_by_default() {
+        assert!(!RateLimit::default().quiet_hours.enabled);
+        assert!(RateLimit::default().quiet_hours.is_valid());
+        assert_eq!(RateLimit::default().quiet_hours.remaining(3 * HOUR), None);
     }
 
     #[test]

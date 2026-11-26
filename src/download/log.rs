@@ -106,6 +106,10 @@ pub enum LogEvent {
     DailyLimitReached {
         seconds: u64,
     },
+    /// The quiet hours of the day begin: nothing is started until they end.
+    QuietHoursStarted {
+        seconds: u64,
+    },
     AlbumSkipped,
     AlbumNotStreamable,
     TrackNotStreamable {
@@ -289,6 +293,10 @@ impl fmt::Display for LogEvent {
             Self::DailyLimitReached { seconds } => write!(
                 formatter,
                 "The daily limit is reached: waiting {seconds} s for enough of the day to go by."
+            ),
+            Self::QuietHoursStarted { seconds } => write!(
+                formatter,
+                "Quiet hours: nothing is downloaded for the next {seconds} s."
             ),
             Self::QueuePaused => write!(formatter, "Queue paused."),
             Self::QueueResumed => write!(formatter, "Queue resumed."),

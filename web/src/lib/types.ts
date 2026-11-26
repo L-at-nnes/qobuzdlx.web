@@ -178,7 +178,7 @@ export interface Progress {
 	halt: 'storage_full' | 'signed_out' | 'paused' | 'subscription_lapsed' | 'blocked' | null;
 	/** The queue holds back on purpose, until the given Unix time in seconds. */
 	wait: {
-		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable' | 'daily_limit';
+		reason: 'between_albums' | 'break' | 'rate_limited' | 'unreachable' | 'daily_limit' | 'quiet_hours';
 		until: number;
 	} | null;
 }
@@ -231,6 +231,17 @@ export interface RateLimit {
 	max_speed_mb: number;
 	/** Gigabytes (a billion bytes) written in any 24 hours at most. 0: no limit. */
 	daily_limit_gb: number;
+	/** Hours of the day when nothing is downloaded. */
+	quiet_hours: QuietHours;
+}
+
+export interface QuietHours {
+	enabled: boolean;
+	/** Minutes since midnight, in the time zone given by `utc_offset_minutes`. */
+	from_minute: number;
+	to_minute: number;
+	/** Local time minus UTC, in minutes. */
+	utc_offset_minutes: number;
 }
 
 export interface Settings {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BreakCondition from '#lib/components/BreakCondition.svelte';
 	import DelayField from '#lib/components/DelayField.svelte';
+	import Switch from '#lib/components/Switch.svelte';
 	import TextField from '#lib/components/TextField.svelte';
 	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { RateLimit, Settings } from '#lib/types.ts';
@@ -8,8 +9,8 @@
 
 	let { draft = $bindable() }: { draft: Settings } = $props();
 
-	/** What a starting point sets: the waits and the breaks. The speed and daily limits are not part of it. */
-	type ProfileLimits = Omit<RateLimit, 'max_speed_mb' | 'daily_limit_gb'>;
+	/** What a starting point sets: the waits and the breaks. The speed, daily and quiet-hours limits are not part of it. */
+	type ProfileLimits = Omit<RateLimit, 'max_speed_mb' | 'daily_limit_gb' | 'quiet_hours'>;
 
 	type Profile = {
 		id: 'light' | 'careful' | 'patient';
@@ -84,11 +85,12 @@
 	const custom = $derived(!profiles.some(matches));
 
 	function apply(profile: Profile) {
-		// The speed and daily limits are kept: a starting point does not decide them
+		// The limits on speed, volume and hours are kept: a starting point does not decide them
 		draft.rate_limit = {
 			...structuredClone(profile.limits),
 			max_speed_mb: draft.rate_limit.max_speed_mb,
-			daily_limit_gb: draft.rate_limit.daily_limit_gb
+			daily_limit_gb: draft.rate_limit.daily_limit_gb,
+			quiet_hours: draft.rate_limit.quiet_hours
 		};
 		draft.advanced.parallel_tracks = profile.parallel;
 	}
@@ -129,6 +131,59 @@
 				: 0;
 		}
 	};
+
+	/** What the browser says its time is: the hours are those of the person who sets them. */
+	const browserOffset = () => -new Date().getTimezoneOffset();
+
+	const clock = (minutes: number) =>
+		`${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+	function parseClock(text: string, fallback: number): number {
+		const found = /^(\d{1,2}):(\d{2})$/.exec(text);
+		if (!found) return fallback;
+		const [hours, minutes] = [Number(found[1]), Number(found[2])];
+		return hours < 24 && minutes < 60 ? hours * 60 + minutes : fallback;
+	}
+
+	const quietOn = {
+		get value() {
+			return draft.rate_limit.quiet_hours.enabled;
+		},
+		set value(on: boolean) {
+			draft.rate_limit.quiet_hours.enabled = on;
+			draft.rate_limit.quiet_hours.utc_offset_minutes = browserOffset();
+		}
+	};
+
+	const quietFrom = {
+		get value() {
+			return clock(draft.rate_limit.quiet_hours.from_minute);
+		},
+		set value(text: string) {
+			const hours = draft.rate_limit.quiet_hours;
+			hours.from_minute = parseClock(text, hours.from_minute);
+			hours.utc_offset_minutes = browserOffset();
+		}
+	};
+
+	const quietTo = {
+		get value() {
+			return clock(draft.rate_limit.quiet_hours.to_minute);
+		},
+		set value(text: string) {
+			const hours = draft.rate_limit.quiet_hours;
+			hours.to_minute = parseClock(text, hours.to_minute);
+			hours.utc_offset_minutes = browserOffset();
+		}
+	};
+
+	/** `+1`, `-5`, `+5:30`. */
+	function utcLabel(offset: number): string {
+		const sign = offset < 0 ? '-' : '+';
+		const hours = Math.floor(Math.abs(offset) / 60);
+		const minutes = Math.abs(offset) % 60;
+		return `${sign}${hours}${minutes ? ':' + String(minutes).padStart(2, '0') : ''}`;
+	}
 
 	const gigabytes = (megabytes: number) => Math.round((megabytes / 1000) * 10) / 10;
 	const minutes = (milliseconds: number) => Math.round((milliseconds / 60_000) * 10) / 10;
@@ -263,6 +318,26 @@
 	</div>
 
 	<div class="group">
+		<h3>{t('settings.rate.quiet')}</h3>
+		<Switch
+			label={t('settings.rate.quiet.switch')}
+			hint={t('settings.rate.quiet.hint')}
+			bind:checked={quietOn.value}
+		/>
+		{#if draft.rate_limit.quiet_hours.enabled}
+			<div class="hours">
+				<TextField label={t('settings.rate.quiet.from')} type="time" bind:value={quietFrom.value} />
+				<TextField label={t('settings.rate.quiet.to')} type="time" bind:value={quietTo.value} />
+			</div>
+			<p class="muted hint">
+				{t('settings.rate.quiet.zone', {
+					offset: utcLabel(draft.rate_limit.quiet_hours.utc_offset_minutes)
+				})}
+			</p>
+		{/if}
+	</div>
+
+	<div class="group">
 		<h3>{t('settings.rate.refused')}</h3>
 		<TextField
 			label={t('settings.rate.cooldown')}
@@ -334,6 +409,12 @@
 
 	.profile .meta {
 		margin-top: var(--space-1);
+	}
+
+	.hours {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+		gap: var(--space-3);
 	}
 
 	.hint {

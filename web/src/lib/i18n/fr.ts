@@ -472,6 +472,14 @@ export const fr: Record<Key, Message> = {
 	'settings.rate.daily.label': 'Maximum écrit en 24 heures, en Go',
 	'settings.rate.daily.hint':
 		"En gigaoctets, un gigaoctet valant un milliard d'octets. Quand les téléchargements des dernières 24 heures l'atteignent, la file attend qu'assez de ce temps soit passé, puis repart toute seule. 0 veut dire sans limite.",
+	'settings.rate.quiet': 'Heures calmes',
+	'settings.rate.quiet.switch': 'Ne rien télécharger pendant ces heures',
+	'settings.rate.quiet.hint':
+		"La file attend la fin de ces heures, puis repart toute seule. Une piste déjà en cours est terminée d'abord.",
+	'settings.rate.quiet.from': 'De',
+	'settings.rate.quiet.to': "Jusqu'à",
+	'settings.rate.quiet.zone':
+		"Heures du fuseau horaire de ce navigateur, UTC{offset}. Après un changement d'heure (été ou hiver), enregistrez de nouveau les réglages.",
 	'settings.rate.refused': 'Quand Qobuz refuse',
 	'settings.rate.cooldown': 'Attente après « trop de requêtes », en secondes',
 	'settings.rate.cooldown.hint':
@@ -509,6 +517,7 @@ export const fr: Record<Key, Message> = {
 	'downloads.wait.break': "Pause en cours, jusqu'à {time}.",
 	'downloads.wait.rate_limited': 'Qobuz a demandé de ralentir. Nouvel essai à {time}.',
 	'downloads.wait.daily_limit': 'La limite quotidienne est atteinte. Reprise à {time}.',
+	'downloads.wait.quiet_hours': 'Heures calmes. Reprise à {time}.',
 	'downloads.wait.unreachable':
 		"Qobuz est injoignable. Rien n'est mis en échec : nouvel essai à {time}.",
 	'log.rate_limited': 'Qobuz a demandé de ralentir : attente de {seconds} s, puis nouvel essai.',
@@ -516,6 +525,7 @@ export const fr: Record<Key, Message> = {
 		"{error}. Rien n'est mis en échec : nouvel essai dans {seconds} s.",
 	'log.daily_limit_reached':
 		"La limite quotidienne est atteinte : attente de {seconds} s, le temps qu'assez de la journée passe.",
+	'log.quiet_hours_started': 'Heures calmes : rien n\u2019est téléchargé pendant {seconds} s.',
 	'log.break_started': 'Pause de {seconds} s.',
 	'log.between_albums': "Attente de {seconds} s avant l'album suivant.",
 

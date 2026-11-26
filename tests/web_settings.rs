@@ -285,3 +285,41 @@ async fn a_locked_application_shows_no_settings() {
     assert_eq!(app.browser().get("/api/settings").await.status, 401);
     assert_eq!(app.browser().get("/api/settings/check").await.status, 401);
 }
+
+#[tokio::test]
+async fn the_limits_on_speed_volume_and_hours_are_checked_and_kept() {
+    let app = TestApp::start().await;
+    let defaults = current(&app).await;
+
+    let mut fast = defaults.clone();
+    fast["rate_limit"]["max_speed_mb"] = json!(20_000);
+    let mut huge = defaults.clone();
+    huge["rate_limit"]["daily_limit_gb"] = json!(1_000_000);
+    let mut late = defaults.clone();
+    late["rate_limit"]["quiet_hours"] =
+        json!({ "enabled": true, "from_minute": 1500, "to_minute": 60, "utc_offset_minutes": 0 });
+    let mut elsewhere = defaults.clone();
+    elsewhere["rate_limit"]["quiet_hours"] =
+        json!({ "enabled": true, "from_minute": 60, "to_minute": 120, "utc_offset_minutes": 2000 });
+    for refused in [fast, huge, late, elsewhere] {
+        let response = app.browser().put("/api/settings", refused).await;
+        assert_eq!(response.status, 400);
+        assert_eq!(response.json()["error"], "invalid_rate_limit");
+    }
+
+    let mut chosen = defaults;
+    chosen["rate_limit"]["max_speed_mb"] = json!(0);
+    chosen["rate_limit"]["daily_limit_gb"] = json!(120);
+    chosen["rate_limit"]["quiet_hours"] =
+        json!({ "enabled": true, "from_minute": 1380, "to_minute": 420, "utc_offset_minutes": 60 });
+    let saved = app.browser().put("/api/settings", chosen).await;
+    assert_eq!(saved.status, 200);
+    let reread = current(&app).await;
+    assert_eq!(reread["rate_limit"]["max_speed_mb"], 0);
+    assert_eq!(reread["rate_limit"]["daily_limit_gb"], 120);
+    assert_eq!(reread["rate_limit"]["quiet_hours"]["from_minute"], 1380);
+    assert_eq!(
+        reread["rate_limit"]["quiet_hours"]["utc_offset_minutes"],
+        60
+    );
+}

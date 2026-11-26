@@ -11,7 +11,8 @@ const NO_WAITS: RateLimit = {
 	break_length: { min_ms: 180_000, max_ms: 180_000 },
 	cooldown_ms: 60_000,
 	max_speed_mb: 0,
-	daily_limit_gb: 0
+	daily_limit_gb: 0,
+	quiet_hours: { enabled: false, from_minute: 1380, to_minute: 420, utc_offset_minutes: 0 }
 };
 
 const IDLE: Progress = {

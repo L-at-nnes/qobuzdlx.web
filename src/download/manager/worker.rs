@@ -360,6 +360,7 @@ impl Inner {
             },
             WaitReason::Break => LogEvent::BreakStarted { seconds },
             WaitReason::DailyLimit => LogEvent::DailyLimitReached { seconds },
+            WaitReason::QuietHours => LogEvent::QuietHoursStarted { seconds },
             WaitReason::BetweenAlbums => LogEvent::BetweenAlbums { seconds },
         });
         self.set_wait(Some(Wait {
@@ -377,8 +378,16 @@ impl Inner {
     /// Why no file should be started now, if there is a reason: a limit that was reached.
     pub(super) fn gate(&self) -> Option<Gate> {
         let limits = self.settings.get().rate_limit;
+        let now = now();
+        // The quiet hours first: they end at a known time, whatever was written today
+        if let Some(wait) = limits.quiet_hours.remaining(now) {
+            return Some(Gate {
+                reason: WaitReason::QuietHours,
+                wait,
+            });
+        }
         locked(&self.budget)
-            .wait(now(), limits.daily_limit())
+            .wait(now, limits.daily_limit())
             .map(|wait| Gate {
                 reason: WaitReason::DailyLimit,
                 wait,
@@ -400,6 +409,7 @@ impl Inner {
         if started {
             self.log(match gate.reason {
                 WaitReason::DailyLimit => LogEvent::DailyLimitReached { seconds },
+                WaitReason::QuietHours => LogEvent::QuietHoursStarted { seconds },
                 WaitReason::BetweenAlbums
                 | WaitReason::Break
                 | WaitReason::RateLimited

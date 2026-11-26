@@ -131,6 +131,8 @@ pub enum WaitReason {
     /// What was downloaded in the last 24 hours reached the daily limit: the queue waits until enough
     /// of the day has gone by.
     DailyLimit,
+    /// The hours of the day when nothing is downloaded.
+    QuietHours,
 }
 
 /// A reason not to start another file for now, and for how long it holds.
