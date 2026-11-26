@@ -88,6 +88,10 @@ impl Inner {
         // The settings are those of the moment the item starts: changing them halfway through would
         // give one folder two naming schemes
         let settings = self.settings.get();
+        // Applies to the transfers of this item, and to those of the items after it until it changes
+        self.env
+            .fetcher
+            .set_speed_limit(settings.rate_limit.max_speed());
         let detail = settings.advanced.log_detail;
         let user_id = self
             .client

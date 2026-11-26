@@ -8,10 +8,13 @@
 
 	let { draft = $bindable() }: { draft: Settings } = $props();
 
+	/** What a starting point sets: the waits and the breaks. The speed limit is not one of them. */
+	type ProfileLimits = Omit<RateLimit, 'max_speed_mb'>;
+
 	type Profile = {
 		id: 'light' | 'careful' | 'patient';
 		parallel: number;
-		limits: RateLimit;
+		limits: ProfileLimits;
 	};
 
 	/** Starting points, from the lightest to the most patient. They are advice, not measured limits. */
@@ -81,7 +84,8 @@
 	const custom = $derived(!profiles.some(matches));
 
 	function apply(profile: Profile) {
-		draft.rate_limit = structuredClone(profile.limits);
+		// The speed limit is kept: it is not part of what a starting point decides
+		draft.rate_limit = { ...structuredClone(profile.limits), max_speed_mb: draft.rate_limit.max_speed_mb };
 		draft.advanced.parallel_tracks = profile.parallel;
 	}
 
@@ -95,6 +99,17 @@
 			draft.rate_limit.cooldown_ms = Number.isFinite(parsed)
 				? Math.min(3600, Math.max(1, parsed)) * 1000
 				: 1000;
+		}
+	};
+
+	const speed = {
+		get value() {
+			return String(draft.rate_limit.max_speed_mb);
+		},
+		set value(text: string) {
+			const parsed = Number.parseInt(text, 10);
+			// 0 is no limit
+			draft.rate_limit.max_speed_mb = Number.isFinite(parsed) ? Math.min(10_000, Math.max(0, parsed)) : 0;
 		}
 	};
 
@@ -204,6 +219,20 @@
 				})}
 			{/if}
 		</p>
+	</div>
+
+	<div class="group">
+		<h3>{t('settings.rate.speed')}</h3>
+		<TextField
+			label={t('settings.rate.speed.label')}
+			hint={t('settings.rate.speed.hint')}
+			type="number"
+			inputmode="numeric"
+			min="0"
+			max="10000"
+			step="1"
+			bind:value={speed.value}
+		/>
 	</div>
 
 	<div class="group">

@@ -1,5 +1,7 @@
 use std::io::{self, SeekFrom};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
@@ -85,6 +87,43 @@ struct Receiving {
     last_report: Instant,
 }
 
+/// A speed limit shared by every transfer that goes through it, however many run at once.
+///
+/// Each chunk received is given a slot as long as it would take at the limit, after the slot of the
+/// one before: what is received is therefore never faster than the limit on average, and a pause
+/// is not made up for afterwards by a burst.
+#[derive(Debug, Clone, Default)]
+struct Throttle {
+    /// Bytes per second, `0` for no limit. Changed while transfers run: the next chunk obeys it.
+    limit: Arc<AtomicU64>,
+    /// When the slot of the last chunk ends.
+    busy_until: Arc<Mutex<Option<Instant>>>,
+}
+
+impl Throttle {
+    fn set(&self, bytes_per_second: u64) {
+        self.limit.store(bytes_per_second, Ordering::Relaxed);
+    }
+
+    /// How long to wait before reading on, after `bytes` came in.
+    #[allow(clippy::cast_precision_loss)] // A chunk is far below 2^52 bytes
+    fn delay(&self, bytes: u64) -> Duration {
+        let limit = self.limit.load(Ordering::Relaxed);
+        if limit == 0 {
+            return Duration::ZERO;
+        }
+        let now = Instant::now();
+        let mut busy_until = self
+            .busy_until
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let start = busy_until.map_or(now, |end| end.max(now));
+        let end = start + Duration::from_secs_f64(bytes as f64 / limit as f64);
+        *busy_until = Some(end);
+        end.saturating_duration_since(now)
+    }
+}
+
 /// Downloads files from the CDN.
 ///
 /// The CDN cuts a connection after a few seconds and a few megabytes, whatever the client: a
@@ -96,6 +135,7 @@ pub struct Fetcher {
     http: reqwest::Client,
     /// How long the connection may stay silent before it is given up.
     stall_timeout: Duration,
+    throttle: Throttle,
 }
 
 impl Fetcher {
@@ -104,7 +144,14 @@ impl Fetcher {
         Self {
             http,
             stall_timeout,
+            throttle: Throttle::default(),
         }
+    }
+
+    /// Limits what all the transfers of this fetcher (and its clones) receive together, in bytes
+    /// per second. `0` removes the limit. It applies to the chunks that come in from now on.
+    pub fn set_speed_limit(&self, bytes_per_second: u64) {
+        self.throttle.set(bytes_per_second);
     }
 
     /// Writes the content of `url` to `path`, starting from scratch. The partial file is removed
@@ -239,6 +286,13 @@ impl Fetcher {
                     receiving.file.write_all(&bytes).await?;
                     receiving.received += bytes.len() as u64;
                     receiving.report(report);
+                    let delay = self.throttle.delay(bytes.len() as u64);
+                    if !delay.is_zero() {
+                        tokio::select! {
+                            () = cancel.cancelled() => return Err(Error::Cancelled),
+                            () = tokio::time::sleep(delay) => {}
+                        }
+                    }
                 }
                 Ok(None) => break,
             }

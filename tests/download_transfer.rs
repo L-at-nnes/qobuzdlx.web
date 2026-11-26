@@ -168,3 +168,119 @@ async fn the_address_never_appears_in_a_network_error() {
     assert!(!format!("{error:?}").contains("SECRET"));
     assert!(!error.to_string().contains("SECRET"));
 }
+
+// ─── Speed limit ───
+
+async fn file_of(size: usize) -> (FakeServer, String) {
+    let server = FakeServer::start().await;
+    let content = vec![7u8; size];
+    server.on("/file", move |_| Reply::bytes(content.clone()));
+    let url = format!("{}/file", server.url());
+    (server, url)
+}
+
+#[tokio::test]
+async fn a_speed_limit_slows_the_transfer_to_that_speed() {
+    let (_server, url) = file_of(300_000).await;
+    let directory = TempDir::new().unwrap();
+    let fetcher = fetcher();
+    fetcher.set_speed_limit(1_000_000);
+
+    let started = std::time::Instant::now();
+    let transfer = fetcher
+        .to_file(
+            &url,
+            &directory.path().join("a.flac"),
+            &CancellationToken::new(),
+            |_| {},
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(transfer.bytes, 300_000);
+    // 300 kB at 1 MB/s: not much less than 0.3 s
+    assert!(
+        started.elapsed() >= Duration::from_millis(250),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[tokio::test]
+async fn without_a_limit_nothing_is_held_back() {
+    let (_server, url) = file_of(300_000).await;
+    let directory = TempDir::new().unwrap();
+    let fetcher = fetcher();
+    fetcher.set_speed_limit(1_000_000);
+    fetcher.set_speed_limit(0);
+
+    let started = std::time::Instant::now();
+    fetcher
+        .to_file(
+            &url,
+            &directory.path().join("a.flac"),
+            &CancellationToken::new(),
+            |_| {},
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        started.elapsed() < Duration::from_millis(250),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[tokio::test]
+async fn transfers_at_once_share_one_limit() {
+    let (_server, url) = file_of(300_000).await;
+    let directory = TempDir::new().unwrap();
+    let fetcher = fetcher();
+    fetcher.set_speed_limit(1_000_000);
+    let cancel = CancellationToken::new();
+    let (first, second) = (
+        directory.path().join("first.flac"),
+        directory.path().join("second.flac"),
+    );
+
+    let started = std::time::Instant::now();
+    let (one, two) = tokio::join!(
+        fetcher.to_file(&url, &first, &cancel, |_| {}),
+        fetcher.to_file(&url, &second, &cancel, |_| {})
+    );
+    one.unwrap();
+    two.unwrap();
+
+    // 600 kB in all, at 1 MB/s together: each at its own limit would take half as long
+    assert!(
+        started.elapsed() >= Duration::from_millis(550),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[tokio::test]
+async fn a_transfer_held_back_by_the_limit_can_still_be_cancelled() {
+    let (_server, url) = file_of(300_000).await;
+    let directory = TempDir::new().unwrap();
+    let fetcher = fetcher();
+    // 300 kB at 10 kB/s would take half a minute
+    fetcher.set_speed_limit(10_000);
+    let cancel = CancellationToken::new();
+    let stopper = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        stopper.cancel();
+    });
+
+    let started = std::time::Instant::now();
+    let error = fetcher
+        .to_file(&url, &directory.path().join("a.flac"), &cancel, |_| {})
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, TransferError::Cancelled));
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(!directory.path().join("a.flac").exists());
+}

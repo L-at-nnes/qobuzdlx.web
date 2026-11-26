@@ -227,6 +227,8 @@ export interface RateLimit {
 	break_after_megabytes: number;
 	break_length: Delay;
 	cooldown_ms: number;
+	/** Megabytes per second, all the tracks together, a megabyte being a million bytes. 0: no limit. */
+	max_speed_mb: number;
 }
 
 export interface Settings {

@@ -426,6 +426,9 @@ pub struct RateLimit {
     /// First wait after Qobuz answered "too many requests"; it doubles each time it happens again
     /// without an item going well in between.
     pub cooldown_ms: u32,
+    /// The most that is received per second, all the tracks downloading at once together, in
+    /// megabytes (a million bytes). `0`: no limit.
+    pub max_speed_mb: u32,
 }
 
 impl RateLimit {
@@ -435,6 +438,8 @@ impl RateLimit {
     pub const BREAK_MEGABYTES_LIMIT: u32 = 10_000_000;
     /// The cooldown can double up to this many times its first value.
     pub const COOLDOWN_DOUBLINGS: u32 = 6;
+    /// The highest speed limit that may be set, in megabytes per second.
+    pub const SPEED_LIMIT_MAX_MB: u32 = 10_000;
 
     /// No wait anywhere but after Qobuz asked for one, for programs that talk to a server of their
     /// own.
@@ -448,6 +453,7 @@ impl RateLimit {
             break_after_megabytes: 0,
             break_length: Delay::NONE,
             cooldown_ms: 1000,
+            max_speed_mb: 0,
         }
     }
 
@@ -465,6 +471,7 @@ impl RateLimit {
             && self.break_after_megabytes <= Self::BREAK_MEGABYTES_LIMIT
             && self.cooldown_ms >= Self::COOLDOWN_MIN_MS
             && self.cooldown_ms <= Delay::LIMIT_MS
+            && self.max_speed_mb <= Self::SPEED_LIMIT_MAX_MB
     }
 
     /// How long to wait after Qobuz said "too many requests" for the `strikes`-th time in a row
@@ -480,6 +487,12 @@ impl RateLimit {
         };
         let wait = u64::from(base) << doublings;
         Duration::from_millis(wait.min(u64::from(Delay::LIMIT_MS)))
+    }
+
+    /// The speed limit in bytes per second, `0` when there is none.
+    #[must_use]
+    pub fn max_speed(&self) -> u64 {
+        u64::from(self.max_speed_mb.min(Self::SPEED_LIMIT_MAX_MB)) * 1_000_000
     }
 
     /// The longest wait after Qobuz could not be reached.
@@ -507,6 +520,7 @@ impl Default for RateLimit {
             break_after_megabytes: 3000,
             break_length: Delay::new(120_000, 300_000),
             cooldown_ms: 60_000,
+            max_speed_mb: 10,
         }
     }
 }
@@ -537,6 +551,24 @@ mod tests {
         assert_eq!(advanced.parallel(), 1);
         advanced.parallel_tracks = 200;
         assert_eq!(advanced.parallel(), 6);
+    }
+
+    #[test]
+    fn the_speed_is_limited_by_default_and_the_limit_is_in_megabytes() {
+        assert_eq!(RateLimit::default().max_speed(), 10_000_000);
+        assert_eq!(RateLimit::off().max_speed(), 0);
+        let high = RateLimit {
+            max_speed_mb: RateLimit::SPEED_LIMIT_MAX_MB + 1,
+            ..RateLimit::default()
+        };
+        assert!(!high.is_valid());
+        assert!(
+            RateLimit {
+                max_speed_mb: 0,
+                ..RateLimit::default()
+            }
+            .is_valid()
+        );
     }
 
     #[test]

@@ -9,7 +9,8 @@ const NO_WAITS: RateLimit = {
 	break_after_albums: 0,
 	break_after_megabytes: 0,
 	break_length: { min_ms: 180_000, max_ms: 180_000 },
-	cooldown_ms: 60_000
+	cooldown_ms: 60_000,
+	max_speed_mb: 0
 };
 
 const IDLE: Progress = {

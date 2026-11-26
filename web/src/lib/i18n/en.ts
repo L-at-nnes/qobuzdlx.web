@@ -452,6 +452,10 @@ export const en = {
 	'settings.rate.sum.or': ', or ',
 	'settings.rate.sum.some': 'A break of {from} to {to} min is taken after {conditions}, whichever comes first.',
 	'settings.rate.sum.none': 'No long break: only the short waits and the wait after a refusal apply.',
+	'settings.rate.speed': 'Download speed',
+	'settings.rate.speed.label': 'Highest speed, in MB/s',
+	'settings.rate.speed.hint':
+		'What all the tracks downloading at once receive together, a megabyte being a million bytes. 0 means no limit. A lower speed also keeps a fast connection from emptying a server in bursts.',
 	'settings.rate.refused': 'When Qobuz refuses',
 	'settings.rate.cooldown': 'Wait after "too many requests", in seconds',
 	'settings.rate.cooldown.hint':

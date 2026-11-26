@@ -465,6 +465,10 @@ export const fr: Record<Key, Message> = {
 	'settings.rate.sum.or': ' ou ',
 	'settings.rate.sum.some': 'Une pause de {from} à {to} min est prise après {conditions}, selon ce qui arrive en premier.',
 	'settings.rate.sum.none': "Pas de longue pause : seules les petites attentes et l'attente après un refus s'appliquent.",
+	'settings.rate.speed': 'Vitesse de téléchargement',
+	'settings.rate.speed.label': 'Vitesse maximale, en Mo/s',
+	'settings.rate.speed.hint':
+		"Ce que reçoivent ensemble toutes les pistes téléchargées en même temps, un mégaoctet valant un million d'octets. 0 veut dire sans limite. Une vitesse plus basse évite aussi qu'une connexion rapide ne vide un serveur par rafales.",
 	'settings.rate.refused': 'Quand Qobuz refuse',
 	'settings.rate.cooldown': 'Attente après « trop de requêtes », en secondes',
 	'settings.rate.cooldown.hint':
