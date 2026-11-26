@@ -755,6 +755,20 @@ mod tests {
     }
 
     #[test]
+    fn settings_written_before_the_limits_take_their_defaults() {
+        let old = r#"{ "rate_limit": { "cooldown_ms": 90000, "break_after_albums": 4 } }"#;
+
+        let settings: Settings = serde_json::from_str(old).unwrap();
+
+        // What the file said is kept, what it did not hold is the default
+        assert_eq!(settings.rate_limit.cooldown_ms, 90_000);
+        assert_eq!(settings.rate_limit.break_after_albums, 4);
+        assert_eq!(settings.rate_limit.max_speed_mb, 10);
+        assert_eq!(settings.rate_limit.daily_limit_gb, 50);
+        assert!(!settings.rate_limit.quiet_hours.enabled);
+    }
+
+    #[test]
     fn a_network_outage_is_waited_for_less_than_a_cooldown_and_is_capped() {
         let limits = RateLimit::default();
 
